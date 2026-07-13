@@ -32,6 +32,12 @@ const documentSchema = new Schema(
       default: "pending",
     },
 
+    rag_status: {
+      type: String,
+      enum: ["not_processed", "processing", "indexed", "failed"],
+      default: "not_processed",
+    },
+
     uploaded_by: {
       type: Schema.Types.ObjectId,
       ref: "User",

@@ -15,6 +15,10 @@ const OrganizationSchema = new mongoose.Schema(
         address: {
             type: String,
         },
+        phone: {
+            type: String,
+            maxlength: 20,
+        },
         email: {
             type: String,
             maxlength: 255,
