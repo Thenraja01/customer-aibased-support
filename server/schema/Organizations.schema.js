@@ -5,8 +5,8 @@ const OrganizationSchema = new mongoose.Schema(
     {
         organization_id: {
             type: String,
-            unique: true
-
+            unique: true,
+            required:true
         },
         name: {
             type: String,

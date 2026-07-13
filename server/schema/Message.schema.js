@@ -1,25 +1,36 @@
-import mongoose from 'mongoose'
-import Chat from './Chat.schema.js'
-const MessageSchema = new mongoose.Schema(
-    {
-        chat_id: {
-            type: Schema.Type.ObjectId,
-            ref: "Chat",
-            required: true
-        },
-        sender_type:{
-                type:String,
-                maxlength: 30
-                
-        },
-        message:{
-            type:String
-        }
+import mongoose, { Schema } from "mongoose";
+
+const messageSchema = new Schema(
+  {
+    chat_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Chat",
+      required: true,
+      index: true,
     },
-    { timestamps: { createdAt: 'created_at', updatedAt: false } }
-)
- 
-messageSchema.index({ chat_id: 1, created_at: 1 });
- 
-const Message = mongoose.model('Message', messageSchema);
-export default Message
+
+    sender_type: {
+      type: String,
+      enum: ["user", "ai", "admin"],
+      required: true,
+    },
+
+    message: {
+      type: String,
+      required: true,
+    },
+  },
+  {
+    timestamps: {
+      createdAt: "created_at",
+      updatedAt: false,
+    },
+  }
+);
+
+messageSchema.index({
+  chat_id: 1,
+  created_at: 1,
+});
+
+export default mongoose.model("Message", messageSchema);
