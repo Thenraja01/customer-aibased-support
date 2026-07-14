@@ -1,203 +1,101 @@
 import Document from "../schema/Document.schema.js";
 
-/**
- * Create a new document
- */
-export const createDocument = async (documentData) => {
-  return await Document.create(documentData);
-};
-
-/**
- * Get all documents
- */
-export const getAllDocuments = async () => {
-  return await Document.find()
-    .populate("user_id")
-    .populate("document_type_id")
-    .populate("uploaded_by")
-    .sort({ uploaded_at: -1 });
-};
-
-/**
- * Get document by ID
- */
-export const getDocumentById = async (documentId) => {
-  return await Document.findById(documentId)
-    .populate("user_id")
-    .populate("document_type_id")
-    .populate("uploaded_by");
-};
-
-/**
- * Get documents of a user
- */
-export const getDocumentsByUser = async (userId) => {
-  return await Document.find({ user_id: userId })
-    .populate("document_type_id")
-    .sort({ uploaded_at: -1 });
-};
-
-/**
- * Get documents uploaded by an admin/user
- */
-export const getDocumentsUploadedBy = async (uploadedBy) => {
-  return await Document.find({ uploaded_by: uploadedBy })
-    .populate("user_id")
-    .populate("document_type_id");
-};
-
-/**
- * Get documents by document type
- */
-export const getDocumentsByType = async (documentTypeId) => {
-  return await Document.find({
-    document_type_id: documentTypeId,
-  }).populate("user_id");
-};
-
-/**
- * Update document details
- */
-export const updateDocument = async (documentId, updateData) => {
-  return await Document.findByIdAndUpdate(
-    documentId,
-    updateData,
-    { new: true, runValidators: true }
-  );
-};
-
-/**
- * Rename document
- */
-export const renameDocument = async (documentId, fileName) => {
-  return await Document.findByIdAndUpdate(
-    documentId,
-    { file_name: fileName },
-    { new: true }
-  );
-};
-
-/**
- * Update verification status
- */
-export const updateDocumentStatus = async (documentId, status) => {
-  return await Document.findByIdAndUpdate(
-    documentId,
-    { status },
-    { new: true }
-  );
-};
-
-/**
- * Update RAG status
- */
-export const updateRagStatus = async (documentId, ragStatus) => {
-  return await Document.findByIdAndUpdate(
-    documentId,
-    { rag_status: ragStatus },
-    { new: true }
-  );
-};
-
-/**
- * Documents waiting for verification
- */
-export const getPendingDocuments = async () => {
-  return await Document.find({
+// Upload / create a document record
+export const createDocument = async ({
+  user_id,
+  document_type_id,
+  file_name,
+  file_path,
+  uploaded_by,
+}) => {
+  return await Document.create({
+    user_id,
+    document_type_id,
+    file_name,
+    file_path,
+    uploaded_by,
     status: "pending",
-  });
-};
-
-/**
- * Approved documents
- */
-export const getApprovedDocuments = async () => {
-  return await Document.find({
-    status: "approved",
-  })
-    .populate("document_type_id")
-    .populate("user_id");
-};
-
-/**
- * Rejected documents
- */
-export const getRejectedDocuments = async () => {
-  return await Document.find({
-    status: "rejected",
-  });
-};
-
-/**
- * Documents waiting for RAG processing
- */
-export const getPendingRagDocuments = async () => {
-  return await Document.find({
     rag_status: "not_processed",
   });
 };
 
-/**
- * Documents currently processing
- */
-export const getProcessingDocuments = async () => {
-  return await Document.find({
-    rag_status: "processing",
-  });
+// Get all documents (admin)
+export const getAllDocuments = async () => {
+  return await Document.find()
+    .populate("user_id", "name email")
+    .populate("document_type_id", "name")
+    .populate("uploaded_by", "name email")
+    .sort({ uploaded_at: -1 });
 };
 
-/**
- * Documents indexed and ready for chatbot
- */
-export const getIndexedDocuments = async () => {
+// Get a single document by ID
+export const getDocumentById = async (documentId) => {
+  const doc = await Document.findById(documentId)
+    .populate("user_id", "name email")
+    .populate("document_type_id", "name")
+    .populate("uploaded_by", "name email");
+
+  if (!doc) throw new Error("Document not found");
+  return doc;
+};
+
+// Get all documents uploaded by a user
+export const getDocumentsByUser = async (userId) => {
+  return await Document.find({ user_id: userId })
+    .populate("document_type_id", "name")
+    .sort({ uploaded_at: -1 });
+};
+
+// Get documents by approval status
+export const getDocumentsByStatus = async (status) => {
+  const allowed = ["pending", "approved", "rejected"];
+  if (!allowed.includes(status)) throw new Error("Invalid document status");
+
+  return await Document.find({ status })
+    .populate("user_id", "name email")
+    .populate("document_type_id", "name")
+    .sort({ uploaded_at: -1 });
+};
+
+// Update document approval status
+export const updateDocumentStatus = async (documentId, status) => {
+  const allowed = ["pending", "approved", "rejected"];
+  if (!allowed.includes(status)) throw new Error("Invalid status value");
+
+  const doc = await Document.findByIdAndUpdate(
+    documentId,
+    { status },
+    { new: true }
+  );
+  if (!doc) throw new Error("Document not found");
+  return doc;
+};
+
+// Update RAG indexing status
+export const updateRagStatus = async (documentId, rag_status) => {
+  const allowed = ["not_processed", "processing", "indexed", "failed"];
+  if (!allowed.includes(rag_status)) throw new Error("Invalid RAG status");
+
+  const doc = await Document.findByIdAndUpdate(
+    documentId,
+    { rag_status },
+    { new: true }
+  );
+  if (!doc) throw new Error("Document not found");
+  return doc;
+};
+
+// Get documents ready for RAG indexing (approved but not yet indexed)
+export const getDocumentsPendingRag = async () => {
   return await Document.find({
     status: "approved",
-    rag_status: "indexed",
-  }).populate("document_type_id");
+    rag_status: "not_processed",
+  }).populate("user_id", "name email");
 };
 
-/**
- * Failed indexing documents
- */
-export const getFailedIndexedDocuments = async () => {
-  return await Document.find({
-    rag_status: "failed",
-  });
-};
-
-/**
- * Search documents by filename
- */
-export const searchDocuments = async (keyword) => {
-  return await Document.find({
-    file_name: {
-      $regex: keyword,
-      $options: "i",
-    },
-  })
-    .populate("user_id")
-    .populate("document_type_id");
-};
-
-/**
- * Count documents of a user
- */
-export const countUserDocuments = async (userId) => {
-  return await Document.countDocuments({
-    user_id: userId,
-  });
-};
-
-/**
- * Total documents
- */
-export const countDocuments = async () => {
-  return await Document.countDocuments();
-};
-
-/**
- * Delete document
- */
+// Delete a document
 export const deleteDocument = async (documentId) => {
-  return await Document.findByIdAndDelete(documentId);
+  const doc = await Document.findByIdAndDelete(documentId);
+  if (!doc) throw new Error("Document not found");
+  return { message: "Document deleted successfully" };
 };

@@ -1,156 +1,63 @@
 import DocumentChunk from "../schema/DocumentChunk.schema.js";
 
-export const createChunk = async (chunkData) => {
-  return await DocumentChunk.create(chunkData);
-};
-export const createChunks = async (chunks) => {
-  return await DocumentChunk.insertMany(chunks);
-};
-export const getAllChunks = async () => {
-  return await DocumentChunk.find()
-    .populate("document_id")
-    .sort({ document_id: 1, chunk_index: 1 });
-};
-
-/**
- * Get chunk by ID
- */
-export const getChunkById = async (chunkId) => {
-  return await DocumentChunk.findById(chunkId)
-    .populate("document_id");
-};
-
-/**
- * Get all chunks of a document
- */
-export const getChunksByDocument = async (documentId) => {
-  return await DocumentChunk.find({
+// Save chunks after a document is split and embedded
+export const saveChunks = async (documentId, chunks) => {
+  // chunks: [{ chunk_index, text_content, embedding }]
+  const docs = chunks.map((chunk) => ({
     document_id: documentId,
-  }).sort({ chunk_index: 1 });
+    chunk_index: chunk.chunk_index,
+    text_content: chunk.text_content,
+    embedding: chunk.embedding,
+  }));
+  return await DocumentChunk.insertMany(docs, { ordered: false });
 };
 
-/**
- * Get a specific chunk using its index
- */
+// Get all chunks for a document (sorted by index)
+export const getChunksByDocument = async (documentId) => {
+  return await DocumentChunk.find({ document_id: documentId }).sort({
+    chunk_index: 1,
+  });
+};
+
+// Get a specific chunk by document and index
 export const getChunkByIndex = async (documentId, chunkIndex) => {
-  return await DocumentChunk.findOne({
+  const chunk = await DocumentChunk.findOne({
     document_id: documentId,
     chunk_index: chunkIndex,
   });
+  if (!chunk) throw new Error("Chunk not found");
+  return chunk;
 };
 
-/**
- * Get first chunk
- */
-export const getFirstChunk = async (documentId) => {
-  return await DocumentChunk.findOne({
-    document_id: documentId,
-  }).sort({ chunk_index: 1 });
-};
-
-export const getLastChunk = async (documentId) => {
-  return await DocumentChunk.findOne({
-    document_id: documentId,
-  }).sort({ chunk_index: -1 });
-};
-
+// Count chunks for a document
 export const countChunks = async (documentId) => {
-  return await DocumentChunk.countDocuments({
-    document_id: documentId,
-  });
-};
-export const updateChunkText = async (chunkId, textContent) => {
-  return await DocumentChunk.findByIdAndUpdate(
-    chunkId,
-    {
-      text_content: textContent,
-    },
-    {
-      new: true,
-      runValidators: true,
-    }
-  );
+  return await DocumentChunk.countDocuments({ document_id: documentId });
 };
 
-export const updateChunkEmbedding = async (chunkId, embedding) => {
-  return await DocumentChunk.findByIdAndUpdate(
-    chunkId,
-    {
-      embedding,
-    },
-    {
-      new: true,
-    }
-  );
-};
-
-export const updateChunk = async (chunkId, updateData) => {
-  return await DocumentChunk.findByIdAndUpdate(
-    chunkId,
-    updateData,
-    {
-      new: true,
-      runValidators: true,
-    }
-  );
-};
-
-export const searchChunks = async (keyword) => {
-  return await DocumentChunk.find({
-    text_content: {
-      $regex: keyword,
-      $options: "i",
-    },
-  }).populate("document_id");
-};
-
-export const deleteChunk = async (chunkId) => {
-  return await DocumentChunk.findByIdAndDelete(chunkId);
-};
-
+// Delete all chunks for a document (used when re-indexing or deleting a doc)
 export const deleteChunksByDocument = async (documentId) => {
-  return await DocumentChunk.deleteMany({
-    document_id: documentId,
-  });
+  const result = await DocumentChunk.deleteMany({ document_id: documentId });
+  return { deleted: result.deletedCount };
 };
 
-/**
- * Delete all chunks
- */
-export const deleteAllChunks = async () => {
-  return await DocumentChunk.deleteMany({});
-};
+// Cosine similarity search (basic in-memory vector search)
+// For production, use a vector DB (e.g., Pinecone, Qdrant, MongoDB Atlas Vector Search)
+export const findSimilarChunks = async (documentId, queryEmbedding, topK = 5) => {
+  const chunks = await DocumentChunk.find({ document_id: documentId });
 
-/**
- * Check whether a document has chunks
- */
-export const hasChunks = async (documentId) => {
-  const count = await DocumentChunk.countDocuments({
-    document_id: documentId,
-  });
-
-  return count > 0;
-};
-
-/**
- * Get chunk statistics
- */
-export const getChunkStatistics = async (documentId) => {
-  const totalChunks = await DocumentChunk.countDocuments({
-    document_id: documentId,
-  });
-
-  const firstChunk = await DocumentChunk.findOne({
-    document_id: documentId,
-  }).sort({ chunk_index: 1 });
-
-  const lastChunk = await DocumentChunk.findOne({
-    document_id: documentId,
-  }).sort({ chunk_index: -1 });
-
-  return {
-    totalChunks,
-    firstChunk,
-    lastChunk,
+  const cosineSimilarity = (a, b) => {
+    const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
+    const magA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+    const magB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+    return magA && magB ? dot / (magA * magB) : 0;
   };
+
+  return chunks
+    .map((chunk) => ({
+      chunk_index: chunk.chunk_index,
+      text_content: chunk.text_content,
+      score: cosineSimilarity(queryEmbedding, chunk.embedding),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
 };

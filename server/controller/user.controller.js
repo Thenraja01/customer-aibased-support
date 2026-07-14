@@ -4,7 +4,9 @@ import {
   createUser,
   updateUser,
   deleteUser,
-} from "../services/user.service.js";
+  searchUsers,
+  updateUserStatus,
+} from "../service/user.service.js";
 
 // GET /users
 export const getUsers = async (req, res) => {
@@ -106,5 +108,26 @@ export const removeUser = async (req, res) => {
       success: false,
       message: error.message,
     });
+  }
+};
+
+// GET /users/search?q=keyword
+export const searchUser = async (req, res) => {
+  try {
+    const users = await searchUsers(req.query.q || "");
+    res.status(200).json({ success: true, data: users });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// PATCH /users/:id/status
+export const patchUserStatus = async (req, res) => {
+  try {
+    const user = await updateUserStatus(req.params.id, req.body.status);
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    const status = error.message === "User not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
   }
 };

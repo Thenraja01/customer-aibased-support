@@ -3,8 +3,6 @@ import {
   login,
   changePassword,
 } from "../services/auth.service.js";
-
-// POST /auth/register
 export const registerUser = async (req, res) => {
   try {
     const result = await register(req.body);
