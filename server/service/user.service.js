@@ -4,14 +4,14 @@ export const getAllUsers = async () => {
   return await User.find()
     .populate("organization_id", "name")
     .populate("role_id", "name")
-    .select("-password");
+    .select("password");
 };
 
 export const getUserById = async (id) => {
   const user = await User.findById(id)
     .populate("organization_id", "name")
     .populate("role_id", "name")
-    .select("-password");
+    .select("password");
 
   if (!user) {
     throw new Error("User not found");
@@ -28,6 +28,19 @@ export const createUser = async (userData) => {
     throw new Error("Email already exists");
   }
 
+  const organization = await Organization.findById(data.organization_id);
+
+  if (!organization) {
+    throw new Error("Organization not found");
+  }
+
+  const role = await Role.findById(data.role_id);
+
+  if (!role) {
+    throw new Error("Role not found");
+  }
+
+
   return await User.create(userData);
 };
 
@@ -38,7 +51,7 @@ export const updateUser = async (id, userData) => {
   })
     .populate("organization_id", "name")
     .populate("role_id", "name")
-    .select("-password");
+    .select("password");
 
   if (!user) {
     throw new Error("User not found");

@@ -1,25 +1,25 @@
-import mongoose, { Schema } from 'mongoose';
+  import mongoose, { Schema } from 'mongoose';
 
-const chatSchema = new Schema(
-  {
-    user_id: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
+  const chatSchema = new Schema(
+    {
+      user_id: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      topic: String,
+      status: {
+        type: String,
+        default: 'open',
+      },
+      closed_at: Date,
     },
-    topic: String,
-    status: {
-      type: String,
-      default: 'open',
-    },
-    closed_at: Date,
-  },
-  {
-    timestamps: {
-      createdAt: 'created_At',
-      updatedAt: false,
-    },
-  }
-);
+    {
+      timestamps: {
+        createdAt: 'created_At',
+        updatedAt: false,
+      },
+    }
+  );
 
-export default mongoose.model('Chat', chatSchema);
+  export default mongoose.model('Chat', chatSchema);
