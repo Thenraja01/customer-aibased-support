@@ -16,6 +16,6 @@ const userSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'created_At', updatedAt: false } }
 );
 
-userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ unique: true });
 
 export default mongoose.model('User', userSchema);

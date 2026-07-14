@@ -1,9 +1,8 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from 'cors';
 import dbconnection from './config/db.js';
 import mongoose from "mongoose";
-dotenv.config()
+import env from './config/env.js'
 const app=express()
 app.use(cors())
 app.use(express.json())
@@ -16,7 +15,7 @@ app.get('/api/health', (_req, res) => {
     mongo: dbReady ? 'connected' : 'disconnected',
   })
 })
-const port = process.env.PORT || 4000
+const port = env.PORT 
 
 const startServer = async () => {
   try {

@@ -1,5 +1,5 @@
 import mongoose, { Schema } from "mongoose";
-
+import Chat from "./Chat.schema"
 const aiSessionSchema = new Schema(
   {
     chat_id: {
