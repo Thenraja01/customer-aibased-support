@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
-import bcrypt from "bcrypt";
 import env from'./env.js'
-import User from '../schema/user.schema.js';
+// import User from '../schema/user.schema.js';
  const dbconnection = async () => {
     try {
         const connection = await mongoose.connect(

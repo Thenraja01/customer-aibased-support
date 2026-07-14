@@ -1,8 +1,7 @@
 import bcrypt from "bcrypt";
-import User from "../schemas/user.schema.js";
+import User from "../schema/user.schema.js";
 import jwt from "jsonwebtoken";
-import User from "../schemas/user.schema.js";
-
+import env from '../config/env.js'
 export const register = async (userData) => {
     const {
         organization_id,
@@ -51,19 +50,14 @@ export const login = async ({ email, password }) => {
     const user = await User.findOne({ email })
         .populate("organization_id")
         .populate("role_id");
-
-    if (!user) {
-        throw new Error("Invalid email or password");
-    }
-
-    if (user.status !== "active") {
-        throw new Error(`Account is ${user.status}`);
+    if (!user || user.status !== "active") {
+        throw new Error("Invalid email or current password");
     }
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
     if (!isPasswordValid) {
-        throw new Error("Invalid email or password");
+        throw new Error("Invalid email or current password");
     }
+
     const token = jwt.sign(
         {
             userId: user._id,
@@ -71,7 +65,7 @@ export const login = async ({ email, password }) => {
             roleId: user.role_id._id,
             email: user.email,
         },
-        process.env.JWT_SECRET,
+        env.JWT_SECRET,
         { expiresIn: "1d" }
     );
 
@@ -90,23 +84,20 @@ export const login = async ({ email, password }) => {
     };
 };
 export const changePassword = async (email, currentPassword, newPassword) => {
-   
+
     const user = await User.findOne({ email });
 
-    if (!user) {
-        throw new Error("User not found");
-    }
-    if (user.status !== "active") {
-        throw new Error(`Account is ${user.status}`);
+    if (!user || user.status !== "active") {
+        throw new Error("Invalid email or current password");
     }
     const isPasswordValid = await bcrypt.compare(
         currentPassword,
         user.password
     );
-
     if (!isPasswordValid) {
-        throw new Error("Current password is incorrect");
+        throw new Error("Invalid email or current password");
     }
+
     const isSamePassword = await bcrypt.compare(
         newPassword,
         user.password

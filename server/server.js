@@ -3,11 +3,13 @@ import cors from 'cors';
 import dbconnection from './config/db.js';
 import mongoose from "mongoose";
 import env from './config/env.js'
+import authRouter from "./routes/auth.route.js";
 const app=express()
 app.use(cors())
 app.use(express.json())
 
-app.get('/api/health', (_req, res) => {
+app.use("/auth", authRouter);
+app.get('/api/health/v1', (req, res) => {
   const dbReady = mongoose.connection.readyState === 1
   res.status(dbReady ? 200 : 503).json({
     success: dbReady,

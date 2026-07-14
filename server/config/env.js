@@ -5,7 +5,10 @@ export default {
   PORT: process.env.PORT || 3060,
 
   NODE_ENV: process.env.NODE_ENV || "development",
-
+  RATE_LIMIT_WINDOW_MS:process.env.RATE_LIMIT_WINDOW_MS,
+  RATE_LIMIT_MAX_REQUESTS:process.env.RATE_LIMIT_MAX_REQUESTS,
+  MAX_AI_TOKENS:process.env.MAX_AI_TOKENS,
+  AI_REQUEST_TIMEOUT_MS:process.env.AI_REQUEST_TIMEOUT_MS,
   MONGODB_URI: process.env.MONGODB_URI,
 
   JWT_SECRET: process.env.JWT_SECRET,
