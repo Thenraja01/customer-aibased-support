@@ -15,7 +15,6 @@ export const createDocument = async ({
     file_path,
     uploaded_by,
     status: "pending",
-    rag_status: "not_processed",
   });
 };
 
@@ -71,27 +70,6 @@ export const updateDocumentStatus = async (documentId, status) => {
   return doc;
 };
 
-// Update RAG indexing status
-export const updateRagStatus = async (documentId, rag_status) => {
-  const allowed = ["not_processed", "processing", "indexed", "failed"];
-  if (!allowed.includes(rag_status)) throw new Error("Invalid RAG status");
-
-  const doc = await Document.findByIdAndUpdate(
-    documentId,
-    { rag_status },
-    { new: true }
-  );
-  if (!doc) throw new Error("Document not found");
-  return doc;
-};
-
-// Get documents ready for RAG indexing (approved but not yet indexed)
-export const getDocumentsPendingRag = async () => {
-  return await Document.find({
-    status: "approved",
-    rag_status: "not_processed",
-  }).populate("user_id", "name email");
-};
 
 // Delete a document
 export const deleteDocument = async (documentId) => {

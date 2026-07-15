@@ -9,44 +9,15 @@ import {
   deleteMessagesByChat,
   searchMessages,
 } from "../service/message.service.js";
-import { answerQuery } from "../service/rag.service.js";
-import { createAISession } from "../service/aiSession.service.js";
 // POST /messages
 export const send = async (req, res) => {
   try {
     const { chat_id, sender_type, message } = req.body;
     const msg = await sendMessage({ chat_id, sender_type, message });
     
-    let aiMsg = null;
-
-    // If the user sends a message, trigger the RAG AI chatbot
-    if (sender_type === "user") {
-      try {
-        const ragResponse = await answerQuery(message);
-        
-        // Save the AI's response to the database
-        aiMsg = await sendMessage({ 
-          chat_id, 
-          sender_type: "ai", 
-          message: ragResponse.answer 
-        });
-
-        // Log the AI token usage and performance metrics
-        await createAISession({
-          chat_id,
-          model_used: "gpt-3.5-turbo",
-          tokens_used: ragResponse.tokensUsed,
-          response_time_ms: ragResponse.responseTimeMs
-        });
-      } catch (aiError) {
-        console.error("AI chatbot failed to respond:", aiError.message);
-      }
-    }
-
     res.status(201).json({ 
       success: true, 
-      data: msg, 
-      aiResponse: aiMsg 
+      data: msg
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

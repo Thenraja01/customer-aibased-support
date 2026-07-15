@@ -5,8 +5,6 @@ import {
   getDocumentsByUser,
   getDocumentsByStatus,
   updateDocumentStatus,
-  updateRagStatus,
-  getDocumentsPendingRag,
   deleteDocument,
 } from "../service/document.service.js";
 
@@ -36,15 +34,6 @@ export const getAll = async (req, res) => {
   }
 };
 
-// GET /documents/pending-rag
-export const getPendingRag = async (req, res) => {
-  try {
-    const docs = await getDocumentsPendingRag();
-    res.status(200).json({ success: true, data: docs });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
 
 // GET /documents/:id
 export const getById = async (req, res) => {
@@ -88,16 +77,6 @@ export const patchStatus = async (req, res) => {
   }
 };
 
-// PATCH /documents/:id/rag-status
-export const patchRagStatus = async (req, res) => {
-  try {
-    const doc = await updateRagStatus(req.params.id, req.body.rag_status);
-    res.status(200).json({ success: true, data: doc });
-  } catch (error) {
-    const status = error.message === "Document not found" ? 404 : 400;
-    res.status(status).json({ success: false, message: error.message });
-  }
-};
 
 // DELETE /documents/:id
 export const remove = async (req, res) => {

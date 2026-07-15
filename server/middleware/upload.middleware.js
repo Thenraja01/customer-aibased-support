@@ -43,7 +43,7 @@ const cloudinaryStorage = new CloudinaryStorage({
   },
 });
 
-// ── Memory Storage (for local dev / RAG text extraction) ────────────
+// ── Memory Storage ────────────────────────────────────────────────────
 const memoryStorage = multer.memoryStorage();
 
 // ── Upload instances ────────────────────────────────────────────────
@@ -55,12 +55,6 @@ export const uploadToCloud = multer({
   fileFilter,
 }).single("file");
 
-// Single file → memory buffer (for RAG text extraction pipeline)
-export const uploadToMemory = multer({
-  storage: memoryStorage,
-  limits: { fileSize: MAX_FILE_SIZE },
-  fileFilter,
-}).single("file");
 
 // Multiple files → memory
 export const uploadMultiple = multer({

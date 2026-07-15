@@ -1,7 +1,5 @@
 import DocumentVerification from "../schema/DocumentVerification.schema.js";
 import { updateDocumentStatus } from "./document.service.js";
-import { fetchAndIndexDocument } from "./rag.service.js";
-
 export const createVerification = async ({ document_id, verified_by }) => {
   const existing = await DocumentVerification.findOne({
     document_id,
@@ -29,7 +27,7 @@ export const getVerificationByDocument = async (documentId) => {
 
 export const getAllVerifications = async () => {
   return await DocumentVerification.find()
-    .populate("document_id", "file_name status rag_status")
+    .populate("document_id", "file_name status")
     .populate("verified_by", "name email")
     .sort({ verified_at: -1 });
 };
@@ -55,11 +53,8 @@ export const approveVerification = async (verificationId, remarks = "") => {
   );
   if (!verification) throw new Error("Verification record not found");
 
-  // Upon approval, update the document status and trigger background RAG indexing
+  // Upon approval, update the document status
   const document = await updateDocumentStatus(verification.document_id, "approved");
-  
-  // Fire and forget — run indexing in the background
-  fetchAndIndexDocument(document._id.toString(), document.file_path).catch(console.error);
 
   return verification;
 };
