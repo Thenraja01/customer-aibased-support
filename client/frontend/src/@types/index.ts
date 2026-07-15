@@ -9,19 +9,21 @@ export interface IOrganization {
   name?: string;
   address?: string;
   phone?: string;
-  
   email?: string;
 }
 
 export interface IUser {
   _id?: string;
-  organization_id: string;
-  role_id: string;
+
+  organization_id: IOrganization;
+  role_id: IRole;
+
   name: string;
   email: string;
   phone?: string;
   password?: string;
   dob?: string;
+
   auth_type: "local" | "google" | "github";
   status: "active" | "inactive" | "blocked";
   created_At?: string;

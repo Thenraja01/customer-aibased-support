@@ -57,7 +57,7 @@ export default function Navbar() {
         <div className="hidden lg:flex items-center gap-3">
           {user ? (
             <div className="relative">
-              <button
+              <Button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent transition-colors"
               >
@@ -66,21 +66,21 @@ export default function Navbar() {
                 </div>
                 <span className="text-sm font-medium">{user.name}</span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </button>
+              </Button>
 
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 rounded-md border bg-popover shadow-lg p-1">
                   <div className="px-3 py-2 text-xs text-muted-foreground border-b mb-1">
                     {user.email}
-                    <div className="text-primary font-medium capitalize">{user.role}</div>
+                    <div className="text-primary font-medium capitalize">{user.role_id}</div>
                   </div>
-                  <button
+                  <Button
                     onClick={handleLogout}
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-accent text-red-600"
                   >
                     <LogOut className="h-4 w-4" />
                     Logout
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -89,7 +89,7 @@ export default function Navbar() {
               <Link to="/login" className={buttonVariants({ variant: "ghost" })}>
                 Log In
               </Link>
-              <Link to="/register" className={buttonVariants({ variant: "default" })}>
+              <Link to="/register" className={buttonVariants({ variant: "ghost" })}>
                 Get Started
               </Link>
             </>
@@ -128,7 +128,7 @@ export default function Navbar() {
               <>
                 <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium">
                   <User className="h-4 w-4" />
-                  {user.name} ({user.role})
+                  {user.name} ({user.role_id})
                 </div>
                 <Button variant="destructive" className="w-full" onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-2" />

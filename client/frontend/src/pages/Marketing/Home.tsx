@@ -83,13 +83,13 @@ export default function Home() {
             focus on complex issues.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" asChild>
+            <Button size="lg" variant="outline">
               <Link to="/contact">Request a Demo</Link>
             </Button>
-            <Button size="lg" variant="outline" asChild>
+            <Button size="lg" variant="ghost" >
               <Link to="/contact">Start Free Trial</Link>
             </Button>
-            <Button size="lg" variant="ghost" asChild>
+            <Button size="lg" variant="ghost" >
               <Link to="/contact">Contact Sales</Link>
             </Button>
           </div>
