@@ -58,10 +58,9 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
   const handleSend = useCallback(
     async (text: string, file?: File) => {
       if (!activeChat?._id || !user?._id) return;
-      // For now, just send the text. File upload would need additional backend integration
+     
       await sendWithAI(activeChat._id, user._id, text);
-      if (file) {
-        // TODO: Implement file upload to chat
+      if (file) { 
         console.log("File selected:", file.name);
       }
     },
@@ -126,7 +125,7 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
       <div className="border-t bg-white bg-background/80 backdrop-blur-xl shrink-0">
         <ChatInput
           onSend={handleSend}
-          disabled={sending || aiThinking || loading || !activeChat?._id}
+          disabled={sending || aiThinking || loading }
         />
       </div>
     </div>
