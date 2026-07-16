@@ -9,34 +9,37 @@ import env from "./config/env.js";
 
 import { notFound, errorHandler } from "./middleware/errorHandler.middleware.js";
 
-import authRouter from "./routes/auth.route.js";
-import userRouter from "./routes/user.route.js";
-import chatRouter from "./routes/chat.route.js";
-import messageRouter from "./routes/message.route.js";
-import ticketRouter from "./routes/ticket.route.js";
-import notificationRouter from "./routes/notification.route.js";
-import documentRouter from "./routes/document.route.js";
-import documentVerificationRouter from "./routes/documentVerification.route.js";
-import organizationRouter from "./routes/organization.route.js";
-import roleRouter from "./routes/role.route.js";
-import documentTypeRouter from "./routes/documentType.route.js";
-import aiSessionRouter from "./routes/aiSession.route.js";
-import auditLogRouter from "./routes/auditLog.route.js";
-import faqRouter from "./routes/faq.route.js";
+import { authRouter } from "./modules/auth/index.js";
+import { userRouter } from "./modules/user/index.js";
+import { chatRouter } from "./modules/chat/index.js";
+import { messageRouter } from "./modules/message/index.js";
+import { ticketRouter } from "./modules/ticket/index.js";
+import { notificationRouter } from "./modules/notification/index.js";
+import { documentRouter } from "./modules/document/index.js";
+import { documentVerificationRouter } from "./modules/document-verification/index.js";
+import { organizationRouter } from "./modules/organization/index.js";
+import { roleRouter } from "./modules/role/index.js";
+import { documentTypeRouter } from "./modules/document-type/index.js";
+import { aiSessionRouter } from "./modules/ai-session/index.js";
+import { auditLogRouter } from "./modules/audit-log/index.js";
+import { faqRouter } from "./modules/faq/index.js";
+import { ragRouter } from "./modules/rag/index.js";
+import { memoryRouter } from "./modules/memory/index.js";
+import { adminRouter } from "./modules/admin/index.js";
+import { knowledgeGraphRouter } from "./modules/knowledge-graph/index.js";
+import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
 
 const app = express();
 
-
-app.use(helmet()); 
+app.use(helmet());
 
 app.use(
   cors({
-    origin: env.NODE_ENV === "production" ? process.env.CLIENT_URL : "*",
+    origin: ["http://localhost:5173", process.env.CLIENT_URL].filter(Boolean),
     credentials: true,
   })
 );
 
-// ── Global Rate Limiter ───────────────────────────────────────────────
 const globalLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
   max: env.RATE_LIMIT_MAX_REQUESTS,
@@ -49,9 +52,8 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// ── Auth-specific stricter rate limiter ──────────────────────────────
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 20,
   message: {
     success: false,
@@ -59,11 +61,9 @@ const authLimiter = rateLimit({
   },
 });
 
-// ── Body Parsers ──────────────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ── API Routes ────────────────────────────────────────────────────────
 app.use("/auth", authLimiter, authRouter);
 app.use("/users", userRouter);
 app.use("/chats", chatRouter);
@@ -78,8 +78,11 @@ app.use("/document-types", documentTypeRouter);
 app.use("/ai-sessions", aiSessionRouter);
 app.use("/audit-logs", auditLogRouter);
 app.use("/faqs", faqRouter);
+app.use("/rag", ragRouter);
+app.use("/memory", memoryRouter);
+app.use("/knowledge-graph", knowledgeGraphRouter);
+app.use("/admin/v1", adminRouter);
 
-// ── Health Check ──────────────────────────────────────────────────────
 app.get("/api/health/v1", (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;
   res.status(dbReady ? 200 : 503).json({
@@ -93,18 +96,23 @@ app.get("/api/health/v1", (req, res) => {
   });
 });
 
-// ── 404 & Global Error Handlers (must be LAST) ─────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
-// ── Start Server ──────────────────────────────────────────────────────
 const port = env.PORT;
 
 const startServer = async () => {
   try {
     await dbconnection();
+
+    setInterval(() => {
+      archiveExpiredMemories().catch((err) =>
+        console.error("[Memory Archiver] Error:", err.message)
+      );
+    }, 60 * 60 * 1000);
+
     app.listen(port, () => {
-      console.log(`🚀 Server running on port ${port} [${env.NODE_ENV}]`);
+      console.log(`Server running on port ${port} [${env.NODE_ENV}]`);
     });
   } catch (error) {
     console.error(`Failed to start server: ${error.message}`);

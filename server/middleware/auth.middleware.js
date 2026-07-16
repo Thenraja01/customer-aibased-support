@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import env from "../config/env.js";
+
 export const protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -14,7 +15,7 @@ export const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
-    req.user = decoded; 
+    req.user = decoded;
     next();
   } catch (error) {
     const message =
@@ -26,16 +27,12 @@ export const protect = (req, res, next) => {
   }
 };
 
-// Restrict access to specific roles by role name
-// Usage: restrict("admin") or restrict("admin", "manager")
 export const restrict = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    // req.user.roleId is the ObjectId — attach role name via middleware chain or use roleId comparison
-    // For flexibility, you can also pass roleId list if needed
     if (!allowedRoles.includes(req.user.roleName)) {
       return res.status(403).json({
         success: false,
@@ -47,10 +44,12 @@ export const restrict = (...allowedRoles) => {
 };
 
 // Ensure the requesting user can only access their own resources
-// Usage: on routes like GET /users/:id — ensures req.user.userId === req.params.id
+// Usage: selfOrAdmin — checks req.params.id
+//        selfOrAdminParam("userId") — checks req.params.userId
 export const selfOrAdmin = (req, res, next) => {
-  const isSelf = req.user?.userId === req.params.id;
-  const isAdmin = req.user?.roleName === "admin";
+  const paramId = req.params.id;
+  const isSelf = req.user?.userId === paramId;
+  const isAdmin = req.user?.roleName === "admin" || req.user?.roleName === "agent";
 
   if (!isSelf && !isAdmin) {
     return res.status(403).json({
@@ -59,4 +58,20 @@ export const selfOrAdmin = (req, res, next) => {
     });
   }
   next();
+};
+
+export const selfOrAdminParam = (paramName) => {
+  return (req, res, next) => {
+    const paramId = req.params[paramName];
+    const isSelf = req.user?.userId === paramId;
+    const isAdmin = req.user?.roleName === "admin" || req.user?.roleName === "agent";
+
+    if (!isSelf && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: You can only access your own data",
+      });
+    }
+    next();
+  };
 };

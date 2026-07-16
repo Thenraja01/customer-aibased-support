@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ShoppingCart,
@@ -11,6 +12,16 @@ import {
   Home,
   Briefcase,
 } from "lucide-react";
+
+const staggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.06 } },
+};
+
+const cardVariant = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+};
 
 const industries = [
   { icon: ShoppingCart, name: "E-commerce", desc: "Handle order inquiries, returns, and support at scale." },
@@ -28,26 +39,42 @@ const industries = [
 export default function Industries() {
   return (
     <div className="container mx-auto px-4 py-16">
-      <div className="max-w-3xl mx-auto text-center mb-16">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-3xl mx-auto text-center mb-16"
+      >
         <h1 className="text-4xl font-bold tracking-tight mb-4">Industries We Serve</h1>
         <p className="text-lg text-muted-foreground">
           Tailored AI support solutions for businesses across every sector.
         </p>
-      </div>
+      </motion.div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={staggerContainer}
+        className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+      >
         {industries.map((industry) => (
-          <Card key={industry.name} className="hover:border-primary/50 transition-colors">
-            <CardHeader>
-              <industry.icon className="h-8 w-8 text-primary mb-2" />
-              <CardTitle className="text-lg">{industry.name}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{industry.desc}</p>
-            </CardContent>
-          </Card>
+          <motion.div key={industry.name} variants={cardVariant}>
+            <Card
+              className="hover:border-primary/50 transition-all duration-300 dark:bg-card/50 dark:border-white/[0.06] dark:hover:border-primary/20 hover:-translate-y-0.5 dark:shadow-lg dark:shadow-black/10 h-full"
+            >
+              <CardHeader>
+                <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/15 flex items-center justify-center mb-2">
+                  <industry.icon className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-lg">{industry.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{industry.desc}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }

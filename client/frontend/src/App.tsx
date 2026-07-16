@@ -14,12 +14,30 @@ import Privacy from "@/pages/Marketing/Privacy";
 import Login from "./pages/AuthPage/Login";
 import Register from "./pages/AuthPage/Register";
 
-import AdminDashboard from "@/pages/Admin/AdminDashboard";
+import SuperAdminDashboard from "@/pages/Admin/SuperAdminDashboard";
+import OrganizationsPage from "@/pages/Admin/OrganizationsPage";
+import UsersPage from "@/pages/Admin/UsersPage";
+import RolesPage from "@/pages/Admin/RolesPage";
+import AuditLogsPage from "@/pages/Admin/AuditLogsPage";
+import DocumentsPage from "@/pages/Admin/DocumentsPage";
+import DocumentTypesPage from "@/pages/Admin/DocumentTypesPage";
+import DocumentVerificationsPage from "@/pages/Admin/DocumentVerificationsPage";
+import AIAnalyticsPage from "@/pages/Admin/AIAnalyticsPage";
+import GlobalSearchPage from "@/pages/Admin/GlobalSearchPage";
+
+import AgentDashboard from "@/pages/Agent/AgentDashboard";
+
 import CustomerDashboard from "./pages/Customer/CustomerDashboard";
+import ChatPage from "./pages/Customer/ChatPage";
+import TicketsPage from "./pages/Customer/TicketsPage";
+import ProfilePage from "./pages/Customer/ProfilePage";
+import FAQPage from "./pages/Customer/FAQPage";
+import CustomerDocumentsPage from "./pages/Customer/CustomerDocumentsPage";
+import ChatHistoryPage from "./pages/Customer/ChatHistoryPage";
+import NotificationsPage from "./pages/Customer/NotificationsPage";
 import DashboardLayout from "./layout/DashboardLayout";
 
 export default function App() {
-
   return (
     <BrowserRouter>
       <Routes>
@@ -37,18 +55,62 @@ export default function App() {
           <Route path="/register" element={<Register />} />
         </Route>
 
-        {/* Admin */}
+        {/* Dashboard */}
         <Route element={<DashboardLayout />}>
+          {/* Super Admin Routes */}
+          <Route
+            element={<ProtectedRoute allowedRoles={["super_admin","admin"]} />}
+          >
+            <Route path="/admin" element={<SuperAdminDashboard />} />
+            <Route path="/admin/organizations" element={<OrganizationsPage />} />
+            <Route path="/admin/users" element={<UsersPage />} />
+            <Route path="/admin/roles" element={<RolesPage />} />
+            <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+            <Route path="/admin/documents" element={<DocumentsPage />} />
+            <Route
+              path="/admin/document-types"
+              element={<DocumentTypesPage />}
+            />
+            <Route
+              path="/admin/document-verifications"
+              element={<DocumentVerificationsPage />}
+            />
+            <Route path="/admin/ai-analytics" element={<AIAnalyticsPage />} />
+            <Route path="/admin/search" element={<GlobalSearchPage />} />
+            <Route path="/admin/chatbot" element={<ChatPage />} />
+          </Route>
 
-          <Route>
-            <Route path="/login" element={<Login />} />
-              <Route path="/admin" element={<AdminDashboard />} />  
-            <Route element={<ProtectedRoute allowedRoles={["admin", "super_admin"]} />}>
-            </Route>
+          {/* Agent Routes */}
+          <Route
+            element={<ProtectedRoute allowedRoles={["agent"]} />}
+          >
+            <Route path="/agent/dashboard" element={<AgentDashboard />} />
+            <Route path="/agent/chats" element={<ChatPage />} />
+            <Route path="/agent/tickets" element={<TicketsPage />} />
+          </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={["user", "admin", "super_admin"]} />}>
-              <Route path="/dashboard" element={<CustomerDashboard />} />
-            </Route>
+          {/* Customer Routes */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={["user", "customer", "admin", "super_admin"]} />
+            }
+          >
+            <Route path="/dashboard" element={<CustomerDashboard />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/tickets" element={<TicketsPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/documents" element={<CustomerDocumentsPage />} />
+            <Route path="/chat-history" element={<ChatHistoryPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+          </Route>
+
+          {/* Profile (all authenticated users) */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={["super_admin", "admin", "agent", "customer", "user"]} />
+            }
+          >
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
       </Routes>

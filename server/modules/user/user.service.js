@@ -1,0 +1,108 @@
+import User from "./user.schema.js";
+import Organization from "../organization/organization.schema.js";
+import Role from "../role/role.schema.js";
+import bcrypt from "bcrypt";
+import { escapeRegex } from "../../utils/escapeRegex.js";
+
+export const getAllUsers = async () => {
+  return await User.find()
+    .populate("organization_id", "name email")
+    .populate("role_id", "role_name")
+    .select("-password");
+};
+
+export const getUserById = async (id) => {
+  const user = await User.findById(id)
+    .populate("organization_id", "name email")
+    .populate("role_id", "role_name")
+    .select("-password");
+  if (!user) throw new Error("User not found");
+  return user;
+};
+
+export const createUser = async (userData) => {
+  const existingUser = await User.findOne({ email: userData.email });
+  if (existingUser) throw new Error("Email already exists");
+
+  const organization = await Organization.findById(userData.organization_id);
+  if (!organization) throw new Error("Organization not found");
+
+  const role = await Role.findById(userData.role_id);
+  if (!role) throw new Error("Role not found");
+
+  const hashedPassword = await bcrypt.hash(userData.password, 10);
+  const user = await User.create({ ...userData, password: hashedPassword });
+
+  const { password: _, ...safeUser } = user.toObject();
+  return safeUser;
+};
+
+export const updateUser = async (id, userData) => {
+  delete userData.password;
+  delete userData.role_id;
+  const user = await User.findByIdAndUpdate(id, userData, {
+    new: true,
+    runValidators: true,
+  })
+    .populate("organization_id", "name email")
+    .populate("role_id", "role_name")
+    .select("-password");
+  if (!user) throw new Error("User not found");
+  return user;
+};
+
+export const updateUserStatus = async (id, status) => {
+  const allowed = ["active", "inactive", "blocked"];
+  if (!allowed.includes(status)) throw new Error("Invalid status value");
+  const user = await User.findByIdAndUpdate(id, { status }, { new: true }).select(
+    "-password"
+  );
+  if (!user) throw new Error("User not found");
+  return user;
+};
+
+export const deleteUser = async (id) => {
+  const user = await User.findByIdAndDelete(id);
+  if (!user) throw new Error("User not found");
+  return { message: "User deleted successfully" };
+};
+
+export const searchUsers = async (keyword) => {
+  const safe = escapeRegex(keyword);
+  return await User.find({
+    $or: [
+      { name: { $regex: safe, $options: "i" } },
+      { email: { $regex: safe, $options: "i" } },
+    ],
+  })
+    .populate("organization_id", "name")
+    .populate("role_id", "role_name")
+    .select("-password");
+};
+
+export const updateProfile = async (userId, profileData) => {
+  const user = await User.findByIdAndUpdate(userId, profileData, {
+    new: true,
+    runValidators: true,
+  })
+    .populate("organization_id", "name email")
+    .populate("role_id", "role_name")
+    .select("-password");
+  if (!user) throw new Error("User not found");
+  return user;
+};
+
+export const changePassword = async (userId, currentPassword, newPassword) => {
+  const user = await User.findById(userId);
+  if (!user) throw new Error("User not found");
+
+  const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+  if (!isPasswordValid) throw new Error("Current password is incorrect");
+
+  const isSamePassword = await bcrypt.compare(newPassword, user.password);
+  if (isSamePassword) throw new Error("New password cannot be the same as current password");
+
+  user.password = await bcrypt.hash(newPassword, 10);
+  await user.save();
+  return { message: "Password changed successfully" };
+};

@@ -20,4 +20,15 @@ export default {
     API_KEY: process.env.CLOUDINARY_API_KEY,
     API_SECRET: process.env.CLOUDINARY_API_SECRET,
   },
+
+  // RAG Configuration
+  RAG: {
+    CHUNK_SIZE: Number(process.env.RAG_CHUNK_SIZE) || 500,
+    CHUNK_OVERLAP: Number(process.env.RAG_CHUNK_OVERLAP) || 100,
+    EMBED_DIM: Number(process.env.RAG_EMBED_DIM) || 256,
+    BFS_MAX_DEPTH: Number(process.env.RAG_BFS_MAX_DEPTH) || 2,
+    BFS_MAX_NODES: Number(process.env.RAG_BFS_MAX_NODES) || 30,
+    TOP_K: Number(process.env.RAG_TOP_K) || 5,
+    QUERY_CACHE_TTL_MS: Number(process.env.RAG_QUERY_CACHE_TTL_MS) || 600000,
+  },
 };

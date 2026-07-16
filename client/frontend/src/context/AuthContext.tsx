@@ -1,85 +1,64 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
-import { IUser, IOrganization, IRole } from "../@types";
-
-const API_URL = "http://localhost:3030";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { useDispatch } from "react-redux";
+import { setUser as setReduxUser, logout as reduxLogout } from "@/store/slices";
+import { AuthAPI } from "@/api/auth.api.js";
 
 interface AuthContextType {
-  user: IUser | null;
+  user: any;
+  loading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (data: Omit<IUser, "_id" | "created_At" | "status" | "auth_type"> & { password: string }) => Promise<boolean>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<IUser | null>(null);
+  const dispatch = useDispatch();
+  const [user, setUser] = useState<any>(() => {
+    const data = localStorage.getItem("user");
+    return data ? JSON.parse(data) : null;
+  });
+  const [loading, setLoading] = useState(true);
 
-  // Load user from local storage on mount
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-    if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+    if (user) {
+      dispatch(setReduxUser(user));
     }
+    setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/v1/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const res = await AuthAPI.login({ email, password });
+      if (!res.data.success) return false;
 
-      const result = await response.json();
-      
-      if (result.success) {
-        setUser(result.data);
-        localStorage.setItem("token", result.token);
-        localStorage.setItem("user", JSON.stringify(result.data));
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Login failed:", error);
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.data));
+
+      setUser(res.data.data);
+      dispatch(setReduxUser(res.data.data));
+
+      return true;
+    } catch {
       return false;
     }
-  };
+  }, [dispatch]);
 
-  const register = async (data: Omit<IUser, "_id" | "created_At" | "status" | "auth_type"> & { password: string }) => {
-    try {
-      const response = await fetch(`${API_URL}/auth/v1/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-      return result.success === true;
-    } catch (error) {
-      console.error("Registration failed:", error);
-      return false;
-    }
-  };
-
-  const logout = () => {
+  const logout = useCallback(() => {
+    localStorage.clear();
     setUser(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-  };
+    dispatch(reduxLogout());
+  }, [dispatch]);
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+export const useAuthContext = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be inside AuthProvider");
+  if (!ctx) throw new Error("useAuthContext must be inside AuthProvider");
   return ctx;
-}
+};

@@ -1,0 +1,18 @@
+import express from "express";
+import * as faqController from "./faq.controller.js";
+import { protect, restrict } from "../../middleware/auth.middleware.js";
+import { validate } from "../../middleware/validate.middleware.js";
+import { createFaqSchema, updateFaqSchema } from "../../validation/index.js";
+
+const router = express.Router();
+
+router.use(protect);
+
+router.post("/", restrict("admin", "agent"), validate(createFaqSchema), faqController.create);
+router.get("/active", faqController.getActive);
+router.get("/", restrict("admin", "agent"), faqController.getAll);
+router.get("/:id", restrict("admin", "agent"), faqController.getById);
+router.put("/:id", restrict("admin", "agent"), validate(updateFaqSchema), faqController.update);
+router.delete("/:id", restrict("admin"), faqController.remove);
+
+export default router;
