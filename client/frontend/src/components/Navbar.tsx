@@ -99,6 +99,12 @@ export default function Navbar() {
                       {user.organization_id.name}
                     </p>
                   </div>
+                  <div className="">
+                    <Button 
+                     variant="link"
+                      className="w-full justify-start text-primary hover:text-primary/80"
+                    onClick={() => { navigate("/dashboard") }}>dashboard</Button>
+                  </div>
 
                   <div className="p-2">
                     <Button

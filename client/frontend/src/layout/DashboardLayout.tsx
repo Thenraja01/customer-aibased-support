@@ -119,7 +119,7 @@ const DashboardLayout = () => {
         </>
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden ">
         <header className="flex items-center justify-between h-16 px-6 bg-card dark:bg-card/80 border-b dark:border-white/[0.06]">
           <button
             className="lg:hidden text-muted-foreground hover:text-foreground"
@@ -128,24 +128,24 @@ const DashboardLayout = () => {
             <Menu size={24} />
           </button>
           <div className="text-lg font-semibold lg:hidden">
-            {roleName === "super_admin" ? "Super Admin" : roleName === "agent" ? "Agent Portal" : "Dashboard"}
+            {roleName === "super_admin" ? "Super Admin" : roleName === "support" ? "support Portal" : "Dashboard"}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex items-center gap-2 justify-end w-full">
+            <div className="relative ">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 rounded-lg hover:bg-muted transition-colors"
               >
                 <Bell size={18} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
+                  <span className="absolute -top-0.5  -right-0.5 w-4 h-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-card dark:bg-card/95 dark:backdrop-blur-md rounded-xl shadow-xl dark:shadow-2xl dark:shadow-black/10 border dark:border-white/[0.06] z-50">
+                <div className="absolute  right-0 top-full mt-2 w-80 bg-card dark:bg-card/95 dark:backdrop-blur-md rounded-xl shadow-xl dark:shadow-2xl dark:shadow-black/10 border dark:border-white/[0.06] z-50">
                   <div className="flex items-center justify-between px-4 py-3 border-b dark:border-white/[0.06]">
                     <h3 className="text-sm font-semibold">Notifications</h3>
                     <div className="flex items-center gap-1">

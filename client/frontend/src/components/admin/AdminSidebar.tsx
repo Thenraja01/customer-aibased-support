@@ -61,7 +61,7 @@ export default function AdminSidebar({
       >
         <div className="flex items-center justify-between h-16 px-6 border-b dark:border-white/[0.06]">
           <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Super Admin
+            Admin
           </span>
           <button
             className="lg:hidden text-muted-foreground hover:text-foreground"

@@ -77,9 +77,7 @@ export default function Login() {
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-secondary/5 blur-3xl dark:bg-secondary/10 animate-pulse-glow [animation-delay:1.5s]" />
 
       <div className="relative z-10 min-h-screen flex items-center justify-center px-6 py-12">
-        <div className="absolute top-6 right-6 z-20">
-          <ThemeToggle />
-        </div>
+      
 
         <motion.div
           className="w-full max-w-md"

@@ -196,9 +196,7 @@ export default function Register() {
       <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10 animate-pulse-glow [animation-delay:1.5s]" />
 
       <div className="relative z-10 min-h-screen flex items-center justify-center px-6 py-12">
-        <div className="absolute top-6 right-6 z-20">
-          <ThemeToggle />
-        </div>
+      
         <motion.div
           className="w-full max-w-lg"
           initial={{ opacity: 0, y: 30 }}
