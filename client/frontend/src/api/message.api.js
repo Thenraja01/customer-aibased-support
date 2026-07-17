@@ -11,6 +11,7 @@ export const MessageAPI = {
   search: (chatId, params) =>
     AxiosInstance.get(`/messages/chat/${chatId}/search`, { params }),
   update: (id, data) => AxiosInstance.put(`/messages/${id}`, data),
+  updateFeedback: (id, feedback) => AxiosInstance.patch(`/messages/${id}/feedback`, { feedback }),
   delete: (id) => AxiosInstance.delete(`/messages/${id}`),
   deleteAll: (chatId) => AxiosInstance.delete(`/messages/chat/${chatId}/all`),
 };

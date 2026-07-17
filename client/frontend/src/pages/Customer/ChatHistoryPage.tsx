@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ChatAPI } from "@/api";
 import { MessageSquare, Clock, Trash2, Eye } from "lucide-react";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 interface Chat {
   _id: string;
@@ -70,15 +72,15 @@ export default function ChatHistoryPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem} className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold tracking-tight">Chat History</h1>
         <p className="text-sm text-muted-foreground">
           View and manage your past chat sessions with the AI assistant.
         </p>
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden">
+      <motion.div variants={staggerItem} className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden">
         <div className="px-6 py-4 border-b dark:border-white/[0.06] flex items-center justify-between">
           <h3 className="text-sm font-medium">Past Conversations</h3>
           <button
@@ -140,7 +142,7 @@ export default function ChatHistoryPage() {
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

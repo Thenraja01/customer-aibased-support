@@ -21,6 +21,16 @@ export default {
     API_SECRET: process.env.CLOUDINARY_API_SECRET,
   },
 
+  // Groq LLM
+  GROQ_API_KEY: process.env.GROQ_API_KEY,
+
+  LLM: {
+    CHAT_MODEL: process.env.LLM_CHAT_MODEL || "llama3-70b-8192",
+    EMBED_MODEL: process.env.LLM_EMBED_MODEL || "nomic-embed-text-v1.5",
+    TEMPERATURE: Number(process.env.LLM_TEMPERATURE) || 0.7,
+    MAX_TOKENS: Number(process.env.LLM_MAX_TOKENS) || 1024,
+  },
+
   // RAG Configuration
   RAG: {
     CHUNK_SIZE: Number(process.env.RAG_CHUNK_SIZE) || 500,

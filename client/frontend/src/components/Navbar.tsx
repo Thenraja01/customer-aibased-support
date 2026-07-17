@@ -103,7 +103,12 @@ export default function Navbar() {
                     <Button 
                      variant="link"
                       className="w-full justify-start text-primary hover:text-primary/80"
-                    onClick={() => { navigate("/dashboard") }}>dashboard</Button>
+                    onClick={() => {
+                      const role = user?.role_id?.role_name?.toLowerCase();
+                      if (role === "super_admin" || role === "admin") navigate("/admin");
+                      else if (role === "agent") navigate("/agent/dashboard");
+                      else navigate("/dashboard");
+                    }}>dashboard</Button>
                   </div>
 
                   <div className="p-2">

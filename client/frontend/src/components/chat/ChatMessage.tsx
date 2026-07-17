@@ -1,11 +1,16 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState, useCallback } from "react";
+
 import { cn } from "@/lib/utils";
-import { Headphones, User } from "lucide-react";
+import { Headphones, User, ThumbsUp, ThumbsDown, FileText } from "lucide-react";
 import type { ChatMessage as MessageType } from "@/types/chat";
+import { MessageAPI } from "@/api";
+import ChatOptionCards, { parseOptions } from "./ChatOptionCards";
+import SuggestedFollowUps from "./SuggestedFollowUps";
 
 interface ChatMessageProps {
   message: MessageType;
   isOwn: boolean;
+  onOptionSelect?: (text: string) => void;
 }
 
 function renderMarkdown(text: string) {
@@ -31,13 +36,122 @@ function renderMarkdown(text: string) {
   return html;
 }
 
-const ChatMessage = memo(function ChatMessage({ message, isOwn }: ChatMessageProps) {
+function parseSources(content: string): string[] {
+  const sources: string[] = [];
+  const sourcePatternA = /\[Source:\s*(.+?)\]/g;
+  let match;
+  while ((match = sourcePatternA.exec(content)) !== null) {
+    sources.push(match[1].trim());
+  }
+  const sourcePatternB = /\*\*Source:\*\*\s*(.+?)(?:\n|$|\s*\*\*)/g;
+  while ((match = sourcePatternB.exec(content)) !== null) {
+    const val = match[1].trim();
+    if (!sources.includes(val)) sources.push(val);
+  }
+  return sources;
+}
+
+function stripSourcePatterns(content: string): string {
+  return content
+    .replace(/\[Source:\s*.+?\]/g, "")
+    .replace(/\*\*Source:\*\*\s*.+?(\n|$)/g, "$1")
+    .replace(/\*\*Choose an option:\*\*[\s\S]*$/i, "")
+    .trim();
+}
+
+function parseConfidence(content: string): number | null {
+  const match = content.match(/\*\*Confidence:\*\*\s*(\d+(?:\.\d+)?)/i);
+  if (match) return parseFloat(match[1]);
+  const match2 = content.match(/confidence[:\s]+(\d+(?:\.\d+)?)/i);
+  if (match2) return parseFloat(match2[1]);
+  return null;
+}
+
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  let label: string;
+  let color: string;
+  if (confidence > 0.8) {
+    label = "High";
+    color = "bg-green-500";
+  } else if (confidence >= 0.5) {
+    label = "Medium";
+    color = "bg-yellow-500";
+  } else {
+    label = "Low";
+    color = "bg-red-500";
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+      <span className={cn("w-1.5 h-1.5 rounded-full", color)} />
+      {label}
+    </span>
+  );
+}
+
+function SourceCitations({ sources }: { sources: string[] }) {
+  if (sources.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {sources.map((src) => (
+        <span
+          key={src}
+          className={cn(
+            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px]",
+            "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400",
+            "border border-blue-200 dark:border-blue-800/30"
+          )}
+        >
+          <FileText size={10} />
+          {src}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const ChatMessage = memo(function ChatMessage({ message, isOwn, onOptionSelect }: ChatMessageProps) {
   const isAI = message.is_ai;
+  const [feedbackState, setFeedbackState] = useState<string | null>(message.feedback || null);
+
+  const handleFeedback = async (feedback: string) => {
+    try {
+      await MessageAPI.updateFeedback(message._id, feedback === feedbackState ? null : feedback);
+      setFeedbackState(feedback === feedbackState ? null : feedback);
+    } catch (e) { console.error(e); }
+  };
+
+  const sources = useMemo(
+    () => (isAI ? parseSources(message.content) : []),
+    [isAI, message.content]
+  );
+
+  const confidence = useMemo(
+    () => (isAI ? parseConfidence(message.content) : null),
+    [isAI, message.content]
+  );
+
+  const options = useMemo(
+    () => (isAI ? parseOptions(message.content) : null),
+    [isAI, message.content]
+  );
+
+  const cleanContent = useMemo(() => {
+    if (!isAI) return message.content;
+    return stripSourcePatterns(message.content);
+  }, [isAI, message.content]);
 
   const renderedContent = useMemo(() => {
     if (!isAI) return null;
-    return { __html: renderMarkdown(message.content) };
-  }, [isAI, message.content]);
+    return { __html: renderMarkdown(cleanContent) };
+  }, [isAI, cleanContent]);
+
+  const handleOptionSelect = useCallback(
+    (text: string) => {
+      onOptionSelect?.(text);
+    },
+    [onOptionSelect]
+  );
 
   return (
     <div
@@ -73,12 +187,55 @@ const ChatMessage = memo(function ChatMessage({ message, isOwn }: ChatMessagePro
                 {message.content}
               </div>
             )}
-            <div className="text-[10px] text-muted-foreground mt-1.5">
-              {new Date(message.created_at).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+
+            {options && onOptionSelect && (
+              <ChatOptionCards options={options} onSelect={handleOptionSelect} />
+            )}
+
+            <SourceCitations sources={sources} />
+
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-[10px] text-muted-foreground">
+                {new Date(message.created_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              {confidence !== null && <ConfidenceBadge confidence={confidence} />}
             </div>
+
+            {isAI && (
+              <div className="flex items-center gap-1 mt-1.5">
+                <button
+                  onClick={() => handleFeedback("helpful")}
+                  className={cn(
+                    "p-1 rounded transition-colors",
+                    feedbackState === "helpful"
+                      ? "text-green-500 bg-green-500/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                  title="Helpful"
+                >
+                  <ThumbsUp size={12} />
+                </button>
+                <button
+                  onClick={() => handleFeedback("not_helpful")}
+                  className={cn(
+                    "p-1 rounded transition-colors",
+                    feedbackState === "not_helpful"
+                      ? "text-red-500 bg-red-500/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                  title="Not helpful"
+                >
+                  <ThumbsDown size={12} />
+                </button>
+              </div>
+            )}
+
+            {isAI && onOptionSelect && (
+              <SuggestedFollowUps messageContent={cleanContent} onSelect={handleOptionSelect} />
+            )}
           </div>
         </div>
       </div>

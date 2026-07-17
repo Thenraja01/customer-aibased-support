@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, memo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,13 +61,25 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
     }
   }, [form, user, addTicket, onClose]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} />
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+          />
 
-      <div className="relative w-full max-w-md mx-4 bg-background dark:bg-card/95 dark:backdrop-blur-md rounded-xl shadow-xl dark:shadow-2xl dark:shadow-black/10 border dark:border-white/[0.06] animate-in fade-in zoom-in-95 duration-200">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="relative w-full max-w-md mx-4 bg-background dark:bg-card/95 dark:backdrop-blur-md rounded-xl shadow-xl dark:shadow-2xl dark:shadow-black/10 border dark:border-white/[0.06]">
         <div className="flex items-center justify-between px-5 py-4 border-b dark:border-white/[0.06]">
           <div>
             <h2 className="text-base font-semibold">Create Ticket</h2>
@@ -150,8 +163,10 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
             </div>
           </form>
         )}
-      </div>
-    </div>
+      </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 });
 

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Ticket, Clock, CheckCircle2, AlertCircle, Plus, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTickets } from "@/hooks/useTickets";
 import CreateTicketDialog from "@/components/ticket/CreateTicketDialog";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 const statusFilters = ["", "open", "in_progress", "resolved", "closed"];
 
@@ -58,8 +60,8 @@ export default function TicketsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           {!isAgent && (
             <button
@@ -85,9 +87,9 @@ export default function TicketsPage() {
             New Ticket
           </button>
         )}
-      </div>
+      </motion.div>
 
-      <div className="flex gap-1">
+      <motion.div variants={staggerItem} className="flex gap-1">
         {statusFilters.map((s) => (
           <button
             key={s}
@@ -101,9 +103,9 @@ export default function TicketsPage() {
             {s || "All"}
           </button>
         ))}
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] shadow-xs">
+      <motion.div variants={staggerItem} className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] shadow-xs">
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">
             <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -165,12 +167,12 @@ export default function TicketsPage() {
             ))}
           </div>
         )}
-      </div>
+      </motion.div>
 
       <CreateTicketDialog
         open={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
       />
-    </div>
+    </motion.div>
   );
 }

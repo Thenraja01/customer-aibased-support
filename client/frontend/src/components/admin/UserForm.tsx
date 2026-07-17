@@ -58,7 +58,8 @@ export default function UserForm({
       const data = password ? { ...rest, password } : { ...rest };
       await onSubmit(data);
       onClose();
-    } catch {
+    } catch (error) {
+      console.error("Form submission failed:", error);
     } finally {
       setSubmitting(false);
     }

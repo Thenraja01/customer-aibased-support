@@ -1,7 +1,9 @@
 import { Users, Building2, Shield, Activity, UserX, UserCheck } from "lucide-react";
+import { motion } from "framer-motion";
 import StatsCard from "@/components/admin/StatsCard";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { staggerContainer, staggerItem, slideUp } from "@/lib/animations";
 
 export default function SuperAdminDashboard() {
   const { dashboardStats, loading } = useAdminDashboard();
@@ -13,13 +15,13 @@ export default function SuperAdminDashboard() {
   const stats = dashboardStats;
 
   return (
-    <div className="space-y-6">
-      <div>
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem}>
         <h1 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h1>
         <p className="text-muted-foreground">System-wide overview and management.</p>
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <motion.div variants={slideUp} initial="initial" animate="animate" transition={{ duration: 0.3 }} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Total Users"
           value={stats?.totalUsers ?? 0}
@@ -44,9 +46,9 @@ export default function SuperAdminDashboard() {
           icon={<Activity size={20} />}
           description="Last 7 days"
         />
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <motion.div variants={slideUp} initial="initial" animate="animate" transition={{ duration: 0.3 }} className="grid gap-4 md:grid-cols-2">
         <StatsCard
           title="Active Users"
           value={stats?.activeUsers ?? 0}
@@ -59,37 +61,39 @@ export default function SuperAdminDashboard() {
           icon={<UserX size={20} />}
           className="border-destructive/20"
         />
-      </div>
+      </motion.div>
 
       {stats?.orgStats && stats.orgStats.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Organizations Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Organization</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Org ID</th>
-                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Users</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.orgStats.map((org) => (
-                    <tr key={org.organizationId} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-4 font-medium">{org.name}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{org.organization_id}</td>
-                      <td className="py-3 px-4 text-right">{org.userCount}</td>
+        <motion.div variants={staggerItem}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Organizations Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Organization</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Org ID</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground">Users</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                  </thead>
+                  <tbody>
+                    {stats.orgStats.map((org) => (
+                      <tr key={org.organizationId} className="border-b hover:bg-muted/50">
+                        <td className="py-3 px-4 font-medium">{org.name}</td>
+                        <td className="py-3 px-4 text-muted-foreground">{org.organization_id}</td>
+                        <td className="py-3 px-4 text-right">{org.userCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }

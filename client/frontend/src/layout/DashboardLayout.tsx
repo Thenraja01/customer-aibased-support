@@ -14,6 +14,8 @@ import AdminSidebar from "@/components/admin/AdminSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
+import { hasPermission } from "@/lib/rbac";
+import { PERMISSIONS } from "@/lib/rbac";
 
 const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -32,24 +34,31 @@ const DashboardLayout = () => {
   }, [user, loadNotifications, loadUnreadCount]);
 
   const customerLinks = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    { name: "Chat", path: "/chat", icon: MessageCircle },
-    { name: "Tickets", path: "/tickets", icon: Ticket },
-    { name: "Settings", path: "/profile", icon: Settings },
+    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, permission: null },
+    { name: "Chat", path: "/chat", icon: MessageCircle, permission: PERMISSIONS.ACCESS_CHATBOT },
+    { name: "Tickets", path: "/tickets", icon: Ticket, permission: null },
+    { name: "Settings", path: "/profile", icon: Settings, permission: null },
   ];
 
   const agentLinks = [
-    { name: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
-    { name: "Chats", path: "/agent/chats", icon: MessageCircle },
-    { name: "Tickets", path: "/agent/tickets", icon: Ticket },
-    { name: "Settings", path: "/profile", icon: Settings },
+    { name: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard, permission: null },
+    { name: "Chats", path: "/agent/chats", icon: MessageCircle, permission: PERMISSIONS.ACCESS_CHATBOT },
+    { name: "Tickets", path: "/agent/tickets", icon: Ticket, permission: null },
+    { name: "Settings", path: "/profile", icon: Settings, permission: null },
   ];
+
+  const filterByPermission = (links: typeof customerLinks) =>
+    links.filter((link) => {
+      if (!link.permission) return true;
+      if (roleName === "super_admin" || roleName === "admin") return true;
+      return hasPermission(roleName, link.permission);
+    });
 
   let links: typeof customerLinks = [];
   if (roleName === "agent") {
-    links = agentLinks;
+    links = filterByPermission(agentLinks);
   } else if (roleName !== "super_admin" && roleName !== "admin") {
-    links = customerLinks;
+    links = filterByPermission(customerLinks);
   }
 
   return (

@@ -124,3 +124,21 @@ export const removeChat = async (req, res) => {
     res.status(status).json({ success: false, message: error.message });
   }
 };
+
+export const assignAgentToChat = async (req, res) => {
+  try {
+    const chat = await chatService.assignAgent(req.params.id, req.body.agentId);
+    res.status(200).json({ success: true, data: chat });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const changePriority = async (req, res) => {
+  try {
+    const chat = await chatService.updatePriority(req.params.id, req.body.priority);
+    res.status(200).json({ success: true, data: chat });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

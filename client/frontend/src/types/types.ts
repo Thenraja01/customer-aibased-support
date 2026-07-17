@@ -1,56 +1,56 @@
-export interface IUser {
-  _id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  organization_id: any;
-  role_id: any;
-  status: string;
-  createdAt?: string;
-}
+export type {
+  IRole,
+  IOrganization,
+  IUser,
+  IDocument,
+  IDocumentType,
+  IDocumentVerification,
+} from "./index";
 
-export interface IOrganization {
-  _id: string;
-  name: string;
-  organization_id?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  description?: string;
-  createdAt?: string;
-}
-
-export interface IRole {
-  _id: string;
-  role_name: string;
-  description?: string;
-  createdAt?: string;
-}
-
-export interface IDocument {
-  _id: string;
-  user_id: string;
+export interface ISubscription {
+  _id?: string;
   organization_id: string;
-  document_type_id?: string;
+  plan: "Starter" | "Professional" | "Enterprise";
+  status: "active" | "trial" | "past_due" | "cancelled";
+  billingCycle: "monthly" | "quarterly" | "annual";
+  tokenLimit: number;
+  userLimit: number;
+  documentLimit: number;
+  startDate?: string;
+  nextBilling?: string;
+}
+
+export interface IKnowledgeBase {
+  _id?: string;
+  organization_id: string;
   title: string;
-  file_url: string;
-  status: "pending" | "approved" | "rejected";
+  content: string;
+  category: string;
+  tags: string[];
+  status: "draft" | "published" | "archived";
   created_at?: string;
   updated_at?: string;
 }
 
-export interface IDocumentType {
-  _id: string;
-  name: string;
-  description?: string;
+export interface IAIConfig {
+  _id?: string;
+  organization_id: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+  enabledFeatures: string[];
+  updated_at?: string;
 }
 
-export interface IDocumentVerification {
-  _id: string;
-  document_id: string;
-  verified_by: string;
-  status: "pending" | "approved" | "rejected";
-  remarks?: string;
+export interface IConversation {
+  _id?: string;
+  chat_id: string;
+  user_id: string;
+  organization_id: string;
+  topic: string;
+  status: "open" | "closed" | "escalated";
+  satisfaction?: number;
   created_at?: string;
   updated_at?: string;
 }

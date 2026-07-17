@@ -92,3 +92,17 @@ export const removeByChat = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const updateFeedback = async (req, res) => {
+  try {
+    const { feedback } = req.body;
+    if (!["helpful", "not_helpful", null].includes(feedback)) {
+      return res.status(400).json({ success: false, message: "Invalid feedback value" });
+    }
+    const msg = await messageService.updateFeedback(req.params.id, feedback);
+    res.status(200).json({ success: true, data: msg });
+  } catch (error) {
+    const status = error.message === "Message not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};

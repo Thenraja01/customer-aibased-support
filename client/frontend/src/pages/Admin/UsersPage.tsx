@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
@@ -7,6 +8,7 @@ import UserForm from "@/components/admin/UserForm";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
 import { useAdminOrganizations } from "@/hooks/useAdminOrganizations";
 import { useAdminRoles } from "@/hooks/useAdminRoles";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 export default function UsersPage() {
   const {
@@ -61,8 +63,8 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Users</h1>
           <p className="text-muted-foreground">Manage all system users.</p>
@@ -71,9 +73,9 @@ export default function UsersPage() {
           <Plus size={16} className="mr-1" />
           New User
         </Button>
-      </div>
+      </motion.div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -93,16 +95,16 @@ export default function UsersPage() {
           <option value="inactive">Inactive</option>
           <option value="blocked">Blocked</option>
         </select>
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border bg-card">
+      <motion.div variants={staggerItem} className="rounded-xl border bg-card">
         <UserTable
           users={users}
           onEdit={(user) => { setEditingUser(user); setShowForm(true); }}
           onDelete={handleDelete}
           onToggleStatus={handleToggleStatus}
         />
-      </div>
+      </motion.div>
 
       {userPagination && userPagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
@@ -140,6 +142,6 @@ export default function UsersPage() {
           onClose={() => { setShowForm(false); setEditingUser(null); }}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

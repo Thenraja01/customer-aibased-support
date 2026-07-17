@@ -28,4 +28,6 @@ export const AdminAPI = {
 
   // Audit Logs
   getAuditLogs: (params) => AxiosInstance.get(`/${url}/audit-logs`, { params }),
+  getAuditStats: (params) => AxiosInstance.get("/audit-logs/stats", { params }),
+  exportAuditLogs: (params) => AxiosInstance.get("/audit-logs/export", { params, responseType: "blob" }),
 };

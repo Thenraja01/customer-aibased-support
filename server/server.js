@@ -28,6 +28,7 @@ import { memoryRouter } from "./modules/memory/index.js";
 import { adminRouter } from "./modules/admin/index.js";
 import { knowledgeGraphRouter } from "./modules/knowledge-graph/index.js";
 import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
+import { auditLogger } from "./middleware/audit.middleware.js";
 
 const app = express();
 
@@ -63,6 +64,8 @@ const authLimiter = rateLimit({
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+app.use(auditLogger);
 
 app.use("/auth", authLimiter, authRouter);
 app.use("/users", userRouter);

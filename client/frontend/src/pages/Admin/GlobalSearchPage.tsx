@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Search, Users, FileText, MessageSquare, Ticket } from "lucide-react";
 import { ChatAPI, UsersAPI, TicketAPI, DocumentAPI } from "@/api";
+import { fadeIn } from "@/lib/animations";
 
 export default function GlobalSearchPage() {
   const [query, setQuery] = useState("");
@@ -46,7 +48,7 @@ export default function GlobalSearchPage() {
   const totalResults = Object.values(results).reduce((sum: number, arr: any) => sum + (arr?.length || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <motion.div {...fadeIn} transition={{ duration: 0.3 }} className="space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold tracking-tight">Global Search</h1>
         <p className="text-sm text-muted-foreground">
@@ -185,6 +187,6 @@ export default function GlobalSearchPage() {
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

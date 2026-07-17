@@ -19,7 +19,14 @@ const messageSchema = new mongoose.Schema(
       enum: ["text", "image", "file", "system"],
       default: "text",
     },
+    file_url: { type: String },
+    file_name: { type: String },
     is_ai: { type: Boolean, default: false, index: true },
+    feedback: {
+      type: String,
+      enum: ["helpful", "not_helpful", null],
+      default: null,
+    },
   },
   {
     timestamps: {

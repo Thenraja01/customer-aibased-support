@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { FAQAPI } from "@/api";
 import { HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 interface FAQ {
   _id: string;
@@ -45,13 +47,13 @@ export default function FAQPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex flex-col gap-2">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6 max-w-4xl mx-auto">
+      <motion.div variants={staggerItem} className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold tracking-tight">Frequently Asked Questions</h1>
         <p className="text-sm text-muted-foreground">
           Find quick answers to common questions about our services.
         </p>
-      </div>
+      </motion.div>
 
       {faqs.length === 0 ? (
         <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] p-8 text-center">
@@ -61,8 +63,9 @@ export default function FAQPage() {
       ) : (
         <div className="space-y-3">
           {faqs.map((faq, index) => (
-            <div
+            <motion.div
               key={faq._id}
+              variants={staggerItem}
               className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden"
             >
               <button
@@ -81,10 +84,10 @@ export default function FAQPage() {
                   <div className="pt-4 whitespace-pre-wrap">{faq.answer}</div>
                 </div>
               )}
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

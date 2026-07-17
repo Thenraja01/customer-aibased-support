@@ -16,6 +16,7 @@ router.get("/chat/:chatId/count", selfOrAdminParam("chatId"), msgController.getC
 router.get("/chat/:chatId/ai", selfOrAdminParam("chatId"), msgController.getAIOnly);
 router.get("/chat/:chatId/search", selfOrAdminParam("chatId"), msgController.search);
 router.put("/:id", selfOrAdmin, validate(updateMessageSchema), msgController.update);
+router.patch("/:id/feedback", msgController.updateFeedback);
 router.delete("/chat/:chatId/all", selfOrAdminParam("chatId"), msgController.removeByChat);
 router.delete("/chat/:chatId", selfOrAdminParam("chatId"), msgController.removeByChat);
 router.delete("/:id", selfOrAdmin, msgController.remove);

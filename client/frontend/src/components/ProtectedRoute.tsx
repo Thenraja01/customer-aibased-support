@@ -34,7 +34,7 @@ export default function ProtectedRoute({ allowedRoles, redirectTo }: Props) {
       (roleName === "super_admin"
         ? "/admin"
         : roleName === "admin"
-        ? "/admin/dashboard"
+        ? "/admin"
         : roleName === "agent"
         ? "/agent/dashboard"
         : "/dashboard");

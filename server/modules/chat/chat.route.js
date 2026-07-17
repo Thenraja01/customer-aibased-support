@@ -19,6 +19,8 @@ router.get("/:id", chatController.getChat);
 router.patch("/:id/topic", selfOrAdmin, validate(updateTopicSchema), chatController.updateTopic);
 router.patch("/:id/close", selfOrAdmin, chatController.close);
 router.patch("/:id/reopen", selfOrAdmin, chatController.reopen);
+router.patch("/:id/assign", restrict("admin", "agent"), chatController.assignAgentToChat);
+router.patch("/:id/priority", restrict("admin", "agent"), chatController.changePriority);
 router.delete("/:id", selfOrAdmin, chatController.removeChat);
 
 export default router;

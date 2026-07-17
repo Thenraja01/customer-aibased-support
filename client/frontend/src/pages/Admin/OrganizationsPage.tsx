@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import OrganizationTable from "@/components/admin/OrganizationTable";
 import OrganizationForm from "@/components/admin/OrganizationForm";
 import { useAdminOrganizations } from "@/hooks/useAdminOrganizations";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 export default function OrganizationsPage() {
   const {
@@ -51,8 +53,8 @@ export default function OrganizationsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Organizations</h1>
           <p className="text-muted-foreground">Manage multi-tenant organizations.</p>
@@ -61,9 +63,9 @@ export default function OrganizationsPage() {
           <Plus size={16} className="mr-1" />
           New Organization
         </Button>
-      </div>
+      </motion.div>
 
-      <div className="flex items-center gap-2">
+      <motion.div variants={staggerItem} className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -73,16 +75,16 @@ export default function OrganizationsPage() {
             className="pl-9"
           />
         </div>
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border bg-card">
+      <motion.div variants={staggerItem} className="rounded-xl border bg-card">
         <OrganizationTable
           organizations={organizations}
           onEdit={(org) => { setEditingOrg(org); setShowForm(true); }}
           onDelete={handleDelete}
           onViewUsers={handleViewUsers}
         />
-      </div>
+      </motion.div>
 
       {orgPagination && orgPagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
@@ -150,6 +152,6 @@ export default function OrganizationsPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

@@ -60,3 +60,9 @@ export const searchMessages = async (chatId, keyword) => {
     content: { $regex: safe, $options: "i" },
   }).populate("sender_id", "name email");
 };
+
+export const updateFeedback = async (id, feedback) => {
+  const msg = await Message.findByIdAndUpdate(id, { feedback }, { new: true });
+  if (!msg) throw new Error("Message not found");
+  return msg;
+};

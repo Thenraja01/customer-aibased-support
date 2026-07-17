@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { UsersAPI, TicketAPI, ChatAPI, DocumentAPI, AISessionAPI } from "@/api";
 import { Users, Ticket, MessageSquare, FileText, Clock, CheckCircle2 } from "lucide-react";
+import { staggerContainer, staggerItem, slideUp } from "@/lib/animations";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -70,15 +72,15 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem} className="flex flex-col gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
         <p className="text-muted-foreground">
           Welcome back, {user?.name || "Admin"}! Here is an overview of your organization.
         </p>
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <motion.div variants={slideUp} initial="initial" animate="animate" transition={{ duration: 0.3 }} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={Users}
           label="Active Users"
@@ -103,9 +105,9 @@ export default function AdminDashboard() {
           value={stats.pendingDocs}
           color="bg-primary/10 text-primary"
         />
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <motion.div variants={slideUp} initial="initial" animate="animate" transition={{ duration: 0.3 }} className="grid gap-4 md:grid-cols-3">
         <StatCard
           icon={Clock}
           label="In Progress Tickets"
@@ -124,7 +126,7 @@ export default function AdminDashboard() {
           value={stats.totalUsers}
           color="bg-muted text-muted-foreground"
         />
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

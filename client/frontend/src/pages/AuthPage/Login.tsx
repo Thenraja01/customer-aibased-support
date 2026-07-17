@@ -13,7 +13,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Login() {
   const { login } = useAuth();
@@ -51,7 +50,7 @@ export default function Login() {
           navigate("/admin", { replace: true });
           break;
         case "admin":
-          navigate("/admin/dashboard", { replace: true });
+          navigate("/admin", { replace: true });
           break;
         case "agent":
           navigate("/agent/dashboard", { replace: true });

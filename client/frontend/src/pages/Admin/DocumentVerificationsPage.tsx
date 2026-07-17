@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import DocumentVerificationTable from "@/components/admin/DocumentVerificationTable";
 import { useAdminDocumentVerifications } from "@/hooks/useAdminDocumentVerifications";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 const statusFilters = ["", "pending", "approved", "rejected"];
 
@@ -62,17 +64,17 @@ export default function DocumentVerificationsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem}>
         <h1 className="text-3xl font-bold tracking-tight">
           Document Verifications
         </h1>
         <p className="text-muted-foreground">
           Review and manage document verifications.
         </p>
-      </div>
+      </motion.div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1">
           {statusFilters.map((s) => (
             <Button
@@ -85,9 +87,9 @@ export default function DocumentVerificationsPage() {
             </Button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border bg-card">
+      <motion.div variants={staggerItem} className="rounded-xl border bg-card">
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">
             Loading...
@@ -100,7 +102,7 @@ export default function DocumentVerificationsPage() {
             onDelete={handleDelete}
           />
         )}
-      </div>
+      </motion.div>
 
       {rejectTarget && (
         <div className="modal-overlay">
@@ -152,6 +154,6 @@ export default function DocumentVerificationsPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

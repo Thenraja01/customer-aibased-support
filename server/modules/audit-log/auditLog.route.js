@@ -8,6 +8,8 @@ router.use(protect);
 
 router.post("/", restrict("admin"), auditController.create);
 router.get("/", restrict("admin"), auditController.getAll);
+router.get("/stats", restrict("admin"), auditController.getStats);
+router.get("/export", restrict("admin"), auditController.exportLogs);
 router.get("/user/:userId", restrict("admin"), auditController.getByUser);
 router.get("/table/:tableName", restrict("admin"), auditController.getByTable);
 router.get("/record/:tableName/:recordId", restrict("admin"), auditController.getByRecord);

@@ -1,9 +1,11 @@
 import { useEffect, memo } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { MessageSquare, Ticket, Clock, CheckCircle2, ArrowRight, Headphones, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTickets } from "@/hooks/useTickets";
 import { useChat } from "@/hooks/useChat";
+import { staggerContainer, staggerItem, slideUp } from "@/lib/animations";
 
 interface StatCardProps {
   icon: React.ComponentType<{ size?: number }>;
@@ -46,22 +48,22 @@ export default function AgentDashboard() {
   const openChats = chats.filter((c: any) => c.status === "open").length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-1">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem} className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight">
           Welcome back, {user?.name?.split(" ")[0] || "Agent"}
         </h1>
         <p className="text-sm text-muted-foreground">
           Manage chats, tickets, and assist customers.
         </p>
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <motion.div variants={slideUp} initial="initial" animate="animate" transition={{ duration: 0.3 }} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={MessageSquare} label="Open Chats" value={openChats} color="bg-primary/10 text-primary" />
         <StatCard icon={Ticket} label="Open Tickets" value={openTickets} color="bg-primary/10 text-primary" />
         <StatCard icon={Clock} label="In Progress" value={inProgressTickets} color="bg-accent text-accent-foreground" />
         <StatCard icon={CheckCircle2} label="Resolved" value={resolvedTickets} color="bg-primary/10 text-primary" />
-      </div>
+      </motion.div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <button
@@ -178,6 +180,6 @@ export default function AgentDashboard() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

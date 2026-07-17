@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
@@ -6,6 +7,7 @@ import DocumentTable from "@/components/admin/DocumentTable";
 import DocumentUploadForm from "@/components/admin/DocumentUploadForm";
 import { useAdminDocuments } from "@/hooks/useAdminDocuments";
 import { useAdminDocumentTypes } from "@/hooks/useAdminDocumentTypes";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 const statusFilters = ["", "pending", "approved", "rejected"];
 
@@ -62,8 +64,8 @@ export default function DocumentsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
           <p className="text-muted-foreground">
@@ -74,9 +76,9 @@ export default function DocumentsPage() {
           <Plus size={16} className="mr-1" />
           Upload Document
         </Button>
-      </div>
+      </motion.div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search
             size={16}
@@ -101,9 +103,9 @@ export default function DocumentsPage() {
             </Button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border bg-card">
+      <motion.div variants={staggerItem} className="rounded-xl border bg-card">
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">
             Loading...
@@ -115,7 +117,7 @@ export default function DocumentsPage() {
             onDelete={handleDelete}
           />
         )}
-      </div>
+      </motion.div>
 
       {showUpload && (
         <DocumentUploadForm
@@ -181,6 +183,6 @@ export default function DocumentsPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

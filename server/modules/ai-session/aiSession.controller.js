@@ -20,7 +20,7 @@ export const getAll = async (req, res) => {
 
 export const getStats = async (req, res) => {
   try {
-    const stats = await sessionService.getModelStats();
+    const stats = await sessionService.getEnhancedStats(req.user?.organizationId);
     res.status(200).json({ success: true, data: stats });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

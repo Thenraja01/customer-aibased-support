@@ -20,6 +20,7 @@ import {
   Zap,
   Shield,
   Globe,
+  Quote,
 } from "lucide-react";
 
 const fadeUp = {
@@ -87,6 +88,33 @@ const statCards = [
   { icon: Shield, value: "99.9%", label: "Uptime SLA" },
   { icon: Globe, value: "50+", label: "Languages" },
   { icon: Bot, value: "24/7", label: "AI Availability" },
+];
+
+const testimonials = [
+  {
+    name: "Sarah Chen",
+    role: "Head of Support",
+    company: "TechFlow Inc.",
+    quote:
+      "SupportAI reduced our average response time from 4 hours to under 3 minutes. Our customer satisfaction scores have never been higher.",
+    avatar: "SC",
+  },
+  {
+    name: "Marcus Rodriguez",
+    role: "CTO",
+    company: "GrowthBase",
+    quote:
+      "The AI chatbot handles 80% of our support tickets automatically. Our team can now focus entirely on complex, high-value customer issues.",
+    avatar: "MR",
+  },
+  {
+    name: "Aisha Patel",
+    role: "Customer Success Manager",
+    company: "CloudServ",
+    quote:
+      "The analytics dashboard gives us real-time insights we never had before. We identified and fixed our biggest pain points within the first week.",
+    avatar: "AP",
+  },
 ];
 
 export default function Home() {
@@ -235,6 +263,64 @@ export default function Home() {
               ))}
             </motion.div>
           </div>
+        </motion.div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="container mx-auto px-4">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={staggerContainer}
+          className="text-center mb-12"
+        >
+          <motion.h2
+            variants={fadeUp}
+            custom={0}
+            className="text-3xl font-bold tracking-tight mb-4"
+          >
+            Trusted by Industry Leaders
+          </motion.h2>
+          <motion.p
+            variants={fadeUp}
+            custom={1}
+            className="text-muted-foreground max-w-2xl mx-auto"
+          >
+            See what our customers have to say about transforming their support
+            with AI.
+          </motion.p>
+        </motion.div>
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={staggerContainer}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        >
+          {testimonials.map((t, i) => (
+            <motion.div key={t.name} variants={fadeUp} custom={i}>
+              <Card className="h-full dark:bg-card/50 dark:border-white/[0.06] dark:hover:shadow-primary/5 dark:hover:border-primary/20 transition-all duration-300 relative overflow-hidden">
+                <CardContent className="p-6 flex flex-col h-full">
+                  <Quote className="h-8 w-8 text-primary/20 dark:text-primary/30 mb-3" />
+                  <p className="text-sm leading-relaxed text-muted-foreground flex-1 mb-6">
+                    {t.quote}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 dark:from-primary/30 dark:to-secondary/30 flex items-center justify-center text-sm font-bold text-primary">
+                      {t.avatar}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t.role}, {t.company}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </motion.div>
       </section>
 

@@ -4,6 +4,7 @@ import { Provider } from "react-redux";
 import { store } from "./store/store";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { Toaster } from "sonner";
 import App from "./App.js";
 import "./index.css";
 
@@ -16,6 +17,7 @@ if (root) {
           <AuthProvider>
             <App />
           </AuthProvider>
+          <Toaster position="top-right" richColors />
         </ThemeProvider>
       </Provider>
     </StrictMode>

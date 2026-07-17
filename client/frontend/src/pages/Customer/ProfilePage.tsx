@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, User, Mail, Phone, Save, Loader2, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +7,7 @@ import { UsersAPI } from "@/api/user.api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fadeIn } from "@/lib/animations";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -82,7 +84,7 @@ export default function ProfilePage() {
   const orgName = typeof user?.organization_id === "object" ? user?.organization_id?.name : user?.organization_id;
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <motion.div {...fadeIn} transition={{ duration: 0.3 }} className="space-y-6 max-w-2xl">
       <div className="flex items-center gap-3">
         <button
           onClick={() => {
@@ -244,6 +246,6 @@ export default function ProfilePage() {
           </Button>
         </form>
       </div>
-    </div>
+    </motion.div>
   );
 }

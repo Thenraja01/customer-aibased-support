@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/store";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -10,7 +11,10 @@ import ChatHeader from "@/components/chat/ChatHeader";
 import WelcomeScreen from "@/components/chat/WelcomeScreen";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
-import TypingIndicator from "@/components/chat/TypingIndigator";
+import TypingIndicator from "@/components/chat/TypingIndicator";
+import ChatLayout from "@/components/chat/ChatLayout";
+import ChatSidebar from "@/components/chat/ChatSidebar";
+import type { Chat } from "@/types/chat";
 
 interface ChatPageProps {
   onOpenTicket?: () => void;
@@ -29,9 +33,15 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
     startNewChat,
     loadMessages,
     sendWithAI,
+    loadUserChats,
+    selectChat,
   } = useChat();
 
   const { containerRef, handleScroll } = useChatScroll(messages);
+
+  useEffect(() => {
+    loadUserChats();
+  }, [loadUserChats]);
 
   useEffect(() => {
     if (activeChat?._id) {
@@ -58,31 +68,49 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
   const handleSend = useCallback(
     async (text: string, file?: File) => {
       if (!activeChat?._id || !user?._id) return;
-     
-      await sendWithAI(activeChat._id, user._id, text);
-      if (file) { 
-        console.log("File selected:", file.name);
+
+      let finalText = text;
+      if (file) {
+        const fileInfo = `[Attached file: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
+        finalText = text ? `${text}\n\n${fileInfo}` : fileInfo;
       }
+
+      await sendWithAI(activeChat._id, user._id, finalText);
     },
     [activeChat, user, sendWithAI]
+  );
+
+  const handleSelectChat = useCallback(
+    (chat: Chat) => {
+      selectChat(chat);
+    },
+    [selectChat]
+  );
+
+  const handleNewChat = useCallback(() => {
+    selectChat(null);
+  }, [selectChat]);
+
+  const sidebar = (
+    <ChatSidebar onSelectChat={handleSelectChat} onNewChat={handleNewChat} />
   );
 
   /* No active chat -> Welcome */
   if (!activeChat && !loading) {
     return (
-      <div className="flex flex-col h-[calc(100vh-4rem)] bg-background dark:bg-gradient-to-b dark:from-background dark:to-background/80">
+      <ChatLayout sidebar={sidebar}>
         <ChatHeader activeChat={null} onOpenTicket={onOpenTicket ?? (() => {})} />
         <WelcomeScreen
           onStartWithMessage={handleStartWithMessage}
           onOpenTicket={onOpenTicket ?? (() => {})}
         />
-      </div>
+      </ChatLayout>
     );
   }
 
   /* Active Chat */
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background dark:bg-gradient-to-b dark:from-background dark:to-background/80">
+    <ChatLayout sidebar={sidebar}>
       <ChatHeader activeChat={activeChat} onOpenTicket={onOpenTicket ?? (() => {})} />
 
       {error && (
@@ -111,11 +139,17 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
         ) : (
           <div className="py-2">
             {messages.map((msg) => (
-              <ChatMessage
+              <motion.div
                 key={msg._id}
-                message={msg}
-                isOwn={!msg.is_ai && msg.sender_id === user?._id}
-              />
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChatMessage
+                  message={msg}
+                  isOwn={!msg.is_ai && msg.sender_id === user?._id}
+                />
+              </motion.div>
             ))}
             {(sending || aiThinking) && <TypingIndicator />}
           </div>
@@ -125,9 +159,9 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
       <div className="border-t bg-white bg-background/80 backdrop-blur-xl shrink-0">
         <ChatInput
           onSend={handleSend}
-          disabled={sending || aiThinking || loading }
+          disabled={sending || aiThinking || loading}
         />
       </div>
-    </div>
+    </ChatLayout>
   );
 }

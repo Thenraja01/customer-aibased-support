@@ -1,6 +1,8 @@
 import { useEffect } from "react";
+import { motion } from "framer-motion";
 import RoleManager from "@/components/admin/RoleManager";
 import { useAdminRoles } from "@/hooks/useAdminRoles";
+import { fadeIn } from "@/lib/animations";
 
 export default function RolesPage() {
   const { roles, fetchRoles, createRole, updateRole, deleteRole } =
@@ -11,7 +13,7 @@ export default function RolesPage() {
   }, [fetchRoles]);
 
   return (
-    <div className="space-y-6">
+    <motion.div {...fadeIn} transition={{ duration: 0.3 }} className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Roles</h1>
         <p className="text-muted-foreground">
@@ -27,6 +29,6 @@ export default function RolesPage() {
           onDelete={deleteRole}
         />
       </div>
-    </div>
+    </motion.div>
   );
 }

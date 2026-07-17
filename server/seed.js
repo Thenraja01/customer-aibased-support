@@ -10,6 +10,9 @@ import Chat from "./modules/chat/chat.schema.js";
 import Document from "./modules/document/document.schema.js";
 import DocumentType from "./modules/document-type/documentType.schema.js";
 import Notification from "./modules/notification/notification.schema.js";
+import DocumentChunk from "./modules/document/documentChunk.schema.js";
+import KnowledgeGraph from "./modules/knowledge-graph/knowledgeGraph.schema.js";
+import GraphEdge from "./modules/knowledge-graph/graphEdge.schema.js";
 
 dotenv.config();
 
@@ -272,33 +275,139 @@ async function seed() {
       }
     }
 
-    // Create Documents
+    // Create Documents with content for RAG
     if (johnUser) {
-      const idDocType = await DocumentType.findOne({ name: "ID Proof" });
-      const documents = [
+      const policyDocType = await DocumentType.findOne({ name: "Business License" }) || await DocumentType.create({ name: "Company Policy", description: "Company policies and procedures" });
+
+      const policyDocs = [
         {
-          user_id: johnUser._id,
-          organization_id: testOrg._id,
-          document_type_id: idDocType?._id,
-          title: "Passport Copy",
-          file_url: "https://example.com/files/passport.pdf",
-          status: "approved",
+          title: "Employee Leave Policy",
+          content: `Employee Leave Policy
+
+1. Annual Leave
+Full-time employees are entitled to 20 days of paid annual leave per year. Leave must be requested at least 2 weeks in advance. Unused leave can be carried over to the next year up to a maximum of 5 days.
+
+2. Sick Leave
+Employees are entitled to 10 days of paid sick leave per year. A medical certificate is required for absences exceeding 3 consecutive days. Sick leave cannot be carried over.
+
+3. Parental Leave
+Primary caregivers are entitled to 16 weeks of paid parental leave. Secondary caregivers are entitled to 4 weeks. Parental leave must be taken within 12 months of the birth or adoption.
+
+4. Bereavement Leave
+Employees are entitled to 5 days of paid bereavement leave for immediate family members and 2 days for extended family members.
+
+5. Unpaid Leave
+Unpaid leave may be granted at the discretion of management for up to 30 days per year. Requests must be submitted 30 days in advance.`,
         },
         {
-          user_id: johnUser._id,
-          organization_id: testOrg._id,
-          document_type_id: idDocType?._id,
-          title: "Driver's License",
-          file_url: "https://example.com/files/license.pdf",
-          status: "pending",
+          title: "Remote Work Policy",
+          content: `Remote Work Policy
+
+1. Eligibility
+Employees who have completed their probationary period and have a satisfactory performance rating are eligible for remote work arrangements.
+
+2. Schedule
+Remote work days must be agreed upon with the direct manager. Core working hours of 10:00 AM to 3:00 PM must be maintained regardless of location.
+
+3. Equipment
+The company provides a laptop and necessary software. Employees are responsible for maintaining a reliable internet connection and suitable workspace at home.
+
+4. Communication
+Remote employees must be available on Slack during core hours and respond to messages within 30 minutes. Weekly video meetings with the team are mandatory.
+
+5. Security
+All company data must be accessed through the VPN. Personal devices should not be used for handling sensitive information. Two-factor authentication is required for all company accounts.`,
+        },
+        {
+          title: "Refund and Returns Policy",
+          content: `Refund and Returns Policy
+
+1. General Policy
+We offer a 30-day money-back guarantee on all our products and services. If you are not satisfied, you can request a full refund within 30 days of purchase.
+
+2. How to Request a Refund
+Contact our support team through the chat feature or email support@company.com with your order number and reason for the refund.
+
+3. Processing Time
+Refunds are processed within 5-7 business days. The refund will be credited to the original payment method.
+
+4. Exceptions
+Custom or personalized orders are non-refundable. Subscriptions can be cancelled at any time, and a prorated refund will be issued for the remaining period.
+
+5. Damaged Products
+If you receive a damaged product, please contact us within 48 hours with photos of the damage. We will arrange a replacement or full refund.`,
         },
       ];
 
-      for (const doc of documents) {
-        let existing = await Document.findOne({ title: doc.title, user_id: doc.user_id });
+      for (const docData of policyDocs) {
+        let existing = await Document.findOne({ title: docData.title, user_id: johnUser._id });
         if (!existing) {
-          await Document.create(doc);
-          console.log(`Document created: ${doc.title}`);
+          const doc = await Document.create({
+            user_id: johnUser._id,
+            organization_id: testOrg._id,
+            document_type_id: policyDocType?._id,
+            title: docData.title,
+            file_url: "",
+            status: "approved",
+          });
+
+          // Create chunks for the document
+          const sentences = docData.content.split(/\n\n+/);
+          let chunkIndex = 0;
+          for (const sentence of sentences) {
+            if (sentence.trim().length > 20) {
+              const keywords = sentence.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter((w) => w.length > 3).slice(0, 8);
+              const embedding = new Array(128).fill(0);
+              keywords.forEach((kw, i) => {
+                let hash = 0;
+                for (let j = 0; j < kw.length; j++) {
+                  hash = ((hash << 5) - hash + kw.charCodeAt(j)) | 0;
+                }
+                embedding[Math.abs(hash % 128)] += 1 / (i + 1);
+              });
+              const mag = Math.sqrt(embedding.reduce((s, v) => s + v * v, 0));
+              if (mag > 0) embedding.forEach((_, i) => (embedding[i] /= mag));
+
+              await DocumentChunk.create({
+                document_id: doc._id,
+                chunk_index: chunkIndex,
+                content: sentence.trim(),
+                embedding,
+                keywords,
+                token_count: sentence.split(/\s+/).length,
+              });
+              chunkIndex++;
+            }
+          }
+
+          // Create KG nodes
+          const entityNames = ["annual leave", "sick leave", "remote work", "refund policy", "parental leave", "core hours", "equipment", "security"];
+          const nodes = [];
+          for (const name of entityNames) {
+            const node = await KnowledgeGraph.create({
+              document_id: doc._id,
+              entity_name: name,
+              entity_type: "Policy",
+              content_hash: Buffer.from(name).toString("base64"),
+              metadata: { source: docData.title },
+            });
+            nodes.push(node);
+          }
+
+          // Create KG edges
+          for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < Math.min(nodes.length, i + 3); j++) {
+              await GraphEdge.create({
+                source_id: nodes[i]._id,
+                target_id: nodes[j]._id,
+                relationship: "related_to",
+                weight: 0.5,
+                document_id: doc._id,
+              });
+            }
+          }
+
+          console.log(`Document created with RAG data: ${docData.title} (${chunkIndex} chunks, ${nodes.length} KG nodes)`);
         }
       }
     }

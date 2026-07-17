@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, memo } from "react";
-import { Send, Paperclip, X } from "lucide-react";
+import { Send, Paperclip, X, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -8,9 +8,14 @@ interface ChatInputProps {
   disabled: boolean;
 }
 
+function isImageFile(file: File): boolean {
+  return file.type.startsWith("image/");
+}
+
 const ChatInput = memo(function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -23,6 +28,7 @@ const ChatInput = memo(function ChatInput({ onSend, disabled }: ChatInputProps) 
       onSend(trimmed, selectedFile || undefined);
       setMessage("");
       setSelectedFile(null);
+      setImagePreview(null);
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
       }
@@ -32,12 +38,21 @@ const ChatInput = memo(function ChatInput({ onSend, disabled }: ChatInputProps) 
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      if (isImageFile(file)) {
+        const reader = new FileReader();
+        reader.onload = (ev) => setImagePreview(ev.target?.result as string);
+        reader.readAsDataURL(file);
+      } else {
+        setImagePreview(null);
+      }
     }
   }, []);
 
   const handleRemoveFile = useCallback(() => {
     setSelectedFile(null);
+    setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -117,17 +132,35 @@ const ChatInput = memo(function ChatInput({ onSend, disabled }: ChatInputProps) 
           </Button>
         </div>
         {selectedFile && (
-          <div className="mt-2 flex items-center gap-2 px-2">
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5 text-xs">
-              <span className="text-muted-foreground truncate max-w-[200px]">{selectedFile.name}</span>
-              <button
-                type="button"
-                onClick={handleRemoveFile}
-                className="hover:text-destructive transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
+          <div className="mt-2 px-2">
+            {imagePreview ? (
+              <div className="relative inline-block">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="h-20 w-20 object-cover rounded-lg border dark:border-white/[0.06]"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveFile}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5 text-xs">
+                <ImageIcon size={14} className="text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground truncate max-w-[200px]">{selectedFile.name}</span>
+                <button
+                  type="button"
+                  onClick={handleRemoveFile}
+                  className="hover:text-destructive transition-colors shrink-0"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </form>

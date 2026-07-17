@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./layout/layout";
-import ProtectedRoute from "@/components/ProdectedRoute";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 import Home from "@/pages/Marketing/Home";
 import About from "@/pages/Marketing/About";
@@ -24,6 +25,15 @@ import DocumentTypesPage from "@/pages/Admin/DocumentTypesPage";
 import DocumentVerificationsPage from "@/pages/Admin/DocumentVerificationsPage";
 import AIAnalyticsPage from "@/pages/Admin/AIAnalyticsPage";
 import GlobalSearchPage from "@/pages/Admin/GlobalSearchPage";
+import FAQManagementPage from "@/pages/Admin/FAQManagementPage";
+import LogManagementPage from "@/pages/Admin/LogManagementPage";
+import SubscriptionManagementPage from "@/pages/Admin/SubscriptionManagementPage";
+import ContentManagementPage from "@/pages/Admin/ContentManagementPage";
+import OrganizationApprovalPage from "@/pages/Admin/OrganizationApprovalPage";
+import TokenUsagePage from "@/pages/Admin/TokenUsagePage";
+import AIConfigurationPage from "@/pages/Admin/AIConfigurationPage";
+import ConversationMonitoringPage from "@/pages/Admin/ConversationMonitoringPage";
+import KnowledgeBasePage from "@/pages/Admin/KnowledgeBasePage";
 
 import AgentDashboard from "@/pages/Agent/AgentDashboard";
 
@@ -40,6 +50,7 @@ import DashboardLayout from "./layout/DashboardLayout";
 export default function App() {
   return (
     <BrowserRouter>
+      <ErrorBoundary>
       <Routes>
         {/* Public */}
         <Route element={<Layout />}>
@@ -78,6 +89,15 @@ export default function App() {
             <Route path="/admin/ai-analytics" element={<AIAnalyticsPage />} />
             <Route path="/admin/search" element={<GlobalSearchPage />} />
             <Route path="/admin/chatbot" element={<ChatPage />} />
+            <Route path="/admin/faqs" element={<FAQManagementPage />} />
+            <Route path="/admin/logs" element={<LogManagementPage />} />
+            <Route path="/admin/subscriptions" element={<SubscriptionManagementPage />} />
+            <Route path="/admin/content" element={<ContentManagementPage />} />
+            <Route path="/admin/org-approvals" element={<OrganizationApprovalPage />} />
+            <Route path="/admin/token-usage" element={<TokenUsagePage />} />
+            <Route path="/admin/ai-config" element={<AIConfigurationPage />} />
+            <Route path="/admin/conversations" element={<ConversationMonitoringPage />} />
+            <Route path="/admin/knowledge-base" element={<KnowledgeBasePage />} />
           </Route>
 
           {/* Agent Routes */}
@@ -114,6 +134,7 @@ export default function App() {
           </Route>
         </Route>
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

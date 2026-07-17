@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import DocumentTypeTable from "@/components/admin/DocumentTypeTable";
 import DocumentTypeForm from "@/components/admin/DocumentTypeForm";
 import { useAdminDocumentTypes } from "@/hooks/useAdminDocumentTypes";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 export default function DocumentTypesPage() {
   const {
@@ -40,8 +42,8 @@ export default function DocumentTypesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Document Types</h1>
           <p className="text-muted-foreground">
@@ -57,9 +59,9 @@ export default function DocumentTypesPage() {
           <Plus size={16} className="mr-1" />
           New Document Type
         </Button>
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border bg-card">
+      <motion.div variants={staggerItem} className="rounded-xl border bg-card">
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">
             Loading...
@@ -74,7 +76,7 @@ export default function DocumentTypesPage() {
             onDelete={handleDelete}
           />
         )}
-      </div>
+      </motion.div>
 
       {showForm && (
         <DocumentTypeForm
@@ -86,6 +88,6 @@ export default function DocumentTypesPage() {
           }}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

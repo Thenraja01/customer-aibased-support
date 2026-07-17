@@ -15,6 +15,7 @@ export interface ChatMessage {
   content: string;
   message_type: "text" | "image" | "file" | "system";
   is_ai: boolean;
+  feedback?: "helpful" | "not_helpful" | null;
   created_at: string;
 }
 

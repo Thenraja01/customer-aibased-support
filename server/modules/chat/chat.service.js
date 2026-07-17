@@ -11,12 +11,14 @@ export const createChat = async (data) => {
 export const getAllChats = async () => {
   return await Chat.find()
     .populate("user_id", "name email")
+    .populate("assigned_to", "name email")
     .sort({ created_at: -1 });
 };
 
 export const getChatById = async (id) => {
   const chat = await Chat.findById(id)
     .populate("user_id", "name email")
+    .populate("assigned_to", "name email")
     .populate("organization_id", "name");
   if (!chat) throw new Error("Chat not found");
   return chat;
@@ -62,6 +64,7 @@ export const countUserChats = async (userId) => {
 export const getActiveChats = async () => {
   return await Chat.find({ status: "open" })
     .populate("user_id", "name email")
+    .populate("assigned_to", "name email")
     .sort({ created_at: -1 });
 };
 
@@ -70,4 +73,20 @@ export const searchChats = async (keyword) => {
   return await Chat.find({
     topic: { $regex: safe, $options: "i" },
   }).populate("user_id", "name email");
+};
+
+export const assignAgent = async (chatId, agentId) => {
+  const chat = await Chat.findByIdAndUpdate(
+    chatId,
+    { assigned_to: agentId, status: "open" },
+    { new: true }
+  ).populate("assigned_to", "name email");
+  if (!chat) throw new Error("Chat not found");
+  return chat;
+};
+
+export const updatePriority = async (chatId, priority) => {
+  const chat = await Chat.findByIdAndUpdate(chatId, { priority }, { new: true });
+  if (!chat) throw new Error("Chat not found");
+  return chat;
 };

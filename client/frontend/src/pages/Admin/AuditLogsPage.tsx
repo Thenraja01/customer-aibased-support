@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import AuditLogTable from "@/components/admin/AuditLogTable";
 import { useAdminAuditLogs } from "@/hooks/useAdminAuditLogs";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 export default function AuditLogsPage() {
   const { auditLogs, logPagination, fetchAuditLogs } =
@@ -25,15 +27,15 @@ export default function AuditLogsPage() {
   }, [page, actionFilter, tableFilter, fromDate, toDate, fetchAuditLogs]);
 
   return (
-    <div className="space-y-6">
-      <div>
+    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
+      <motion.div variants={staggerItem}>
         <h1 className="text-3xl font-bold tracking-tight">Audit Logs</h1>
         <p className="text-muted-foreground">
           Track all system activity and changes.
         </p>
-      </div>
+      </motion.div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -61,11 +63,11 @@ export default function AuditLogsPage() {
           onChange={(e) => { setToDate(e.target.value); setPage(1); }}
           className="max-w-[170px]"
         />
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border bg-card">
+      <motion.div variants={staggerItem} className="rounded-xl border bg-card">
         <AuditLogTable logs={auditLogs} />
-      </div>
+      </motion.div>
 
       {logPagination && logPagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
@@ -93,6 +95,6 @@ export default function AuditLogsPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
