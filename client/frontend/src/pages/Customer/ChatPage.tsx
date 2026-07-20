@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useCallback, useState } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/store";
@@ -33,8 +31,6 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
     messagesLoading,
     sending,
     aiThinking,
-    streamingMessageId,
-    streamingContent,
     error,
     startNewChat,
     startNewChatViaSocket,
@@ -43,6 +39,7 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
     sendWithAIStream,
     loadUserChats,
     selectChat,
+    resetMessages,
   } = useChat();
 
   const { containerRef, handleScroll } = useChatScroll(messages);
@@ -78,20 +75,33 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
     }
   }, [activeChat?._id, loadMessages]);
 
-  const handleStartWithMessage = useCallback(
-    async (initialMessage: string) => {
-      if (!user?._id || !user?.organization_id?._id) return;
+  const startChatSession = useCallback(
+    async (topic: string) => {
+      if (!user?._id || !user?.organization_id?._id) return null;
       const result = await startNewChat({
         user_id: user._id,
         organization_id: user.organization_id._id,
-        topic: initialMessage.substring(0, 50),
+        topic,
       });
       const newChat = result.payload;
       if (newChat?._id) {
+        selectChat(newChat);
+        resetMessages();
+        return newChat;
+      }
+      return null;
+    },
+    [user, startNewChat, selectChat, resetMessages]
+  );
+
+  const handleStartWithMessage = useCallback(
+    async (initialMessage: string) => {
+      const newChat = await startChatSession(initialMessage.substring(0, 50));
+      if (newChat?._id && user?._id) {
         await sendWithAIStream(newChat._id, user._id, initialMessage);
       }
     },
-    [user, startNewChat, sendWithAIStream]
+    [startChatSession, user, sendWithAIStream]
   );
 
   const handleStartWithDocumentViaSocket = useCallback(
@@ -103,10 +113,12 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
       });
       const newChat = result.payload;
       if (newChat?._id) {
+        selectChat(newChat);
+        resetMessages();
         await sendWithStreamViaSocket(newChat._id, initialMessage);
       }
     },
-    [user, startNewChatViaSocket, sendWithStreamViaSocket]
+    [user, startNewChatViaSocket, selectChat, resetMessages, sendWithStreamViaSocket]
   );
 
   const handleSend = useCallback(
@@ -149,19 +161,13 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
   );
 
   const handleNewChat = useCallback(async () => {
-    if (!user?._id || !user?.organization_id?._id) return;
-    await startNewChat({
-      user_id: user._id,
-      organization_id: user.organization_id._id,
-      topic: "New Chat",
-    });
-  }, [user, startNewChat]);
+    await startChatSession("New Chat");
+  }, [startChatSession]);
 
   const sidebar = (
     <ChatSidebar onSelectChat={handleSelectChat} onNewChat={handleNewChat} />
   );
 
-  /* No active chat -> Welcome */
   if (!activeChat && !loading) {
     return (
       <ChatLayout sidebar={sidebar}>
@@ -176,7 +182,6 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
     );
   }
 
-  /* Active Chat */
   return (
     <ChatLayout sidebar={sidebar}>
       <ChatHeader activeChat={activeChat} onOpenTicket={onOpenTicket ?? (() => {})} />

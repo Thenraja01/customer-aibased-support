@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+﻿import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Menu, Bell, X } from "lucide-react";
 import RbacSidebar from "@/components/common/Navigation/RbacSidebar";
+import SupportSidebar from "@/components/support/SupportSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -25,7 +26,7 @@ const DashboardLayout = () => {
       ? user.role_id?.role_name
       : typeof user?.role_id === "string"
       ? user.role_id
-      : "";
+      : user?.roleName || "";
 
   const portalLabel =
     roleName === "support"
@@ -38,12 +39,18 @@ const DashboardLayout = () => {
 
   return (
     <div className="flex h-screen bg-background font-sans">
-      <RbacSidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
+      {roleName === "support" ? (
+        <SupportSidebar
+          isSidebarOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      ) : (
+        <RbacSidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      )}
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="flex items-center justify-between h-16 px-6 bg-card dark:bg-card/80 border-b dark:border-white/[0.06]">
           <button
@@ -54,7 +61,6 @@ const DashboardLayout = () => {
           </button>
           <div className="text-lg font-semibold lg:hidden">{portalLabel}</div>
           <div className="flex items-center gap-2 justify-end w-full">
-            {/* Notification bell */}
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}

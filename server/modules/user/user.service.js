@@ -1,16 +1,17 @@
-import User from "./user.schema.js";
+﻿import User from "./user.schema.js";
 import Organization from "../organization/organization.schema.js";
 import Role from "../role/role.schema.js";
 import bcrypt from "bcrypt";
 import { escapeRegex } from "../../utils/escapeRegex.js";
 
-export const getAllUsers = async (options = {}) => {
+export const getAllUsers = async (options = {}, organizationId = null) => {
   const { page, limit, status, role, search, sortBy, sortOrder } = options;
   const filter = { is_deleted: { $ne: true } };
+  if (organizationId) filter.organization_id = organizationId;
   if (status) filter.status = status;
   if (role) filter.role_id = role;
   if (search) {
-    const safe = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safe = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     filter.$or = [
       { name: { $regex: safe, $options: "i" } },
       { email: { $regex: safe, $options: "i" } },
@@ -45,8 +46,10 @@ export const getAllUsers = async (options = {}) => {
     .sort(sortObj);
 };
 
-export const getUserById = async (id) => {
-  const user = await User.findOne({ _id: id, is_deleted: { $ne: true } })
+export const getUserById = async (id, organizationId = null) => {
+  const filter = { _id: id, is_deleted: { $ne: true } };
+  if (organizationId) filter.organization_id = organizationId;
+  const user = await User.findOne(filter)
     .populate("organization_id", "name email")
     .populate("role_id", "role_name")
     .select("-password");
@@ -71,10 +74,14 @@ export const createUser = async (userData) => {
   return safeUser;
 };
 
-export const updateUser = async (id, userData) => {
+export const updateUser = async (id, userData, organizationId = null) => {
   delete userData.password;
   delete userData.role_id;
-  const user = await User.findByIdAndUpdate(id, userData, {
+
+  const filter = { _id: id };
+  if (organizationId) filter.organization_id = organizationId;
+
+  const user = await User.findOneAndUpdate(filter, userData, {
     new: true,
     runValidators: true,
   })
@@ -85,19 +92,24 @@ export const updateUser = async (id, userData) => {
   return user;
 };
 
-export const updateUserStatus = async (id, status) => {
-  const allowed = ["active", "inactive", "blocked"];
+export const updateUserStatus = async (id, status, organizationId = null) => {
+  const allowed = ["active", "inactive", "blocked", "pending"];
   if (!allowed.includes(status)) throw new Error("Invalid status value");
-  const user = await User.findByIdAndUpdate(id, { status }, { new: true }).select(
-    "-password"
-  );
+
+  const filter = { _id: id };
+  if (organizationId) filter.organization_id = organizationId;
+
+  const user = await User.findOneAndUpdate(filter, { status }, { new: true }).select("-password");
   if (!user) throw new Error("User not found");
   return user;
 };
 
-export const deleteUser = async (id) => {
-  const user = await User.findByIdAndUpdate(
-    id,
+export const deleteUser = async (id, organizationId = null) => {
+  const filter = { _id: id };
+  if (organizationId) filter.organization_id = organizationId;
+
+  const user = await User.findOneAndUpdate(
+    filter,
     { is_deleted: true, deleted_at: new Date() },
     { new: true }
   );
@@ -111,15 +123,18 @@ export const hardDeleteUser = async (id) => {
   return { message: "User permanently deleted" };
 };
 
-export const searchUsers = async (keyword) => {
+export const searchUsers = async (keyword, organizationId = null) => {
   const safe = escapeRegex(keyword);
-  return await User.find({
+  const filter = {
     is_deleted: { $ne: true },
     $or: [
       { name: { $regex: safe, $options: "i" } },
       { email: { $regex: safe, $options: "i" } },
     ],
-  })
+  };
+  if (organizationId) filter.organization_id = organizationId;
+
+  return await User.find(filter)
     .populate("organization_id", "name")
     .populate("role_id", "role_name")
     .select("-password");

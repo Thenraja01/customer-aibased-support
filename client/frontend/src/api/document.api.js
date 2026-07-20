@@ -7,10 +7,7 @@ const DocumentAPI = {
   getById: (id) => AxiosInstance.get(`/${url}/${id}`),
   getByUser: (userId) => AxiosInstance.get(`/${url}/user/${userId}`),
   getByStatus: (status) => AxiosInstance.get(`/${url}/status/${status}`),
-  upload: (formData) =>
-    AxiosInstance.post(`/${url}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }),
+  upload: (formData) => AxiosInstance.post(`/${url}`, formData),
   updateStatus: (id, status) =>
     AxiosInstance.patch(`/${url}/${id}/status`, { status }),
   delete: (id) => AxiosInstance.delete(`/${url}/${id}`),

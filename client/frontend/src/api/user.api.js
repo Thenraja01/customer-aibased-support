@@ -11,9 +11,6 @@ export const UsersAPI = {
   updateProfile: (data) => AxiosInstance.put("/users/profile", data),
   changePassword: (currentPassword, newPassword) =>
     AxiosInstance.put("/users/password", { currentPassword, newPassword }),
-  uploadAvatar: (formData) =>
-    AxiosInstance.post("/users/avatar", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }),
+  uploadAvatar: (formData) => AxiosInstance.post("/users/avatar", formData),
   getActivityLogs: () => AxiosInstance.get("/users/activity"),
 };

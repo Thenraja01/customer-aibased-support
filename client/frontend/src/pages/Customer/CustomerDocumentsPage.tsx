@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,14 +8,15 @@ import { DocumentList } from "@/components/customer/Documents/DocumentList";
 import { DocumentUpload } from "@/components/customer/Documents/DocumentUpload";
 import { DocumentAPI } from "@/api";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function CustomerDocumentsPage() {
+  const { isAdmin, isSupport } = useAuth();
   const [search, setSearch] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
-  
-  // A refresh trigger for the DocumentList
   const [refreshKey, setRefreshKey] = useState(0);
+  const canUpload = isAdmin || isSupport;
 
   const handleUpload = async (file: File, title: string) => {
     setUploading(true);
@@ -23,7 +24,7 @@ export default function CustomerDocumentsPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("title", title);
-      formData.append("is_knowledge_base", "true"); // Uploading for RAG processing
+      formData.append("is_knowledge_base", "false");
 
       await DocumentAPI.upload(formData);
       toast.success("Document uploaded successfully");
@@ -43,20 +44,22 @@ export default function CustomerDocumentsPage() {
           <h1 className="text-2xl font-bold">My Documents</h1>
           <p className="text-sm text-muted-foreground mt-1">Upload and manage your documents for AI context.</p>
         </div>
-        <Button onClick={() => setShowUpload(!showUpload)} variant={showUpload ? "outline" : "default"}>
-          {showUpload ? (
-            <>
-              <X className="mr-2 h-4 w-4" /> Cancel
-            </>
-          ) : (
-            <>
-              <Upload className="mr-2 h-4 w-4" /> Upload Document
-            </>
-          )}
-        </Button>
+        {canUpload ? (
+          <Button onClick={() => setShowUpload(!showUpload)} variant={showUpload ? "outline" : "default"}>
+            {showUpload ? (
+              <>
+                <X className="mr-2 h-4 w-4" /> Cancel
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-4 w-4" /> Upload Document
+              </>
+            )}
+          </Button>
+        ) : null}
       </div>
 
-      {showUpload && (
+      {canUpload && showUpload && (
         <Card className="border-primary/50 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Upload New Document</CardTitle>

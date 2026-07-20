@@ -2,21 +2,21 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Input } from '@/components/common/Forms/Input';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/useAuth';
 import { isValidEmail, isValidPassword } from '@/utils/validators';
 
 export function RegisterForm() {
-  const { login } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (!name.trim()) {
       setError('Name is required');
@@ -41,7 +41,7 @@ export function RegisterForm() {
       const { AuthAPI } = await import('@/api/auth.api');
       const res = await AuthAPI.signup({ name, email, password });
       if (res.data.success) {
-        await login(email, password);
+        setSuccess('Account created. Please sign in.');
       } else {
         setError(res.data.message || 'Registration failed');
       }
@@ -58,6 +58,11 @@ export function RegisterForm() {
         <h2 className="text-2xl font-bold">Create account</h2>
         <p className="text-sm text-muted-foreground mt-1">Get started with SupportAI</p>
       </div>
+      {success && (
+        <div className="p-3 rounded-lg bg-primary/10 text-primary text-sm">
+          {success} <Link to="/login" className="font-medium underline">Sign in</Link>
+        </div>
+      )}
       {error && (
         <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           {error}

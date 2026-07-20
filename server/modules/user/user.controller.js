@@ -1,13 +1,20 @@
-import * as userService from "./user.service.js";
+﻿import * as userService from "./user.service.js";
 
 export const getUsers = async (req, res) => {
   try {
     const { page, limit, status, role, search, sortBy, sortOrder } = req.query;
-    const result = await userService.getAllUsers({
-      page: page ? Number(page) : undefined,
-      limit: limit ? Number(limit) : undefined,
-      status, role, search, sortBy, sortOrder,
-    });
+    const result = await userService.getAllUsers(
+      {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        status,
+        role,
+        search,
+        sortBy,
+        sortOrder,
+      },
+      req.organization?._id || req.user.organizationId || req.user.organization_id
+    );
     res.status(200).json({ success: true, ...(result.pagination ? result : { data: result }) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -16,7 +23,7 @@ export const getUsers = async (req, res) => {
 
 export const getUser = async (req, res) => {
   try {
-    const user = await userService.getUserById(req.params.id);
+    const user = await userService.getUserById(req.params.id, req.organization?._id || req.user.organizationId || req.user.organization_id);
     res.status(200).json({ success: true, data: user });
   } catch (error) {
     const status = error.message === "User not found" ? 404 : 500;
@@ -26,7 +33,7 @@ export const getUser = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
-    const user = await userService.getUserById(req.user.userId);
+    const user = await userService.getUserById(req.user.userId, req.organization?._id || req.user.organizationId || req.user.organization_id);
     res.status(200).json({ success: true, data: user });
   } catch (error) {
     const status = error.message === "User not found" ? 404 : 500;
@@ -67,7 +74,7 @@ export const addUser = async (req, res) => {
 
 export const editUser = async (req, res) => {
   try {
-    const user = await userService.updateUser(req.params.id, req.body);
+    const user = await userService.updateUser(req.params.id, req.body, req.organization?._id || req.user.organizationId || req.user.organization_id);
     res.status(200).json({ success: true, message: "User updated successfully", data: user });
   } catch (error) {
     const status = error.message === "User not found" ? 404 : 500;
@@ -77,7 +84,7 @@ export const editUser = async (req, res) => {
 
 export const removeUser = async (req, res) => {
   try {
-    const result = await userService.deleteUser(req.params.id);
+    const result = await userService.deleteUser(req.params.id, req.organization?._id || req.user.organizationId || req.user.organization_id);
     res.status(200).json({ success: true, message: result.message });
   } catch (error) {
     const status = error.message === "User not found" ? 404 : 500;
@@ -87,7 +94,7 @@ export const removeUser = async (req, res) => {
 
 export const searchUser = async (req, res) => {
   try {
-    const users = await userService.searchUsers(req.query.q || "");
+    const users = await userService.searchUsers(req.query.q || "", req.organization?._id || req.user.organizationId || req.user.organization_id);
     res.status(200).json({ success: true, data: users });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -96,7 +103,7 @@ export const searchUser = async (req, res) => {
 
 export const exportUsers = async (req, res) => {
   try {
-    const users = await userService.getAllUsers();
+    const users = await userService.getAllUsers({}, req.organization?._id || req.user.organizationId || req.user.organization_id);
     const rows = Array.isArray(users) ? users : users.data || [];
     const header = "Name,Email,Role,Status,Phone,Last Login,Created At\n";
     const csv = rows.map((u) =>
@@ -133,7 +140,7 @@ export const getActivityLogs = async (req, res) => {
 
 export const patchUserStatus = async (req, res) => {
   try {
-    const user = await userService.updateUserStatus(req.params.id, req.body.status);
+    const user = await userService.updateUserStatus(req.params.id, req.body.status, req.organization?._id || req.user.organizationId || req.user.organization_id);
     res.status(200).json({ success: true, data: user });
   } catch (error) {
     const status = error.message === "User not found" ? 404 : 400;
@@ -144,11 +151,14 @@ export const patchUserStatus = async (req, res) => {
 export const getPendingUsers = async (req, res) => {
   try {
     const { page, limit } = req.query;
-    const result = await userService.getAllUsers({
-      status: "pending",
-      page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 10,
-    });
+    const result = await userService.getAllUsers(
+      {
+        status: "pending",
+        page: page ? Number(page) : 1,
+        limit: limit ? Number(limit) : 10,
+      },
+      req.organization?._id || req.user.organizationId || req.user.organization_id
+    );
     res.status(200).json({ success: true, ...(result.pagination ? result : { data: result }) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -157,7 +167,7 @@ export const getPendingUsers = async (req, res) => {
 
 export const approveUser = async (req, res) => {
   try {
-    const user = await userService.updateUserStatus(req.params.id, "active");
+    const user = await userService.updateUserStatus(req.params.id, "active", req.organization?._id || req.user.organizationId || req.user.organization_id);
     res.status(200).json({ success: true, message: "User approved successfully", data: user });
   } catch (error) {
     const status = error.message === "User not found" ? 404 : 400;
@@ -167,7 +177,7 @@ export const approveUser = async (req, res) => {
 
 export const rejectUser = async (req, res) => {
   try {
-    const user = await userService.updateUserStatus(req.params.id, "inactive");
+    const user = await userService.updateUserStatus(req.params.id, "inactive", req.organization?._id || req.user.organizationId || req.user.organization_id);
     res.status(200).json({ success: true, message: "User rejected", data: user });
   } catch (error) {
     const status = error.message === "User not found" ? 404 : 400;

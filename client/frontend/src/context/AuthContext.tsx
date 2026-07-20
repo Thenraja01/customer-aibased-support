@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+﻿import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { useDispatch } from "react-redux";
 import { setUser as setReduxUser, logout as reduxLogout } from "@/store/slices";
 import { AuthAPI } from "@/api/auth.api.js";
+import { tokenManager } from "@/utils/tokenManager";
 
 interface AuthContextType {
   user: any;
@@ -25,18 +26,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch(setReduxUser(user));
     }
     setLoading(false);
-  }, []);
+  }, [dispatch, user]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
       const res = await AuthAPI.login({ email, password });
-      if (!res.data.success) return false;
+      const payload = res.data ?? {};
+      const token = payload.access_token || payload.token || payload.data?.access_token || payload.data?.token;
+      const userData = payload.data ?? payload.user ?? payload.data?.user ?? null;
+      const uiConfig = payload.ui_config ?? payload.data?.ui_config ?? null;
 
-      const token = res.data.access_token || res.data.token;
-      const userData = res.data.data;
-      const uiConfig = res.data.ui_config;
+      if (!token || !userData) return false;
 
       localStorage.setItem("token", token);
+      tokenManager.setAccessToken(token);
       localStorage.setItem("user", JSON.stringify(userData));
       if (uiConfig) {
         localStorage.setItem("ui_config", JSON.stringify(uiConfig));
@@ -52,7 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [dispatch]);
 
   const logout = useCallback(() => {
-    localStorage.clear();
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("ui_config");
+    tokenManager.clearTokens();
     setUser(null);
     dispatch(reduxLogout());
   }, [dispatch]);

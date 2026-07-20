@@ -115,8 +115,12 @@ export default function DocumentUploadForm({
       formData.append("title", title);
       formData.append("file", file);
       formData.append("user_id", user._id);
-      if (user.organization_id) {
-        formData.append("organization_id", typeof user.organization_id === 'string' ? user.organization_id : user.organization_id._id);
+      const organizationId =
+        typeof user.organization_id === "string"
+          ? user.organization_id
+          : user.organization_id?._id || user.organizationId || "";
+      if (organizationId) {
+        formData.append("organization_id", organizationId);
       }
       formData.append("is_knowledge_base", "true"); // Always knowledge base for admin/support uploads
       referenceImages.forEach((f) => formData.append("reference_images", f));

@@ -1,18 +1,26 @@
-import Organization from "../modules/organization/organization.schema.js";
+﻿import Organization from "../modules/organization/organization.schema.js";
 import ApiError from "../utils/ApiError.js";
+import { normalizeRoleName } from "./auth.middleware.js";
 
-/**
- * Attach organization configuration to request
- * Loads org config from database (can be enhanced with Redis caching)
- */
+const resolveOrgId = (req) => {
+  return req.headers["x-organization-id"] || req.headers["x-org-id"] || req.user?.organizationId || req.user?.organization_id || null;
+};
+
 export const attachOrganization = async (req, res, next) => {
   try {
-    if (!req.user || !req.user.organizationId) {
-      throw new ApiError(400, "User must belong to an organization");
+    const roleName = normalizeRoleName(req.user?.roleName);
+    const organizationId = resolveOrgId(req);
+
+    if (!organizationId) {
+      if (roleName === "super_admin") {
+        req.organization = null;
+        return next();
+      }
+      throw new ApiError(400, "Organization context is required");
     }
 
     const organization = await Organization.findOne({
-      _id: req.user.organizationId,
+      $or: [{ _id: organizationId }, { organization_id: organizationId }, { slug: organizationId }],
       is_deleted: { $ne: true },
     });
 
@@ -20,12 +28,8 @@ export const attachOrganization = async (req, res, next) => {
       throw new ApiError(404, "Organization not found");
     }
 
-    if (organization.status === "suspended") {
-      throw new ApiError(403, "Organization is suspended");
-    }
-
-    if (organization.status === "inactive") {
-      throw new ApiError(403, "Organization is inactive");
+    if (["suspended", "inactive"].includes(organization.status)) {
+      throw new ApiError(403, `Organization is ${organization.status}`);
     }
 
     req.organization = organization;
@@ -35,16 +39,22 @@ export const attachOrganization = async (req, res, next) => {
   }
 };
 
-/**
- * Enforce that user belongs to the organization they're trying to access
- */
 export const enforceOrgScope = (req, res, next) => {
   try {
+    const roleName = normalizeRoleName(req.user?.roleName);
+
+    if (roleName === "super_admin" && !req.organization) {
+      return next();
+    }
+
     if (!req.user || !req.organization) {
       throw new ApiError(401, "Unauthorized");
     }
 
-    if (req.user.organizationId.toString() !== req.organization._id.toString()) {
+    const userOrg = String(req.user.organizationId || req.user.organization_id || "");
+    const orgId = String(req.organization._id);
+
+    if (userOrg && userOrg !== orgId) {
       throw new ApiError(403, "Access denied: organization scope violation");
     }
 
@@ -54,13 +64,13 @@ export const enforceOrgScope = (req, res, next) => {
   }
 };
 
-/**
- * Check if a specific feature is enabled for the organization
- */
 export const checkFeatureFlag = (feature) => {
   return (req, res, next) => {
     try {
       if (!req.organization) {
+        if (normalizeRoleName(req.user?.roleName) === "super_admin") {
+          return next();
+        }
         throw new ApiError(401, "Organization not attached to request");
       }
 
@@ -75,12 +85,12 @@ export const checkFeatureFlag = (feature) => {
   };
 };
 
-/**
- * Check if organization is active (not suspended or inactive)
- */
 export const enforceOrgActive = (req, res, next) => {
   try {
     if (!req.organization) {
+      if (normalizeRoleName(req.user?.roleName) === "super_admin") {
+        return next();
+      }
       throw new ApiError(401, "Organization not attached to request");
     }
 
@@ -94,13 +104,13 @@ export const enforceOrgActive = (req, res, next) => {
   }
 };
 
-/**
- * Check organization limits (e.g., max users, max uploads)
- */
 export const checkOrgLimit = (limitType) => {
   return async (req, res, next) => {
     try {
       if (!req.organization) {
+        if (normalizeRoleName(req.user?.roleName) === "super_admin") {
+          return next();
+        }
         throw new ApiError(401, "Organization not attached to request");
       }
 
@@ -108,13 +118,9 @@ export const checkOrgLimit = (limitType) => {
       const limit = limits[limitType];
 
       if (limit === undefined) {
-        // No limit set, allow
         return next();
       }
 
-      // Check current usage against limit
-      // This would need to be implemented based on the specific limit type
-      // For now, we'll pass through and let specific controllers handle limit checking
       req.limitCheck = { type: limitType, limit };
       next();
     } catch (error) {

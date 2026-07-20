@@ -58,6 +58,7 @@ const ProfilePage = lazy(() => import("@/pages/Customer/ProfilePage"));
 const FAQPage = lazy(() => import("@/pages/Customer/FAQPage"));
 const ChatHistoryPage = lazy(() => import("@/pages/Customer/ChatHistoryPage"));
 const NotificationsPage = lazy(() => import("@/pages/Customer/NotificationsPage"));
+const CustomerDocumentsPage = lazy(() => import("@/pages/Customer/CustomerDocumentsPage"));
 
 const SupportDashboardPage = lazy(() => import("@/pages/support/DashboardPage"));
 const SupportTicketsPage = lazy(() => import("@/pages/support/TicketsPage"));
@@ -147,6 +148,7 @@ export default function App() {
             <Route path={ROUTES.CUSTOMER.DASHBOARD} element={<LazyLoad><CustomerDashboard /></LazyLoad>} />
             <Route path={ROUTES.CUSTOMER.CHAT} element={<LazyLoad><ChatPage /></LazyLoad>} />
             <Route path={ROUTES.CUSTOMER.TICKETS} element={<LazyLoad><TicketsPage /></LazyLoad>} />
+            <Route path={ROUTES.CUSTOMER.DOCUMENTS} element={<LazyLoad><CustomerDocumentsPage /></LazyLoad>} />
           </Route>
 
           {/* Profile (all authenticated users) */}

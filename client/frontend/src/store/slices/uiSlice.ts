@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+﻿import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface Toast {
   id: string;
@@ -33,6 +33,8 @@ interface NavigationItem {
 interface Permissions {
   can_upload_documents: boolean;
   can_verify_documents: boolean;
+  can_review_documents: boolean;
+  can_approve_documents: boolean;
   can_manage_users: boolean;
   can_view_analytics: boolean;
   can_broadcast_notifications: boolean;
@@ -85,7 +87,10 @@ const initialState: UISlice = {
   toasts: [],
   modals: [],
   isOnline: navigator.onLine,
-  ui_config: null,
+  ui_config: (() => {
+    const raw = localStorage.getItem('ui_config');
+    return raw ? JSON.parse(raw) : null;
+  })(),
 };
 
 const uiSlice = createSlice({
@@ -125,6 +130,7 @@ const uiSlice = createSlice({
     },
     setUIConfig: (state, action: PayloadAction<UIConfig>) => {
       state.ui_config = action.payload;
+      localStorage.setItem('ui_config', JSON.stringify(action.payload));
     },
   },
 });

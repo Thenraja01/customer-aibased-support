@@ -1,5 +1,31 @@
-import jwt from "jsonwebtoken";
+﻿import jwt from "jsonwebtoken";
 import env from "../config/env.js";
+
+const ROLE_ALIASES = {
+  agent: "support",
+  user: "customer",
+  member: "customer",
+};
+
+const normalizeRoleName = (roleName) => {
+  if (!roleName) return "customer";
+  const lowered = String(roleName).toLowerCase();
+  return ROLE_ALIASES[lowered] || lowered;
+};
+
+const expandRoles = (allowedRoles) => {
+  const expanded = new Set();
+  for (const role of allowedRoles) {
+    const normalized = normalizeRoleName(role);
+    expanded.add(normalized);
+    if (normalized === "admin") expanded.add("super_admin");
+    if (normalized === "support") {
+      expanded.add("admin");
+      expanded.add("super_admin");
+    }
+  }
+  return expanded;
+};
 
 export const protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -15,7 +41,16 @@ export const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
-    req.user = decoded;
+    const roleName = normalizeRoleName(decoded.roleName || decoded.role || decoded.role_name);
+
+    req.user = {
+      ...decoded,
+      userId: decoded.userId || decoded.id || decoded.sub,
+      organizationId: decoded.organizationId || decoded.organization_id || null,
+      roleName,
+      role_id: decoded.roleId || decoded.role_id || null,
+    };
+
     next();
   } catch (error) {
     const message =
@@ -33,30 +68,27 @@ export const restrict = (...allowedRoles) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const effectiveRoles = allowedRoles.includes("admin")
-      ? [...new Set([...allowedRoles, "super_admin"])]
-      : allowedRoles;
+    const currentRole = normalizeRoleName(req.user.roleName);
+    const effectiveRoles = expandRoles(allowedRoles);
 
-    if (!effectiveRoles.includes(req.user.roleName)) {
+    if (!effectiveRoles.has(currentRole)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden: You do not have permission to perform this action",
       });
     }
+
     next();
   };
 };
 
-// Ensure the requesting user can only access their own resources
-// Usage: selfOrAdmin — checks req.params.id
-//        selfOrAdminParam("userId") — checks req.params.userId
-const isStaffOrSuper = (roleName) =>
-  ["admin", "support", "super_admin"].includes(roleName);
+const isStaffOrSuper = (roleName) => ["admin", "support", "super_admin"].includes(normalizeRoleName(roleName));
 
 export const selfOrAdmin = (req, res, next) => {
   const paramId = req.params.id;
-  const isSelf = req.user?.userId === paramId;
-  const isStaff = isStaffOrSuper(req.user?.roleName);
+  const currentRole = normalizeRoleName(req.user?.roleName);
+  const isSelf = String(req.user?.userId) === String(paramId);
+  const isStaff = isStaffOrSuper(currentRole);
 
   if (!isSelf && !isStaff) {
     return res.status(403).json({
@@ -70,8 +102,9 @@ export const selfOrAdmin = (req, res, next) => {
 export const selfOrAdminParam = (paramName) => {
   return (req, res, next) => {
     const paramId = req.params[paramName];
-    const isSelf = req.user?.userId === paramId;
-    const isStaff = isStaffOrSuper(req.user?.roleName);
+    const currentRole = normalizeRoleName(req.user?.roleName);
+    const isSelf = String(req.user?.userId) === String(paramId);
+    const isStaff = isStaffOrSuper(currentRole);
 
     if (!isSelf && !isStaff) {
       return res.status(403).json({
@@ -82,3 +115,5 @@ export const selfOrAdminParam = (paramName) => {
     next();
   };
 };
+
+export { normalizeRoleName };

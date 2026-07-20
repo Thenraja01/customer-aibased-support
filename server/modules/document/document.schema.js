@@ -1,4 +1,19 @@
-import mongoose, { Schema } from "mongoose";
+﻿import mongoose, { Schema } from "mongoose";
+
+const approvalHistorySchema = new mongoose.Schema(
+  {
+    action: {
+      type: String,
+      enum: ["pending_review", "approved", "rejected", "archived"],
+      default: "pending_review",
+    },
+    decision_by: { type: Schema.Types.ObjectId, ref: "User" },
+    decision_role: { type: String, maxlength: 50 },
+    decision_at: { type: Date },
+    decision_reason: { type: String, maxlength: 1000 },
+  },
+  { _id: false }
+);
 
 const documentSchema = new mongoose.Schema(
   {
@@ -34,8 +49,21 @@ const documentSchema = new mongoose.Schema(
     is_knowledge_base: { type: Boolean, default: false, index: true },
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
+      enum: ["draft", "pending_review", "approved", "rejected", "archived"],
+      default: "pending_review",
+      index: true,
+    },
+    approval_history: [approvalHistorySchema],
+    approval_meta: {
+      decision: {
+        type: String,
+        enum: ["pending_review", "approved", "rejected", "archived"],
+        default: "pending_review",
+      },
+      decision_by: { type: Schema.Types.ObjectId, ref: "User" },
+      decision_role: { type: String, maxlength: 50 },
+      decision_at: { type: Date },
+      decision_reason: { type: String, maxlength: 1000 },
     },
     tags: [{ type: String, maxlength: 50 }],
     is_deleted: { type: Boolean, default: false, index: true },

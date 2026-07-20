@@ -1,18 +1,25 @@
-import { useState, useEffect } from 'react';
-import { SupportTicketTable } from '@/components/support/Tickets/SupportTicketTable';
-import { TicketFilters } from '@/components/admin/Tickets/TicketFilters';
-import { useTickets } from '@/hooks/useTickets';
+﻿import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { SupportTicketTable } from "@/components/support/Tickets/SupportTicketTable";
+import { TicketFilters } from "@/components/admin/Tickets/TicketFilters";
+import { useTickets } from "@/hooks/useTickets";
 
 export default function SupportTicketsPage() {
   const { tickets, loading, loadAllTickets } = useTickets();
-  const [filters, setFilters] = useState({ search: '', status: '', priority: '' });
+  const [filters, setFilters] = useState({ search: "", status: "", priority: "" });
+  const [debouncedFilters, setDebouncedFilters] = useState(filters);
 
   useEffect(() => {
-    loadAllTickets(filters);
-  }, [loadAllTickets, filters]);
+    const timer = setTimeout(() => setDebouncedFilters(filters), 350);
+    return () => clearTimeout(timer);
+  }, [filters]);
+
+  useEffect(() => {
+    loadAllTickets(debouncedFilters);
+  }, [loadAllTickets, debouncedFilters]);
 
   const handleClear = () => {
-    setFilters({ search: '', status: '', priority: '' });
+    setFilters({ search: "", status: "", priority: "" });
   };
 
   return (

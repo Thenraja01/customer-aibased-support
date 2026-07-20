@@ -1,16 +1,22 @@
-import Document from "../modules/document/document.schema.js";
+﻿import Document from "../modules/document/document.schema.js";
 import ApiError from "../utils/ApiError.js";
+import { normalizeRoleName } from "./auth.middleware.js";
 
-/**
- * Check if user has access to a specific document
- * - Admins can access all documents in their org
- * - Support and customers can only access approved documents
- */
+const isSameOrg = (documentOrgId, requestOrgId) => {
+  if (!requestOrgId) return true;
+  return String(documentOrgId) === String(requestOrgId);
+};
+
+const canAccessAnyDocument = (roleName) => ["admin", "super_admin"].includes(normalizeRoleName(roleName));
+
+const canReviewDocument = (roleName) => ["admin", "super_admin", "support"].includes(normalizeRoleName(roleName));
+
 export const checkDocumentAccess = async (req, res, next) => {
   try {
     const { id } = req.params;
     const user = req.user;
-    const organizationId = req.organization?._id || req.user.organizationId;
+    const roleName = normalizeRoleName(user?.roleName);
+    const organizationId = req.organization?._id || user.organizationId || user.organization_id;
 
     const document = await Document.findOne({
       _id: id,
@@ -21,15 +27,14 @@ export const checkDocumentAccess = async (req, res, next) => {
       throw new ApiError(404, "Document not found");
     }
 
-    // Check organization scope
-    if (document.organization_id.toString() !== organizationId.toString()) {
+    if (!isSameOrg(document.organization_id, organizationId) && roleName !== "super_admin") {
       throw new ApiError(403, "Access denied: document belongs to different organization");
     }
 
-    // Role-based access
-    if (user.roleName !== "admin" && user.roleName !== "super_admin") {
-      if (document.status !== "approved") {
-        throw new ApiError(403, "Access denied: document is not approved");
+    if (!canAccessAnyDocument(roleName)) {
+      const isOwner = String(document.user_id) === String(user?.userId);
+      if (!isOwner && !canReviewDocument(roleName)) {
+        throw new ApiError(403, "Access denied: insufficient permissions for this document");
       }
     }
 
@@ -40,18 +45,13 @@ export const checkDocumentAccess = async (req, res, next) => {
   }
 };
 
-/**
- * Check if user can upload knowledge base documents
- * - Only admins can upload knowledge base documents
- * - Customers can only upload KYC documents
- */
 export const checkKnowledgeBaseUpload = async (req, res, next) => {
   try {
-    const user = req.user;
+    const roleName = normalizeRoleName(req.user?.roleName);
     const isKnowledgeBase = req.body.is_knowledge_base === true || req.body.isOrgDoc === true;
 
-    if (isKnowledgeBase && user.roleName !== "admin" && user.roleName !== "super_admin") {
-      throw new ApiError(403, "Only admins can upload knowledge base documents");
+    if (isKnowledgeBase && !["admin", "super_admin"].includes(roleName)) {
+      throw new ApiError(403, "Only organization admins can upload knowledge base documents");
     }
 
     next();
@@ -60,22 +60,24 @@ export const checkKnowledgeBaseUpload = async (req, res, next) => {
   }
 };
 
-/**
- * Filter documents by role at middleware level
- * - Admins: see all documents in org
- * - Support/customers: see only approved documents
- */
 export const filterDocumentsByRole = (req, res, next) => {
   try {
-    const user = req.user;
-    const organizationId = req.organization?._id || req.user.organizationId;
+    const roleName = normalizeRoleName(req.user?.roleName);
+    const organizationId = req.organization?._id || req.user.organizationId || req.user.organization_id;
 
     req.documentFilter = {
-      organization_id: organizationId,
       is_deleted: { $ne: true },
     };
 
-    if (user.roleName !== "admin" && user.roleName !== "super_admin") {
+    if (roleName !== "super_admin" || organizationId) {
+      req.documentFilter.organization_id = organizationId;
+    }
+
+    if (roleName === "customer" || roleName === "user" || roleName === "member") {
+      req.documentFilter.user_id = req.user.userId;
+    }
+
+    if (!canReviewDocument(roleName)) {
       req.documentFilter.status = "approved";
     }
 
@@ -85,17 +87,12 @@ export const filterDocumentsByRole = (req, res, next) => {
   }
 };
 
-/**
- * Check if document type is knowledge base type
- * Used to restrict knowledge base operations
- */
 export const checkKnowledgeBaseType = async (req, res, next) => {
   try {
-    const user = req.user;
+    const roleName = normalizeRoleName(req.user?.roleName);
 
-    // Only admins can manage knowledge base types
-    if (user.roleName !== "admin" && user.roleName !== "super_admin") {
-      throw new ApiError(403, "Only admins can manage knowledge base document types");
+    if (!["admin", "super_admin"].includes(roleName)) {
+      throw new ApiError(403, "Only organization admins can manage knowledge base document types");
     }
 
     next();
@@ -103,3 +100,5 @@ export const checkKnowledgeBaseType = async (req, res, next) => {
     next(error);
   }
 };
+
+export const canReviewDocuments = canReviewDocument;

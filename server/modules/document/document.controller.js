@@ -1,33 +1,43 @@
-import * as docService from "./document.service.js";
+﻿import * as docService from "./document.service.js";
 import downloadService from "../../services/download.service.js";
 import ragService from "../../services/rag.service.js";
 import { enqueueDocument } from "../../workers/rag.worker.js";
+import { normalizeRoleName } from "../../middleware/auth.middleware.js";
 
 export const upload = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
-    const organizationId = req.organization?._id || req.user.organizationId;
+    const organizationId = req.organization?._id || req.user.organizationId || req.user.organization_id;
     const isKnowledgeBase = req.body.is_knowledge_base === true || req.body.is_knowledge_base === "true" || req.body.isOrgDoc === true || req.body.isOrgDoc === "true";
-    
+
     const docData = {
       ...req.body,
-      user_id: req.user.userId,
+      user_id: req.body.user_id || req.user.userId,
       organization_id: organizationId,
       file_data: req.file.buffer,
       file_mimetype: req.file.mimetype,
       file_name: req.file.originalname,
       file_size: req.file.size,
       is_knowledge_base: isKnowledgeBase,
-      rag_status: isKnowledgeBase ? 'pending' : null,
+      status: isKnowledgeBase ? "pending_review" : "draft",
+      rag_status: isKnowledgeBase ? "pending" : "pending",
+      approval_meta: {
+        decision: isKnowledgeBase ? "pending_review" : "draft",
+        decision_by: null,
+        decision_role: null,
+        decision_at: null,
+        decision_reason: null,
+      },
     };
     const doc = await docService.createDocument(docData);
     const { file_data, ...docResponse } = doc.toObject();
 
     if (isKnowledgeBase) {
-      enqueueDocument(doc._id, organizationId, req.file.buffer, req.file.mimetype)
-        .catch((error) => console.error('RAG queue failed:', error.message));
+      enqueueDocument(doc._id, organizationId, req.file.buffer, req.file.mimetype).catch((error) =>
+        console.error("RAG queue failed:", error.message)
+      );
     }
 
     res.status(201).json({ success: true, data: docResponse });
@@ -56,7 +66,8 @@ export const getAll = async (req, res) => {
 
 export const getById = async (req, res) => {
   try {
-    const doc = await docService.getDocumentById(req.params.id);
+    const orgId = req.organization?._id || req.user.organizationId || req.user.organization_id;
+    const doc = await docService.getDocumentById(req.params.id, false, orgId);
     res.status(200).json({ success: true, data: doc });
   } catch (error) {
     const status = error.message === "Document not found" ? 404 : 500;
@@ -66,7 +77,7 @@ export const getById = async (req, res) => {
 
 export const getByUser = async (req, res) => {
   try {
-    const organizationId = req.organization?._id || req.user.organizationId;
+    const organizationId = req.organization?._id || req.user.organizationId || req.user.organization_id;
     const docs = await docService.getDocumentsByUser(req.params.userId, organizationId);
     res.status(200).json({ success: true, data: docs });
   } catch (error) {
@@ -76,7 +87,7 @@ export const getByUser = async (req, res) => {
 
 export const getByStatus = async (req, res) => {
   try {
-    const organizationId = req.organization?._id || req.user.organizationId;
+    const organizationId = req.organization?._id || req.user.organizationId || req.user.organization_id;
     const docs = await docService.getDocumentsByStatus(req.params.status, organizationId);
     res.status(200).json({ success: true, data: docs });
   } catch (error) {
@@ -86,7 +97,8 @@ export const getByStatus = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const doc = await docService.updateDocument(req.params.id, req.body);
+    const orgId = req.organization?._id || req.user.organizationId || req.user.organization_id;
+    const doc = await docService.updateDocument(req.params.id, req.body, orgId);
     res.status(200).json({ success: true, data: doc });
   } catch (error) {
     const status = error.message === "Document not found" ? 404 : 400;
@@ -96,7 +108,13 @@ export const update = async (req, res) => {
 
 export const patchStatus = async (req, res) => {
   try {
-    const doc = await docService.updateDocumentStatus(req.params.id, req.body.status);
+    const orgId = req.organization?._id || req.user.organizationId || req.user.organization_id;
+    const doc = await docService.updateDocumentStatus(req.params.id, req.body.status, {
+      decision_by: req.user.userId,
+      decision_role: normalizeRoleName(req.user.roleName),
+      decision_at: new Date(),
+      decision_reason: req.body.reason,
+    }, orgId);
     res.status(200).json({ success: true, data: doc });
   } catch (error) {
     const status = error.message === "Document not found" ? 404 : 400;
@@ -106,7 +124,8 @@ export const patchStatus = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    const result = await docService.deleteDocument(req.params.id);
+    const orgId = req.organization?._id || req.user.organizationId || req.user.organization_id;
+    const result = await docService.deleteDocument(req.params.id, orgId);
     res.status(200).json({ success: true, message: result.message });
   } catch (error) {
     const status = error.message === "Document not found" ? 404 : 500;
@@ -117,8 +136,7 @@ export const remove = async (req, res) => {
 export const download = async (req, res) => {
   try {
     const { token } = req.query;
-    
-    // Verify secure download token
+
     if (!token) {
       return res.status(401).json({ success: false, message: "Download token required" });
     }
@@ -128,12 +146,12 @@ export const download = async (req, res) => {
       return res.status(401).json({ success: false, message: "Invalid or expired download token" });
     }
 
-    // Verify token matches the requested document and user
     if (!downloadService.isAuthorized(token, req.params.id, req.user.userId)) {
       return res.status(403).json({ success: false, message: "Unauthorized download" });
     }
 
-    const doc = await docService.getDocumentById(req.params.id);
+    const orgId = req.organization?._id || req.user.organizationId || req.user.organization_id;
+    const doc = await docService.getDocumentById(req.params.id, true, orgId);
     res.set("Content-Type", doc.file_mimetype);
     res.set("Content-Disposition", `attachment; filename="${doc.file_name}"`);
     res.send(doc.file_data);
@@ -145,8 +163,9 @@ export const download = async (req, res) => {
 
 export const getDownloadUrl = async (req, res) => {
   try {
-    const doc = await docService.getDocumentById(req.params.id);
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const orgId = req.organization?._id || req.user.organizationId || req.user.organization_id;
+    const doc = await docService.getDocumentById(req.params.id, false, orgId);
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
     const downloadUrl = downloadService.generateDownloadUrl(doc._id, req.user.userId, baseUrl);
     res.status(200).json({ success: true, data: { download_url: downloadUrl } });
   } catch (error) {
@@ -157,33 +176,33 @@ export const getDownloadUrl = async (req, res) => {
 
 export const reindexDocument = async (req, res) => {
   try {
-    const doc = await docService.getDocumentById(req.params.id);
-    
-    // Check if document is a knowledge base document
+    const orgId = req.organization?._id || req.user.organizationId || req.user.organization_id;
+    const doc = await docService.getDocumentById(req.params.id, true, orgId);
+
     if (!doc.is_knowledge_base) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Only knowledge base documents can be reindexed" 
+      return res.status(400).json({
+        success: false,
+        message: "Only knowledge base documents can be reindexed",
       });
     }
 
-    doc.rag_status = 'pending';
+    doc.rag_status = "pending";
     doc.rag_queued_at = new Date();
     doc.rag_error = null;
     await doc.save();
 
-    const organizationId = req.organization?._id || req.user.organizationId;
-    const fullDoc = await docService.getDocumentById(req.params.id, true);
-    enqueueDocument(doc._id, organizationId, fullDoc.file_data, fullDoc.file_mimetype)
-      .catch((error) => console.error('RAG reindex queue failed:', error.message));
+    const fullDoc = await docService.getDocumentById(req.params.id, true, orgId);
+    enqueueDocument(doc._id, orgId, fullDoc.file_data, fullDoc.file_mimetype).catch((error) =>
+      console.error("RAG reindex queue failed:", error.message)
+    );
 
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       message: "Document queued for reindexing via BullMQ",
-      data: { 
-        document_id: doc._id, 
-        rag_status: doc.rag_status 
-      } 
+      data: {
+        document_id: doc._id,
+        rag_status: doc.rag_status,
+      },
     });
   } catch (error) {
     const status = error.message === "Document not found" ? 404 : 500;
@@ -197,7 +216,7 @@ export const bulkUpload = async (req, res) => {
       return res.status(400).json({ success: false, message: "No files uploaded" });
     }
 
-    const organizationId = req.organization?._id || req.user.organizationId;
+    const organizationId = req.organization?._id || req.user.organizationId || req.user.organization_id;
     const isKnowledgeBase = req.body.is_knowledge_base === true || req.body.is_knowledge_base === "true" || req.body.isOrgDoc === true || req.body.isOrgDoc === "true";
     const results = [];
     const errors = [];
@@ -213,21 +232,22 @@ export const bulkUpload = async (req, res) => {
           file_name: file.originalname,
           file_size: file.size,
           is_knowledge_base: isKnowledgeBase,
-          rag_status: isKnowledgeBase ? 'pending' : null,
+          status: isKnowledgeBase ? "pending_review" : "draft",
+          rag_status: isKnowledgeBase ? "pending" : "pending",
         };
         const doc = await docService.createDocument(docData);
         const { file_data, ...docResponse } = doc.toObject();
         results.push(docResponse);
 
-        // Trigger RAG processing for knowledge base documents
         if (isKnowledgeBase) {
-          enqueueDocument(doc._id, organizationId, file.buffer, file.mimetype)
-            .catch((error) => console.error('RAG queue failed:', error.message));
+          enqueueDocument(doc._id, organizationId, file.buffer, file.mimetype).catch((error) =>
+            console.error("RAG queue failed:", error.message)
+          );
         }
       } catch (error) {
         errors.push({
           file: file.originalname,
-          error: error.message
+          error: error.message,
         });
       }
     }
@@ -238,8 +258,8 @@ export const bulkUpload = async (req, res) => {
         uploaded: results.length,
         failed: errors.length,
         documents: results,
-        errors: errors
-      }
+        errors: errors,
+      },
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

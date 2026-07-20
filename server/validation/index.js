@@ -1,4 +1,4 @@
-export { registerSchema, loginSchema, changePasswordSchema } from "./auth.validation.js";
+﻿export { registerSchema, loginSchema, changePasswordSchema } from "./auth.validation.js";
 export { createUserSchema, updateUserSchema, updateUserStatusSchema, updateProfileSchema, userPasswordSchema } from "./user.validation.js";
 export { createChatSchema, updateTopicSchema } from "./chat.validation.js";
 export { sendMessageSchema, updateMessageSchema } from "./message.validation.js";
@@ -10,7 +10,7 @@ export { createOrganizationSchema, updateOrganizationSchema } from "./organizati
 export { createRoleSchema, updateRoleSchema } from "./role.validation.js";
 export { ingestSchema, querySchema } from "./rag.validation.js";
 export { createDocumentTypeSchema, updateDocumentTypeSchema } from "./documentType.validation.js";
-export { createVerificationSchema, rejectVerificationSchema } from "./documentVerification.validation.js";
+export { createVerificationSchema, approveVerificationSchema, rejectVerificationSchema } from "./documentVerification.validation.js";
 export { storeMemorySchema, updateMemorySchema } from "./memory.validation.js";
 export { createChatAnalyticsSchema } from "./chatAnalytics.validation.js";
 export { createSystemConfigSchema, updateSystemConfigSchema } from "./systemConfig.validation.js";

@@ -1,4 +1,4 @@
-import crypto from "crypto";
+﻿import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { register, login, changePassword, generateUIConfig } from "./auth.service.js";
@@ -19,12 +19,12 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   try {
     const result = await login(req.body);
-    res.status(200).json({ 
-      success: true, 
-      message: result.message, 
-      access_token: result.access_token, 
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      access_token: result.access_token,
       data: result.user,
-      ui_config: result.ui_config
+      ui_config: result.ui_config,
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -38,9 +38,14 @@ export const registerOrganization = async (req, res) => {
       return res.status(400).json({ success: false, message: "Name and email are required" });
     }
     const org = await Organization.create({
-      name, email, phone, address,
+      name,
+      email,
+      phone,
+      address,
       organization_id: organization_id || name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
-      approval_status: "pending", registration_type: "self_registered", status: "inactive",
+      approval_status: "pending",
+      registration_type: "self_registered",
+      status: "inactive",
     });
     res.status(201).json({ success: true, message: "Organization registration submitted for approval", data: { id: org._id, name: org.name } });
   } catch (error) {
@@ -64,7 +69,7 @@ export const updatePassword = async (req, res) => {
 export const listOrganizations = async (_req, res) => {
   try {
     const orgs = await Organization.find({ status: "active", is_deleted: { $ne: true } })
-      .sort({ name: 1 }).select("name organization_id");
+      .sort({ name: 1 }).select("name organization_id slug");
     res.status(200).json({ success: true, data: orgs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -73,7 +78,7 @@ export const listOrganizations = async (_req, res) => {
 
 export const listRoles = async (_req, res) => {
   try {
-    const roles = await Role.find().sort({ role_name: 1 }).select("role_name");
+    const roles = await Role.find().sort({ role_name: 1 }).select("role_name permissions");
     res.status(200).json({ success: true, data: roles });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -159,11 +164,11 @@ export const getUIConfig = async (req, res) => {
     const user = await User.findById(req.user.userId)
       .populate("organization_id")
       .populate("role_id");
-    
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     const ui_config = generateUIConfig(user, user.organization_id);
     res.status(200).json({ success: true, data: ui_config });
   } catch (error) {

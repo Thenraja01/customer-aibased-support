@@ -1,16 +1,17 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+﻿import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { AuthAPI } from '@/api/auth.api';
 import { tokenManager } from '@/utils/tokenManager';
 
 interface UserData {
   _id: string;
+  id?: string;
   name: string;
   email: string;
   phone?: string;
   avatar_url?: string;
-  role_id?: { _id: string; role_name: string };
-  role?: { _id: string; name: string };
-  organization_id?: { _id: string; name: string };
+  role_id?: { _id: string; role_name: string } | string;
+  roleName?: string;
+  organization_id?: { _id: string; name: string } | string;
   status?: string;
 }
 
@@ -49,8 +50,14 @@ interface AuthState {
 
 const initialState: AuthState = {
   isAuthenticated: !!tokenManager.getAccessToken(),
-  user: null,
-  ui_config: null,
+  user: (() => {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  })(),
+  ui_config: (() => {
+    const raw = localStorage.getItem('ui_config');
+    return raw ? JSON.parse(raw) : null;
+  })(),
   loading: false,
   error: null,
 };
@@ -59,9 +66,16 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async ({ email, password }: { email: string; password: string }) => {
     const response = await AuthAPI.login({ email, password });
-    const data = response.data.data;
-    const { access_token, user, ui_config } = data;
-    tokenManager.setAccessToken(access_token);
+    const data = response.data ?? {};
+    const accessToken = data.access_token || data.token || data.data?.access_token || data.data?.token;
+    const user = data.data ?? data.user ?? data.data?.user;
+    const ui_config = data.ui_config ?? data.data?.ui_config ?? null;
+    if (accessToken) {
+      tokenManager.setAccessToken(accessToken);
+      localStorage.setItem('token', accessToken);
+    }
+    if (user) localStorage.setItem('user', JSON.stringify(user));
+    if (ui_config) localStorage.setItem('ui_config', JSON.stringify(ui_config));
     return { user, ui_config };
   }
 );
@@ -70,9 +84,16 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData: any) => {
     const response = await AuthAPI.signup(userData);
-    const data = response.data.data;
-    const { access_token, user, ui_config } = data;
-    tokenManager.setAccessToken(access_token);
+    const data = response.data ?? {};
+    const accessToken = data.access_token || data.token || data.data?.access_token || data.data?.token;
+    const user = data.data ?? data.user ?? data.data?.user;
+    const ui_config = data.ui_config ?? data.data?.ui_config ?? null;
+    if (accessToken) {
+      tokenManager.setAccessToken(accessToken);
+      localStorage.setItem('token', accessToken);
+    }
+    if (user) localStorage.setItem('user', JSON.stringify(user));
+    if (ui_config) localStorage.setItem('ui_config', JSON.stringify(ui_config));
     return { user, ui_config };
   }
 );
@@ -82,6 +103,9 @@ export const logoutUser = createAsyncThunk('auth/logout', async () => {
     await (AuthAPI as any).logout();
   } finally {
     tokenManager.clearTokens();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('ui_config');
   }
 });
 

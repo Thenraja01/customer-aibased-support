@@ -1,7 +1,7 @@
-import express from "express";
+﻿import express from "express";
 import jwt from "jsonwebtoken";
 import * as docController from "./document.controller.js";
-import { protect, restrict, selfOrAdmin, selfOrAdminParam } from "../../middleware/auth.middleware.js";
+import { protect, restrict, selfOrAdminParam } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { createDocumentSchema, updateDocumentStatusSchema } from "../../validation/index.js";
 import { uploadToMemory, uploadMultiple, handleUpload } from "../../middleware/upload.middleware.js";
@@ -16,7 +16,9 @@ const authOrToken = (req, res, next) => {
     try {
       req.user = jwt.verify(authHeader.split(" ")[1], env.JWT_SECRET);
       return next();
-    } catch { /* fall through to token query check */ }
+    } catch {
+      /* fall through to token query check */
+    }
   }
   const token = req.query.token;
   if (token) {
@@ -30,14 +32,14 @@ const authOrToken = (req, res, next) => {
   return res.status(401).json({ success: false, message: "Unauthorized: No token provided" });
 };
 
-router.get("/:id/download", authOrToken, restrict("admin", "support"), checkDocumentAccess, docController.download);
+router.get("/:id/download", authOrToken, restrict("admin", "support", "customer"), checkDocumentAccess, docController.download);
 
 router.use(protect);
 
-router.post("/", restrict("admin", "support"), checkKnowledgeBaseUpload, handleUpload(uploadToMemory), validate(createDocumentSchema), docController.upload);
-router.post("/bulk", restrict("admin", "support"), checkKnowledgeBaseUpload, handleUpload(uploadMultiple), docController.bulkUpload);
+router.post("/", restrict("admin", "support", "customer"), handleUpload(uploadToMemory), checkKnowledgeBaseUpload, validate(createDocumentSchema), docController.upload);
+router.post("/bulk", restrict("admin", "support"), handleUpload(uploadMultiple), checkKnowledgeBaseUpload, docController.bulkUpload);
 router.get("/", filterDocumentsByRole, docController.getAll);
-router.get("/user/:userId", restrict("admin", "support"), selfOrAdminParam("userId"), docController.getByUser);
+router.get("/user/:userId", restrict("admin", "support", "customer"), selfOrAdminParam("userId"), docController.getByUser);
 router.get("/status/:status", restrict("admin", "support"), docController.getByStatus);
 router.get("/:id", checkDocumentAccess, docController.getById);
 router.get("/:id/download-url", checkDocumentAccess, docController.getDownloadUrl);
