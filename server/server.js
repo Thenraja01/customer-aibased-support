@@ -1,3 +1,4 @@
+import http from "http";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -14,6 +15,7 @@ import { userRouter } from "./modules/user/index.js";
 import { chatRouter } from "./modules/chat/index.js";
 import { messageRouter } from "./modules/message/index.js";
 import { ticketRouter } from "./modules/ticket/index.js";
+import { ticketCommentRouter } from "./modules/ticket-comment/index.js";
 import { notificationRouter } from "./modules/notification/index.js";
 import { documentRouter } from "./modules/document/index.js";
 import { documentVerificationRouter } from "./modules/document-verification/index.js";
@@ -27,10 +29,37 @@ import { ragRouter } from "./modules/rag/index.js";
 import { memoryRouter } from "./modules/memory/index.js";
 import { adminRouter } from "./modules/admin/index.js";
 import { knowledgeGraphRouter } from "./modules/knowledge-graph/index.js";
+import { searchRouter } from "./modules/search/index.js";
+import { chatAnalyticsRouter } from "./modules/chat-analytics/index.js";
+import analyticsRouter from "./modules/analytics/index.js";
+import { systemConfigRouter } from "./modules/system-config/index.js";
+import { userSessionRouter } from "./modules/user-session/index.js";
+import { documentAccessControlRouter } from "./modules/document-access-control/index.js";
+import { documentCategoryRouter } from "./modules/document-category/index.js";
+import { documentCommentRouter } from "./modules/document-comment/index.js";
+import { documentShareRouter } from "./modules/document-share/index.js";
+import { notificationPreferenceRouter } from "./modules/notification-preference/index.js";
+import { bulkOperationRouter } from "./modules/bulk-operation/index.js";
+import { apiUsageRouter } from "./modules/api-usage/index.js";
+import { ticketTemplateRouter } from "./modules/ticket-template/index.js";
+import { quickReplyRouter } from "./modules/quick-reply/index.js";
+import { notificationTemplateRouter } from "./modules/notification-template/index.js";
 import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
 import { auditLogger } from "./middleware/audit.middleware.js";
+import { startRAGWorker } from "./workers/rag.worker.js";
+import { checkSlaBreach } from "./modules/ticket/ticket.service.js";
+import { setupWebSocket } from "./websocket/index.js";
+
+process.on("unhandledRejection", (reason) => {
+  if (reason?.code === "ECONNREFUSED" || reason?.message?.includes("ECONNREFUSED")) {
+    console.warn("[Server] Redis unavailable, continuing without queue worker");
+    return;
+  }
+  console.error("[Server] Unhandled rejection:", reason);
+});
 
 const app = express();
+const server = http.createServer(app);
 
 app.use(helmet());
 
@@ -85,6 +114,22 @@ app.use("/rag", ragRouter);
 app.use("/memory", memoryRouter);
 app.use("/knowledge-graph", knowledgeGraphRouter);
 app.use("/admin/v1", adminRouter);
+app.use("/ticket-comments", ticketCommentRouter);
+app.use("/search/v1", searchRouter);
+app.use("/analytics", analyticsRouter);
+app.use("/chat-analytics", chatAnalyticsRouter);
+app.use("/system-config", systemConfigRouter);
+app.use("/sessions", userSessionRouter);
+app.use("/document-access-control", documentAccessControlRouter);
+app.use("/document-categories", documentCategoryRouter);
+app.use("/document-comments", documentCommentRouter);
+app.use("/document-shares", documentShareRouter);
+app.use("/notification-preferences", notificationPreferenceRouter);
+app.use("/bulk-operations", bulkOperationRouter);
+app.use("/api-usage", apiUsageRouter);
+app.use("/ticket-templates", ticketTemplateRouter);
+app.use("/quick-replies", quickReplyRouter);
+app.use("/notification-templates", notificationTemplateRouter);
 
 app.get("/api/health/v1", (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;
@@ -114,7 +159,17 @@ const startServer = async () => {
       );
     }, 60 * 60 * 1000);
 
-    app.listen(port, () => {
+    setInterval(() => {
+      checkSlaBreach().catch((err) =>
+        console.error("[SLA Checker] Error:", err.message)
+      );
+    }, 15 * 60 * 1000);
+
+    startRAGWorker();
+
+    setupWebSocket(server);
+
+    server.listen(port, () => {
       console.log(`Server running on port ${port} [${env.NODE_ENV}]`);
     });
   } catch (error) {

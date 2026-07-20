@@ -9,7 +9,11 @@ export const UsersAPI = {
   updateStatus: (id, status) => AxiosInstance.patch(`/users/${id}/status`, { status }),
   getProfile: () => AxiosInstance.get("/users/profile"),
   updateProfile: (data) => AxiosInstance.put("/users/profile", data),
-
   changePassword: (currentPassword, newPassword) =>
     AxiosInstance.put("/users/password", { currentPassword, newPassword }),
+  uploadAvatar: (formData) =>
+    AxiosInstance.post("/users/avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  getActivityLogs: () => AxiosInstance.get("/users/activity"),
 };

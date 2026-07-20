@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
 import {
   X,
   Upload,
@@ -41,9 +42,10 @@ export default function DocumentUploadForm({
   onSubmit: (formData: FormData) => Promise<any>;
   onClose: () => void;
 }) {
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [documentTypeId, setDocumentTypeId] = useState("");
-  const [files, setFiles] = useState<FileWithPreview[]>([]);
+  const [file, setFile] = useState<FileWithPreview | null>(null);
   const [referenceImages, setReferenceImages] = useState<FileWithPreview[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -52,14 +54,14 @@ export default function DocumentUploadForm({
   const refInputRef = useRef<HTMLInputElement>(null);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
-    const arr = Array.from(newFiles).map((f) => {
-      const ff = f as FileWithPreview;
+    const arr = Array.from(newFiles);
+    if (arr.length > 0) {
+      const f = arr[0] as FileWithPreview;
       if (f.type.startsWith("image/")) {
-        ff.preview = URL.createObjectURL(f);
+        f.preview = URL.createObjectURL(f);
       }
-      return ff;
-    });
-    setFiles((prev) => [...prev, ...arr]);
+      setFile(f);
+    }
   }, []);
 
   const addRefImages = useCallback((newFiles: FileList | File[]) => {
@@ -73,12 +75,9 @@ export default function DocumentUploadForm({
     setReferenceImages((prev) => [...prev, ...arr]);
   }, []);
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => {
-      const removed = prev[index];
-      if (removed.preview) URL.revokeObjectURL(removed.preview);
-      return prev.filter((_, i) => i !== index);
-    });
+  const removeFile = () => {
+    if (file?.preview) URL.revokeObjectURL(file.preview);
+    setFile(null);
   };
 
   const removeRef = (index: number) => {
@@ -107,14 +106,18 @@ export default function DocumentUploadForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || files.length === 0) return;
+    if (!title || !file || !user?._id) return;
 
     setSubmitting(true);
     setUploadProgress(0);
     try {
       const formData = new FormData();
       formData.append("title", title);
-      files.forEach((f) => formData.append("files", f));
+      formData.append("file", file);
+      formData.append("user_id", user._id);
+      if (user.organization_id) {
+        formData.append("organization_id", typeof user.organization_id === 'string' ? user.organization_id : user.organization_id._id);
+      }
       referenceImages.forEach((f) => formData.append("reference_images", f));
       if (documentTypeId) formData.append("document_type_id", documentTypeId);
 
@@ -136,7 +139,7 @@ export default function DocumentUploadForm({
     }
   };
 
-  const canSubmit = title.trim() && files.length > 0 && !submitting;
+  const canSubmit = title.trim() && file !== null && !submitting;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -211,7 +214,6 @@ export default function DocumentUploadForm({
               <input
                 ref={fileInputRef}
                 type="file"
-                multiple
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files) addFiles(e.target.files);
@@ -223,7 +225,7 @@ export default function DocumentUploadForm({
 
           {/* File Preview List */}
           <AnimatePresence>
-            {files.length > 0 && (
+            {file && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -231,47 +233,44 @@ export default function DocumentUploadForm({
                 className="space-y-2"
               >
                 <p className="text-xs font-medium text-muted-foreground">
-                  {files.length} file{files.length !== 1 ? "s" : ""} selected
+                  1 file selected
                 </p>
-                {files.map((f, i) => {
-                  const Icon = getFileIcon(f.type);
-                  return (
-                    <motion.div
-                      key={`${f.name}-${i}`}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 10 }}
-                    >
-                      <Card className="dark:bg-card/50 dark:border-white/[0.06]">
-                        <CardContent className="flex items-center gap-3 p-3">
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                            <Icon size={18} className="text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {f.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatBytes(f.size)}
-                            </p>
-                          </div>
-                          <Badge variant="secondary" className="text-xs shrink-0">
-                            {f.type.split("/")[1]?.toUpperCase() || "FILE"}
-                          </Badge>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFile(i)}
-                            className="text-destructive hover:text-destructive shrink-0"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                >
+                  <Card className="dark:bg-card/50 dark:border-white/[0.06]">
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        {(() => {
+                          const Icon = getFileIcon(file.type);
+                          return <Icon size={18} className="text-primary" />;
+                        })()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatBytes(file.size)}
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {file.type.split("/")[1]?.toUpperCase() || "FILE"}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={removeFile}
+                        className="text-destructive hover:text-destructive shrink-0"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -356,7 +355,7 @@ export default function DocumentUploadForm({
               ) : (
                 <span className="flex items-center gap-2">
                   <Upload size={16} />
-                  Upload {files.length > 0 ? `(${files.length})` : ""}
+                  Upload
                 </span>
               )}
             </Button>

@@ -4,15 +4,49 @@ import Role from "../role/role.schema.js";
 import bcrypt from "bcrypt";
 import { escapeRegex } from "../../utils/escapeRegex.js";
 
-export const getAllUsers = async () => {
-  return await User.find()
+export const getAllUsers = async (options = {}) => {
+  const { page, limit, status, role, search, sortBy, sortOrder } = options;
+  const filter = { is_deleted: { $ne: true } };
+  if (status) filter.status = status;
+  if (role) filter.role_id = role;
+  if (search) {
+    const safe = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.$or = [
+      { name: { $regex: safe, $options: "i" } },
+      { email: { $regex: safe, $options: "i" } },
+    ];
+  }
+
+  const sortField = sortBy || "created_at";
+  const sortDir = sortOrder === "asc" ? 1 : -1;
+  const sortObj = {};
+  sortObj[sortField] = sortDir;
+
+  if (page && limit) {
+    const total = await User.countDocuments(filter);
+    const users = await User.find(filter)
+      .populate("organization_id", "name email")
+      .populate("role_id", "role_name")
+      .select("-password")
+      .sort(sortObj)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return {
+      data: users,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  return await User.find(filter)
     .populate("organization_id", "name email")
     .populate("role_id", "role_name")
-    .select("-password");
+    .select("-password")
+    .sort(sortObj);
 };
 
 export const getUserById = async (id) => {
-  const user = await User.findById(id)
+  const user = await User.findOne({ _id: id, is_deleted: { $ne: true } })
     .populate("organization_id", "name email")
     .populate("role_id", "role_name")
     .select("-password");
@@ -21,7 +55,7 @@ export const getUserById = async (id) => {
 };
 
 export const createUser = async (userData) => {
-  const existingUser = await User.findOne({ email: userData.email });
+  const existingUser = await User.findOne({ email: userData.email, is_deleted: { $ne: true } });
   if (existingUser) throw new Error("Email already exists");
 
   const organization = await Organization.findById(userData.organization_id);
@@ -62,14 +96,25 @@ export const updateUserStatus = async (id, status) => {
 };
 
 export const deleteUser = async (id) => {
+  const user = await User.findByIdAndUpdate(
+    id,
+    { is_deleted: true, deleted_at: new Date() },
+    { new: true }
+  );
+  if (!user) throw new Error("User not found");
+  return { message: "User soft-deleted" };
+};
+
+export const hardDeleteUser = async (id) => {
   const user = await User.findByIdAndDelete(id);
   if (!user) throw new Error("User not found");
-  return { message: "User deleted successfully" };
+  return { message: "User permanently deleted" };
 };
 
 export const searchUsers = async (keyword) => {
   const safe = escapeRegex(keyword);
   return await User.find({
+    is_deleted: { $ne: true },
     $or: [
       { name: { $regex: safe, $options: "i" } },
       { email: { $regex: safe, $options: "i" } },
@@ -100,9 +145,27 @@ export const changePassword = async (userId, currentPassword, newPassword) => {
   if (!isPasswordValid) throw new Error("Current password is incorrect");
 
   const isSamePassword = await bcrypt.compare(newPassword, user.password);
-  if (isSamePassword) throw new Error("New password cannot be the same as current password");
+  if (!isSamePassword) throw new Error("New password cannot be the same as current password");
 
   user.password = await bcrypt.hash(newPassword, 10);
   await user.save();
   return { message: "Password changed successfully" };
+};
+
+export const uploadAvatar = async (userId, file) => {
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { avatar_url: `/uploads/avatars/${file.filename || file.originalname}` },
+    { new: true }
+  ).select("-password");
+  if (!user) throw new Error("User not found");
+  return user;
+};
+
+export const getActivityLogs = async (userId) => {
+  const { default: AuditLog } = await import("../audit-log/auditLog.schema.js");
+  return await AuditLog.find({ user_id: userId })
+    .sort({ created_at: -1 })
+    .limit(50)
+    .lean();
 };

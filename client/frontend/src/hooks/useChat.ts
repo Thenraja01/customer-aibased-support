@@ -4,10 +4,13 @@ import {
   fetchChats,
   fetchUserChats,
   createChat,
+  createChatViaSocket,
+  sendAndReceiveStreamViaSocket,
   closeChat,
   fetchMessages,
   sendMessage,
   sendAndReceiveAI,
+  sendAndReceiveAIStream,
   setActiveChat,
   clearMessages,
 } from "@/store/chatSlice";
@@ -15,8 +18,18 @@ import type { RootState, AppDispatch } from "@/store/store";
 
 export function useChat() {
   const dispatch = useDispatch<AppDispatch>();
-  const { chats, activeChat, messages, loading, messagesLoading, sending, aiThinking, error } =
-    useSelector((state: RootState) => state.chat);
+  const {
+    chats,
+    activeChat,
+    messages,
+    loading,
+    messagesLoading,
+    sending,
+    aiThinking,
+    streamingMessageId,
+    streamingContent,
+    error,
+  } = useSelector((state: RootState) => state.chat);
   const { user } = useSelector((state: RootState) => state.user);
 
   const loadUserChats = useCallback(() => {
@@ -67,6 +80,27 @@ export function useChat() {
     [dispatch]
   );
 
+  const sendWithAIStream = useCallback(
+    (chatId: string, userId: string, content: string) => {
+      return dispatch(sendAndReceiveAIStream({ chatId, userId, content }));
+    },
+    [dispatch]
+  );
+
+  const startNewChatViaSocket = useCallback(
+    (data: { organization_id: string; topic: string }) => {
+      return dispatch(createChatViaSocket(data));
+    },
+    [dispatch]
+  );
+
+  const sendWithStreamViaSocket = useCallback(
+    (chatId: string, content: string) => {
+      return dispatch(sendAndReceiveStreamViaSocket({ chatId, content }));
+    },
+    [dispatch]
+  );
+
   const selectChat = useCallback(
     (chat: any) => {
       dispatch(setActiveChat(chat));
@@ -86,6 +120,8 @@ export function useChat() {
     messagesLoading,
     sending,
     aiThinking,
+    streamingMessageId,
+    streamingContent,
     error,
     loadUserChats,
     loadAllChats,
@@ -94,6 +130,9 @@ export function useChat() {
     loadMessages,
     send,
     sendWithAI,
+    sendWithAIStream,
+    startNewChatViaSocket,
+    sendWithStreamViaSocket,
     selectChat,
     resetMessages,
   };

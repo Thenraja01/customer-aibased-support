@@ -8,11 +8,11 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("admin", "agent"), validate(createFaqSchema), faqController.create);
+router.post("/", restrict("admin", "support"), validate(createFaqSchema), faqController.create);
 router.get("/active", faqController.getActive);
-router.get("/", restrict("admin", "agent"), faqController.getAll);
-router.get("/:id", restrict("admin", "agent"), faqController.getById);
-router.put("/:id", restrict("admin", "agent"), validate(updateFaqSchema), faqController.update);
+router.get("/", restrict("admin", "support"), faqController.getAll);
+router.get("/:id", restrict("admin", "support"), faqController.getById);
+router.put("/:id", restrict("admin", "support"), validate(updateFaqSchema), faqController.update);
 router.delete("/:id", restrict("admin"), faqController.remove);
 
 export default router;

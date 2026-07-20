@@ -8,12 +8,12 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("admin", "agent"), validate(createVerificationSchema), dvController.create);
-router.get("/", restrict("admin", "agent"), dvController.getAll);
-router.get("/document/:documentId", restrict("admin", "agent"), dvController.getByDocument);
-router.get("/status/:status", restrict("admin", "agent"), dvController.getByStatus);
-router.patch("/:id/approve", restrict("admin", "agent"), dvController.approve);
-router.patch("/:id/reject", restrict("admin", "agent"), validate(rejectVerificationSchema), dvController.reject);
+router.post("/", restrict("admin", "support"), validate(createVerificationSchema), dvController.create);
+router.get("/", restrict("admin", "support"), dvController.getAll);
+router.get("/document/:documentId", restrict("admin", "support"), dvController.getByDocument);
+router.get("/status/:status", restrict("admin", "support"), dvController.getByStatus);
+router.patch("/:id/approve", restrict("admin", "support"), dvController.approve);
+router.patch("/:id/reject", restrict("admin", "support"), validate(rejectVerificationSchema), dvController.reject);
 router.delete("/:id", restrict("admin"), dvController.remove);
 
 export default router;

@@ -1,4 +1,4 @@
-import DocumentChunk from "./documentChunk.schema.js";
+import DocumentChunk from "./documentChunk.model.js";
 import { generateChunkHash } from "../../utils/hash.utils.js";
 
 export const saveChunksWithDedup = async (chunks) => {

@@ -5,6 +5,7 @@ import { store } from "./store/store";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Toaster } from "sonner";
+import BrandingInjector from "@/components/common/BrandingInjector";
 import App from "./App.js";
 import "./index.css";
 
@@ -15,6 +16,8 @@ if (root) {
       <Provider store={store}>
         <ThemeProvider>
           <AuthProvider>
+            {/* BrandingInjector reads ui_config from Redux and applies dynamic CSS vars */}
+            <BrandingInjector />
             <App />
           </AuthProvider>
           <Toaster position="top-right" richColors />

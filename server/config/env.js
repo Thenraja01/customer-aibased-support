@@ -14,15 +14,25 @@ export default {
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
 
-  // Cloudinary
-  CLOUDINARY: {
-    CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
-    API_KEY: process.env.CLOUDINARY_API_KEY,
-    API_SECRET: process.env.CLOUDINARY_API_SECRET,
-  },
+  // Redis
+  REDIS_URL: process.env.REDIS_URL || "redis://localhost:6379",
 
   // Groq LLM
   GROQ_API_KEY: process.env.GROQ_API_KEY,
+
+  // Google AI
+  GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY,
+
+  // ChromaDB
+  CHROMA_URL: process.env.CHROMA_URL || "http://localhost:8000",
+  CHROMA_TENANT: process.env.CHROMA_TENANT || "default_tenant",
+  CHROMA_DATABASE: process.env.CHROMA_DATABASE || "default_database",
+
+  // SendGrid
+  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
+
+  // Client URL
+  CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5173",
 
   LLM: {
     CHAT_MODEL: process.env.LLM_CHAT_MODEL || "llama3-70b-8192",

@@ -38,7 +38,7 @@ export const getByStatus = async (req, res) => {
 
 export const approve = async (req, res) => {
   try {
-    const v = await dvService.approveVerification(req.params.id);
+    const v = await dvService.approveVerification(req.params.id, req.user);
     res.status(200).json({ success: true, data: v });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

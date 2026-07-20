@@ -31,6 +31,8 @@ const chatSchema = new mongoose.Schema(
       default: "open",
       index: true,
     },
+    is_deleted: { type: Boolean, default: false, index: true },
+    deleted_at: { type: Date, default: null },
   },
   {
     timestamps: {
@@ -39,5 +41,8 @@ const chatSchema = new mongoose.Schema(
     },
   }
 );
+
+chatSchema.index({ organization_id: 1, status: 1, updated_at: -1 });
+chatSchema.index({ assigned_to: 1, status: 1 });
 
 export default mongoose.model("Chat", chatSchema);

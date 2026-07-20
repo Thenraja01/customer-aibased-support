@@ -35,7 +35,9 @@ export interface IDocument {
   organization_id: string;
   document_type_id?: string;
   title: string;
-  file_url: string;
+  file_mimetype: string;
+  file_name: string;
+  file_size: number;
   status: "pending" | "approved" | "rejected";
   created_at?: string;
   updated_at?: string;

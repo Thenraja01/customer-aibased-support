@@ -1,43 +1,32 @@
-import { useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { AdminAPI } from "@/api/admin.api";
-import {
-  setRoles,
-  setRolePagination,
-  setLoading,
-} from "@/store/adminSlice";
-import type { RootState, AppDispatch } from "@/store/store";
+import { useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { setRoles, setRolePagination, setLoading } from '@/store/adminSlice';
+import { AdminAPI } from '@/api/admin.api';
+import type { RootState, AppDispatch } from '@/store/store';
 
-export const useAdminRoles = () => {
+export function useAdminRoles() {
   const dispatch = useDispatch<AppDispatch>();
-  const { roles, rolePagination, loading } = useSelector(
-    (state: RootState) => state.admin
-  );
+  const { roles, rolePagination, loading } = useSelector((state: RootState) => state.admin);
 
-  const fetchRoles = useCallback(
-    async (params?: { page?: number; limit?: number }) => {
-      dispatch(setLoading(true));
-      try {
-        const res = await AdminAPI.getRoles(params);
-        if (res.data.success) {
-          dispatch(setRoles(res.data.data));
-          dispatch(setRolePagination(res.data.pagination));
-        }
-      } catch (error) {
-        console.error("Failed to fetch roles", error);
-      } finally {
-        dispatch(setLoading(false));
+  const fetchRoles = useCallback(async (params?: Record<string, any>) => {
+    dispatch(setLoading(true));
+    try {
+      const res = await AdminAPI.getRoles(params);
+      dispatch(setRoles(res.data.data || []));
+      if (res.data.pagination) {
+        dispatch(setRolePagination(res.data.pagination));
       }
-    },
-    [dispatch]
-  );
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }, [dispatch]);
 
-  const createRole = useCallback(async (data: { role_name: string }) => {
+  const createRole = useCallback(async (data: any) => {
     const res = await AdminAPI.createRole(data);
     return res.data;
   }, []);
 
-  const updateRole = useCallback(async (id: string, data: { role_name: string }) => {
+  const updateRole = useCallback(async (id: string, data: any) => {
     const res = await AdminAPI.updateRole(id, data);
     return res.data;
   }, []);
@@ -47,13 +36,5 @@ export const useAdminRoles = () => {
     return res.data;
   }, []);
 
-  return {
-    roles,
-    rolePagination,
-    loading,
-    fetchRoles,
-    createRole,
-    updateRole,
-    deleteRole,
-  };
-};
+  return { roles, pagination: rolePagination, loading, fetchRoles, createRole, updateRole, deleteRole };
+}

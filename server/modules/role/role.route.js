@@ -9,8 +9,8 @@ const router = express.Router();
 router.use(protect);
 
 router.post("/", restrict("admin"), validate(createRoleSchema), roleController.create);
-router.get("/", restrict("admin", "agent"), roleController.getAll);
-router.get("/:id", restrict("admin", "agent"), roleController.getById);
+router.get("/", restrict("admin", "support"), roleController.getAll);
+router.get("/:id", restrict("admin", "support"), roleController.getById);
 router.put("/:id", restrict("admin"), validate(updateRoleSchema), roleController.update);
 router.delete("/:id", restrict("admin"), roleController.remove);
 

@@ -7,6 +7,7 @@ import DocumentTable from "@/components/admin/DocumentTable";
 import DocumentUploadForm from "@/components/admin/DocumentUploadForm";
 import { useAdminDocuments } from "@/hooks/useAdminDocuments";
 import { useAdminDocumentTypes } from "@/hooks/useAdminDocumentTypes";
+import { DocumentAPI } from "@/api";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 
 const statusFilters = ["", "pending", "approved", "rejected"];
@@ -167,16 +168,31 @@ export default function DocumentsPage() {
                     : "—"}
                 </span>
               </div>
-              {viewingDoc.file_url && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">File</span>
+                <span className="font-medium truncate max-w-[200px] text-right">
+                  {viewingDoc.file_name || "—"}
+                </span>
+              </div>
+              {viewingDoc.file_size ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Size</span>
+                  <span className="font-medium">
+                    {(viewingDoc.file_size / 1024).toFixed(1)} KB
+                  </span>
+                </div>
+              ) : null}
+              {viewingDoc.file_name && (
                 <div className="pt-2">
-                  <a
-                    href={viewingDoc.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
+                  <button
+                    onClick={async () => {
+                      const url = await DocumentAPI.getDownloadUrl(viewingDoc._id);
+                      window.open(url, '_blank');
+                    }}
+                    className="text-primary hover:underline cursor-pointer"
                   >
-                    View File
-                  </a>
+                    Download {viewingDoc.file_name}
+                  </button>
                 </div>
               )}
             </div>

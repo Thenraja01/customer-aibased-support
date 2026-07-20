@@ -33,7 +33,11 @@ export const restrict = (...allowedRoles) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    if (!allowedRoles.includes(req.user.roleName)) {
+    const effectiveRoles = allowedRoles.includes("admin")
+      ? [...new Set([...allowedRoles, "super_admin"])]
+      : allowedRoles;
+
+    if (!effectiveRoles.includes(req.user.roleName)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden: You do not have permission to perform this action",
@@ -46,12 +50,15 @@ export const restrict = (...allowedRoles) => {
 // Ensure the requesting user can only access their own resources
 // Usage: selfOrAdmin — checks req.params.id
 //        selfOrAdminParam("userId") — checks req.params.userId
+const isStaffOrSuper = (roleName) =>
+  ["admin", "support", "super_admin"].includes(roleName);
+
 export const selfOrAdmin = (req, res, next) => {
   const paramId = req.params.id;
   const isSelf = req.user?.userId === paramId;
-  const isAdmin = req.user?.roleName === "admin" || req.user?.roleName === "agent";
+  const isStaff = isStaffOrSuper(req.user?.roleName);
 
-  if (!isSelf && !isAdmin) {
+  if (!isSelf && !isStaff) {
     return res.status(403).json({
       success: false,
       message: "Forbidden: You can only access your own data",
@@ -64,9 +71,9 @@ export const selfOrAdminParam = (paramName) => {
   return (req, res, next) => {
     const paramId = req.params[paramName];
     const isSelf = req.user?.userId === paramId;
-    const isAdmin = req.user?.roleName === "admin" || req.user?.roleName === "agent";
+    const isStaff = isStaffOrSuper(req.user?.roleName);
 
-    if (!isSelf && !isAdmin) {
+    if (!isSelf && !isStaff) {
       return res.status(403).json({
         success: false,
         message: "Forbidden: You can only access your own data",

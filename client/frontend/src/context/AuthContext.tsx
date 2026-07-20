@@ -32,11 +32,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await AuthAPI.login({ email, password });
       if (!res.data.success) return false;
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.data));
+      const token = res.data.access_token || res.data.token;
+      const userData = res.data.data;
+      const uiConfig = res.data.ui_config;
 
-      setUser(res.data.data);
-      dispatch(setReduxUser(res.data.data));
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(userData));
+      if (uiConfig) {
+        localStorage.setItem("ui_config", JSON.stringify(uiConfig));
+      }
+
+      setUser(userData);
+      dispatch(setReduxUser(userData));
 
       return true;
     } catch {

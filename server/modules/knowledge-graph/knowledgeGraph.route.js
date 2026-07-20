@@ -6,10 +6,10 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get("/document/:documentId", restrict("admin", "agent"), kgController.getNodesByDocument);
-router.get("/search", restrict("admin", "agent"), kgController.searchNodes);
-router.get("/traverse", restrict("admin", "agent"), kgController.traverse);
+router.get("/document/:documentId", restrict("admin", "support"), kgController.getNodesByDocument);
+router.get("/search", restrict("admin", "support"), kgController.searchNodes);
+router.get("/traverse", restrict("admin", "support"), kgController.traverse);
 router.get("/stats/:documentId", restrict("admin"), kgController.getStats);
-router.get("/:id", restrict("admin", "agent"), kgController.getNodeById);
+router.get("/:id", restrict("admin", "support"), kgController.getNodeById);
 
 export default router;

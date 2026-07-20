@@ -1,41 +1,25 @@
-import { useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { AdminAPI } from "@/api/admin.api";
-import {
-  setUsers,
-  setUserPagination,
-  setLoading,
-} from "@/store/adminSlice";
-import type { RootState, AppDispatch } from "@/store/store";
+import { useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { setUsers, setUserPagination, setLoading } from '@/store/adminSlice';
+import { AdminAPI } from '@/api/admin.api';
+import type { RootState, AppDispatch } from '@/store/store';
 
-export const useAdminUsers = () => {
+export function useAdminUsers() {
   const dispatch = useDispatch<AppDispatch>();
-  const { users, userPagination, loading } = useSelector(
-    (state: RootState) => state.admin
-  );
+  const { users, userPagination, loading } = useSelector((state: RootState) => state.admin);
 
-  const fetchUsers = useCallback(
-    async (params?: {
-      page?: number;
-      limit?: number;
-      search?: string;
-      status?: string;
-    }) => {
-      dispatch(setLoading(true));
-      try {
-        const res = await AdminAPI.getUsers(params);
-        if (res.data.success) {
-          dispatch(setUsers(res.data.data));
-          dispatch(setUserPagination(res.data.pagination));
-        }
-      } catch (error) {
-        console.error("Failed to fetch users", error);
-      } finally {
-        dispatch(setLoading(false));
+  const fetchUsers = useCallback(async (params?: Record<string, any>) => {
+    dispatch(setLoading(true));
+    try {
+      const res = await AdminAPI.getUsers(params);
+      dispatch(setUsers(res.data.data || []));
+      if (res.data.pagination) {
+        dispatch(setUserPagination(res.data.pagination));
       }
-    },
-    [dispatch]
-  );
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }, [dispatch]);
 
   const createUser = useCallback(async (data: any) => {
     const res = await AdminAPI.createUser(data);
@@ -57,14 +41,5 @@ export const useAdminUsers = () => {
     return res.data;
   }, []);
 
-  return {
-    users,
-    userPagination,
-    loading,
-    fetchUsers,
-    createUser,
-    updateUser,
-    updateUserStatus,
-    deleteUser,
-  };
-};
+  return { users, userPagination, pagination: userPagination, loading, fetchUsers, createUser, updateUser, updateUserStatus, deleteUser };
+}

@@ -14,8 +14,26 @@ export const broadcastNotification = async (data, userIds) => {
   return await Notification.insertMany(notifications);
 };
 
-export const getNotificationsByUser = async (userId) => {
-  return await Notification.find({ user_id: userId }).sort({ created_at: -1 });
+export const getNotificationsByUser = async (userId, options = {}) => {
+  const { page, limit, type, unread } = options;
+  const filter = { user_id: userId };
+  if (type) filter.type = type;
+  if (unread === "true") filter.is_read = false;
+
+  if (page && limit) {
+    const total = await Notification.countDocuments(filter);
+    const notifs = await Notification.find(filter)
+      .sort({ created_at: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return {
+      data: notifs,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  return await Notification.find(filter).sort({ created_at: -1 });
 };
 
 export const getUnreadNotifications = async (userId) => {

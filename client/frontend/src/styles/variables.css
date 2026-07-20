@@ -1,0 +1,13 @@
+:root {
+  --header-height: 4rem;
+  --sidebar-width: 16rem;
+  --sidebar-collapsed-width: 4rem;
+  --content-max-width: 1280px;
+  --transition-speed: 200ms;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 0rem;
+  }
+}

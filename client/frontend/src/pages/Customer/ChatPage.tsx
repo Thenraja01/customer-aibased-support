@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/store";
@@ -15,6 +15,8 @@ import TypingIndicator from "@/components/chat/TypingIndicator";
 import ChatLayout from "@/components/chat/ChatLayout";
 import ChatSidebar from "@/components/chat/ChatSidebar";
 import type { Chat } from "@/types/chat";
+import { DocumentAPI } from "@/api";
+import { connectSocket, disconnectSocket } from "@/utils/socket";
 
 interface ChatPageProps {
   onOpenTicket?: () => void;
@@ -22,6 +24,8 @@ interface ChatPageProps {
 
 export default function ChatPage({ onOpenTicket }: ChatPageProps) {
   const { user } = useSelector((state: RootState) => state.user);
+  const [userDocuments, setUserDocuments] = useState<Array<{ _id?: string; title?: string; filename?: string }>>([]);
+
   const {
     activeChat,
     messages,
@@ -29,10 +33,14 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
     messagesLoading,
     sending,
     aiThinking,
+    streamingMessageId,
+    streamingContent,
     error,
     startNewChat,
+    startNewChatViaSocket,
+    sendWithStreamViaSocket,
     loadMessages,
-    sendWithAI,
+    sendWithAIStream,
     loadUserChats,
     selectChat,
   } = useChat();
@@ -42,6 +50,27 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
   useEffect(() => {
     loadUserChats();
   }, [loadUserChats]);
+
+  useEffect(() => {
+    if (user?._id) {
+      DocumentAPI.getByUser(user._id)
+        .then((res) => {
+          const docs = res.data.data || res.data;
+          if (Array.isArray(docs)) setUserDocuments(docs);
+        })
+        .catch(() => {});
+    }
+  }, [user?._id]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      connectSocket(token);
+    }
+    return () => {
+      disconnectSocket();
+    };
+  }, []);
 
   useEffect(() => {
     if (activeChat?._id) {
@@ -59,10 +88,25 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
       });
       const newChat = result.payload;
       if (newChat?._id) {
-        await sendWithAI(newChat._id, user._id, initialMessage);
+        await sendWithAIStream(newChat._id, user._id, initialMessage);
       }
     },
-    [user, startNewChat, sendWithAI]
+    [user, startNewChat, sendWithAIStream]
+  );
+
+  const handleStartWithDocumentViaSocket = useCallback(
+    async (initialMessage: string) => {
+      if (!user?.organization_id?._id) return;
+      const result = await startNewChatViaSocket({
+        organization_id: user.organization_id._id,
+        topic: initialMessage.substring(0, 50),
+      });
+      const newChat = result.payload;
+      if (newChat?._id) {
+        await sendWithStreamViaSocket(newChat._id, initialMessage);
+      }
+    },
+    [user, startNewChatViaSocket, sendWithStreamViaSocket]
   );
 
   const handleSend = useCallback(
@@ -71,13 +115,30 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
 
       let finalText = text;
       if (file) {
-        const fileInfo = `[Attached file: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
-        finalText = text ? `${text}\n\n${fileInfo}` : fileInfo;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("user_id", user._id);
+        if (user?.organization_id?._id) {
+          formData.append("organization_id", user.organization_id._id);
+        }
+        try {
+          const uploadRes = await DocumentAPI.upload(formData);
+          const doc = uploadRes.data.data || uploadRes.data;
+          const docId = doc._id || doc.id;
+          const docName = doc.title || doc.filename || file.name;
+          finalText = text
+            ? `${text}\n\n[Attached file: ${docName} (document_id: ${docId})]`
+            : `[Attached file: ${docName} (document_id: ${docId})]`;
+        } catch {
+          finalText = text
+            ? `${text}\n\n[Attached file: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`
+            : `[Attached file: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
+        }
       }
 
-      await sendWithAI(activeChat._id, user._id, finalText);
+      await sendWithAIStream(activeChat._id, user._id, finalText);
     },
-    [activeChat, user, sendWithAI]
+    [activeChat, user, sendWithAIStream]
   );
 
   const handleSelectChat = useCallback(
@@ -87,9 +148,14 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
     [selectChat]
   );
 
-  const handleNewChat = useCallback(() => {
-    selectChat(null);
-  }, [selectChat]);
+  const handleNewChat = useCallback(async () => {
+    if (!user?._id || !user?.organization_id?._id) return;
+    await startNewChat({
+      user_id: user._id,
+      organization_id: user.organization_id._id,
+      topic: "New Chat",
+    });
+  }, [user, startNewChat]);
 
   const sidebar = (
     <ChatSidebar onSelectChat={handleSelectChat} onNewChat={handleNewChat} />
@@ -102,7 +168,9 @@ export default function ChatPage({ onOpenTicket }: ChatPageProps) {
         <ChatHeader activeChat={null} onOpenTicket={onOpenTicket ?? (() => {})} />
         <WelcomeScreen
           onStartWithMessage={handleStartWithMessage}
+          onStartWithDocument={handleStartWithDocumentViaSocket}
           onOpenTicket={onOpenTicket ?? (() => {})}
+          documents={userDocuments}
         />
       </ChatLayout>
     );

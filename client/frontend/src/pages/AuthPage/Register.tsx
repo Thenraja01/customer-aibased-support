@@ -81,20 +81,22 @@ export default function Register() {
 
   const [orgsLoading, setOrgsLoading] = useState(true);
   const [rolesLoading, setRolesLoading] = useState(true);
-  const [fetchError, setFetchError] = useState("");
+  const [orgsError, setOrgsError] = useState("");
+  const [rolesError, setRolesError] = useState("");
 
   useEffect(() => {
     setOrgsLoading(true);
-    setFetchError("");
+    setOrgsError("");
     AuthAPI.getOrganizations()
       .then((res: any) => setOrgs(res.data.data || []))
-      .catch(() => setFetchError("Failed to load organizations"))
+      .catch(() => setOrgsError("Failed to load organizations"))
       .finally(() => setOrgsLoading(false));
 
     setRolesLoading(true);
+    setRolesError("");
     AuthAPI.getRoles()
       .then((res: any) => setRoles(res.data.data || []))
-      .catch(() => setFetchError("Failed to load roles"))
+      .catch(() => setRolesError("Failed to load roles"))
       .finally(() => setRolesLoading(false));
   }, []);
 
@@ -347,10 +349,20 @@ export default function Register() {
             </div>
 
             <CardContent className="p-0">
-              {fetchError && (
-                <div className="mb-4 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  <AlertCircle size={14} />
-                  {fetchError}
+              {(orgsError || rolesError) && (
+                <div className="mb-4 space-y-1">
+                  {orgsError && (
+                    <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      <AlertCircle size={14} />
+                      {orgsError}
+                    </div>
+                  )}
+                  {rolesError && (
+                    <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      <AlertCircle size={14} />
+                      {rolesError}
+                    </div>
+                  )}
                 </div>
               )}
 

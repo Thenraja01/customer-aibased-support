@@ -1,30 +1,17 @@
 import { useState, useEffect } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  Settings,
-  LogOut,
-  Menu,
-  MessageCircle,
-  Ticket,
-  Bell,
-  X,
-} from "lucide-react";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import { Outlet } from "react-router-dom";
+import { Menu, Bell, X } from "lucide-react";
+import RbacSidebar from "@/components/common/Navigation/RbacSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
-import { hasPermission } from "@/lib/rbac";
-import { PERMISSIONS } from "@/lib/rbac";
 
 const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const location = useLocation();
-  const { user, logout } = useAuth();
-  const { notifications, unreadCount, loadNotifications, loadUnreadCount, markRead, markAllRead } = useNotifications();
-
-  const roleName = user?.role_id?.role_name;
+  const { user } = useAuth();
+  const { notifications, unreadCount, loadNotifications, loadUnreadCount, markRead, markAllRead } =
+    useNotifications();
 
   useEffect(() => {
     if (user?._id) {
@@ -33,102 +20,31 @@ const DashboardLayout = () => {
     }
   }, [user, loadNotifications, loadUnreadCount]);
 
-  const customerLinks = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, permission: null },
-    { name: "Chat", path: "/chat", icon: MessageCircle, permission: PERMISSIONS.ACCESS_CHATBOT },
-    { name: "Tickets", path: "/tickets", icon: Ticket, permission: null },
-    { name: "Settings", path: "/profile", icon: Settings, permission: null },
-  ];
+  const roleName =
+    typeof user?.role_id === "object"
+      ? user.role_id?.role_name
+      : typeof user?.role_id === "string"
+      ? user.role_id
+      : "";
 
-  const agentLinks = [
-    { name: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard, permission: null },
-    { name: "Chats", path: "/agent/chats", icon: MessageCircle, permission: PERMISSIONS.ACCESS_CHATBOT },
-    { name: "Tickets", path: "/agent/tickets", icon: Ticket, permission: null },
-    { name: "Settings", path: "/profile", icon: Settings, permission: null },
-  ];
-
-  const filterByPermission = (links: typeof customerLinks) =>
-    links.filter((link) => {
-      if (!link.permission) return true;
-      if (roleName === "super_admin" || roleName === "admin") return true;
-      return hasPermission(roleName, link.permission);
-    });
-
-  let links: typeof customerLinks = [];
-  if (roleName === "agent") {
-    links = filterByPermission(agentLinks);
-  } else if (roleName !== "super_admin" && roleName !== "admin") {
-    links = filterByPermission(customerLinks);
-  }
+  const portalLabel =
+    roleName === "support"
+      ? "Support Portal"
+      : roleName === "agent"
+      ? "Agent Portal"
+      : roleName === "super_admin" || roleName === "admin"
+      ? "Admin Portal"
+      : "Customer Portal";
 
   return (
     <div className="flex h-screen bg-background font-sans">
-      {roleName === "super_admin" || roleName === "admin" ? (
-        <AdminSidebar
-          isSidebarOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-        />
-      ) : (
-        <>
-          {isSidebarOpen && (
-            <div
-              className="fixed inset-0 z-20 bg-black/50 backdrop-blur-sm lg:hidden"
-              onClick={() => setIsSidebarOpen(false)}
-            />
-          )}
-          <aside
-            className={`fixed inset-y-0 left-0 z-30 w-64 transform bg-card dark:bg-gradient-to-b dark:from-card dark:to-background/80 border-r transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-0 flex flex-col dark:border-white/[0.06] ${
-              isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-            }`}
-          >
-            <div className="flex items-center justify-between h-16 px-6 border-b dark:border-white/[0.06]">
-              <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                {roleName === "agent" ? "Agent Portal" : "SupportAI"}
-              </span>
-              <button
-                className="lg:hidden text-muted-foreground hover:text-foreground"
-                onClick={() => setIsSidebarOpen(false)}
-              >
-                &times;
-              </button>
-            </div>
+      <RbacSidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
 
-            <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-              {links.map((link) => {
-                const Icon = link.icon;
-                const isActive = location.pathname === link.path;
-                return (
-                  <Link
-                    key={link.name}
-                    to={link.path}
-                    className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? "bg-primary/10 text-primary dark:bg-primary/15 dark:shadow-sm dark:shadow-primary/10"
-                        : "text-muted-foreground hover:bg-muted dark:hover:bg-white/[0.04] hover:text-foreground"
-                    }`}
-                    onClick={() => setIsSidebarOpen(false)}
-                  >
-                    <Icon size={18} />
-                    <span>{link.name}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-
-            <div className="p-4 border-t dark:border-white/[0.06]">
-              <button
-                onClick={logout}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-destructive rounded-lg hover:bg-destructive/10 dark:hover:bg-destructive/15 transition-colors w-full"
-              >
-                <LogOut size={18} />
-                <span>Logout</span>
-              </button>
-            </div>
-          </aside>
-        </>
-      )}
-
-      <div className="flex-1 flex flex-col overflow-hidden ">
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         <header className="flex items-center justify-between h-16 px-6 bg-card dark:bg-card/80 border-b dark:border-white/[0.06]">
           <button
             className="lg:hidden text-muted-foreground hover:text-foreground"
@@ -136,34 +52,30 @@ const DashboardLayout = () => {
           >
             <Menu size={24} />
           </button>
-          <div className="text-lg font-semibold lg:hidden">
-            {roleName === "super_admin" ? "Super Admin" : roleName === "support" ? "support Portal" : "Dashboard"}
-          </div>
+          <div className="text-lg font-semibold lg:hidden">{portalLabel}</div>
           <div className="flex items-center gap-2 justify-end w-full">
-            <div className="relative ">
+            {/* Notification bell */}
+            <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 rounded-lg hover:bg-muted transition-colors"
               >
                 <Bell size={18} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5  -right-0.5 w-4 h-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute  right-0 top-full mt-2 w-80 bg-card dark:bg-card/95 dark:backdrop-blur-md rounded-xl shadow-xl dark:shadow-2xl dark:shadow-black/10 border dark:border-white/[0.06] z-50">
+                <div className="absolute right-0 top-full mt-2 w-80 bg-card dark:bg-card/95 dark:backdrop-blur-md rounded-xl shadow-xl dark:shadow-2xl dark:shadow-black/10 border dark:border-white/[0.06] z-50">
                   <div className="flex items-center justify-between px-4 py-3 border-b dark:border-white/[0.06]">
                     <h3 className="text-sm font-semibold">Notifications</h3>
                     <div className="flex items-center gap-1">
                       {unreadCount > 0 && (
                         <button
-                          onClick={() => {
-                            markAllRead();
-                            loadUnreadCount();
-                          }}
+                          onClick={() => { markAllRead(); loadUnreadCount(); }}
                           className="text-xs text-primary hover:underline"
                         >
                           Mark all read
@@ -192,10 +104,7 @@ const DashboardLayout = () => {
                               !notif.read ? "bg-primary/5 dark:bg-primary/10" : ""
                             }`}
                             onClick={() => {
-                              if (!notif.read) {
-                                markRead(notif._id);
-                                loadUnreadCount();
-                              }
+                              if (!notif.read) { markRead(notif._id); loadUnreadCount(); }
                             }}
                           >
                             <p className="text-sm font-medium line-clamp-1">{notif.title || notif.message}</p>

@@ -1,5 +1,6 @@
 import * as chatService from "./chat.service.js";
 import { processAIMessage } from "./aiChat.service.js";
+import Message from "../message/message.schema.js";
 
 export const createNewChat = async (req, res) => {
   try {
@@ -140,5 +141,83 @@ export const changePriority = async (req, res) => {
     res.status(200).json({ success: true, data: chat });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const streamChat = async (req, res) => {
+  try {
+    const { message } = req.body;
+    const chatId = req.params.id;
+    const userId = req.user.userId;
+    const organizationId = req.user.organizationId;
+
+    if (!message) {
+      return res.status(400).json({ success: false, message: "Message is required" });
+    }
+
+    const chat = await chatService.getChatById(chatId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: "Chat not found" });
+    }
+
+    await Message.create({
+      chat_id: chatId,
+      sender_id: userId,
+      content: message,
+      message_type: "text",
+      is_ai: false,
+    });
+
+    const { streamAIResponse } = await import("../../services/streaming.service.js");
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const stream = streamAIResponse({
+      chatId,
+      userId,
+      userMessage: message,
+      organizationId,
+    });
+
+    for await (const event of stream) {
+      if (event.type === "token") {
+        res.write(`data: ${JSON.stringify({ type: "token", content: event.content })}\n\n`);
+      } else if (event.type === "done") {
+        res.write(`data: ${JSON.stringify({ type: "done", meta: event.meta })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+        return;
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ type: "done", meta: { intent: "unknown" } })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
+  } catch (error) {
+    console.error("[SSE Stream] Error:", error.message);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: error.message });
+    } else {
+      res.write(`data: ${JSON.stringify({ type: "error", message: error.message })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    }
+  }
+};
+
+export const escalateChat = async (req, res) => {
+  try {
+    const chatId = req.params.id;
+    const userId = req.user.userId;
+    const organizationId = req.user.organizationId;
+    const { subject, description } = req.body;
+
+    const ticket = await chatService.escalateToTicket(chatId, userId, organizationId, subject, description);
+    res.status(201).json({ success: true, data: ticket, message: "Chat escalated to ticket" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

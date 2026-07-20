@@ -9,9 +9,9 @@ const router = express.Router();
 router.use(protect);
 
 router.post("/", restrict("admin"), validate(createOrganizationSchema), orgController.create);
-router.get("/", restrict("admin", "agent"), orgController.getAll);
-router.get("/search", restrict("admin", "agent"), orgController.search);
-router.get("/:id", restrict("admin", "agent"), orgController.getById);
+router.get("/", restrict("admin", "support"), orgController.getAll);
+router.get("/search", restrict("admin", "support"), orgController.search);
+router.get("/:id", restrict("admin", "support"), orgController.getById);
 router.put("/:id", restrict("admin"), validate(updateOrganizationSchema), orgController.update);
 router.delete("/:id", restrict("admin"), orgController.remove);
 

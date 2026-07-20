@@ -35,7 +35,7 @@ import {
   Zap,
 } from "lucide-react";
 import { staggerContainer, staggerItem, scaleIn } from "@/lib/animations";
-import { RAGAPI } from "@/api";
+import { RAGAPI, DocumentAPI } from "@/api";
 
 interface RAGDocument {
   id: string;
@@ -61,54 +61,12 @@ interface SearchResult {
   score: number;
 }
 
-const MOCK_DOCUMENTS: RAGDocument[] = [
-  { id: "doc_1", title: "Product Documentation", chunkCount: 342, entityCount: 89, lastIndexed: "2026-07-15T10:30:00Z", status: "indexed", type: "pdf" },
-  { id: "doc_2", title: "API Reference Guide", chunkCount: 218, entityCount: 156, lastIndexed: "2026-07-14T15:45:00Z", status: "indexed", type: "markdown" },
-  { id: "doc_3", title: "Customer FAQ Database", chunkCount: 567, entityCount: 234, lastIndexed: "2026-07-13T09:00:00Z", status: "indexed", type: "json" },
-  { id: "doc_4", title: "Troubleshooting Handbook", chunkCount: 189, entityCount: 67, lastIndexed: "2026-07-12T14:20:00Z", status: "indexed", type: "pdf" },
-  { id: "doc_5", title: "Onboarding Guide", chunkCount: 124, entityCount: 45, lastIndexed: "2026-07-11T11:10:00Z", status: "indexed", type: "docx" },
-  { id: "doc_6", title: "Release Notes v3.2", chunkCount: 45, entityCount: 12, lastIndexed: "2026-07-10T08:00:00Z", status: "pending", type: "markdown" },
-  { id: "doc_7", title: "Security Policies", chunkCount: 78, entityCount: 23, lastIndexed: "2026-07-09T16:00:00Z", status: "indexed", type: "pdf" },
-  { id: "doc_8", title: "Integration Partners", chunkCount: 92, entityCount: 34, lastIndexed: "2026-07-08T13:30:00Z", status: "error", type: "csv" },
-];
 
-const MOCK_GRAPH_STATS: GraphStats = {
-  totalNodes: 1247,
-  totalEdges: 3891,
-  documentsProcessed: 7,
-  nodeTypes: [
-    { type: "Concept", count: 456 },
-    { type: "Entity", count: 312 },
-    { type: "Feature", count: 198 },
-    { type: "Organization", count: 87 },
-    { type: "Product", count: 124 },
-    { type: "Process", count: 70 },
-  ],
-};
-
-const MOCK_SEARCH_RESULTS: SearchResult[] = [
-  {
-    chunkId: "chk_1",
-    documentTitle: "Product Documentation",
-    content: "Our AI-powered customer support platform uses RAG (Retrieval Augmented Generation) to provide accurate, context-aware responses. The system processes documents into semantic chunks...",
-    score: 0.94,
-  },
-  {
-    chunkId: "chk_2",
-    documentTitle: "API Reference Guide",
-    content: "The /api/v1/rag/query endpoint accepts a POST request with a query string and optional filters. The response includes relevant document chunks ranked by similarity score...",
-    score: 0.91,
-  },
-  {
-    chunkId: "chk_3",
-    documentTitle: "Customer FAQ Database",
-    content: "Q: How does the knowledge base work? A: Documents are split into chunks, embedded using our embedding model, and stored in a vector database for semantic search retrieval...",
-    score: 0.87,
-  },
-];
 
 export default function KnowledgeBasePage() {
   const [ragStats, setRagStats] = useState<any>(null);
+  const [documents, setDocuments] = useState<RAGDocument[]>([]);
+  const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -126,10 +84,35 @@ export default function KnowledgeBasePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await RAGAPI.getStats();
-      if (res.data.success) setRagStats(res.data.data);
+      const [statsRes, docsRes, graphRes] = await Promise.allSettled([
+        RAGAPI.getStats(),
+        DocumentAPI.getAll({}),
+        RAGAPI.getGlobalStats(),
+      ]);
+      if (statsRes.status === "fulfilled" && statsRes.value.data.success) {
+        setRagStats(statsRes.value.data.data);
+      }
+      if (docsRes.status === "fulfilled") {
+        const docs = docsRes.value.data.data || docsRes.value.data;
+        if (Array.isArray(docs)) {
+          setDocuments(
+            docs.map((d: any) => ({
+              id: d._id || d.id,
+              title: d.title || d.filename || "Untitled",
+              chunkCount: d.chunkCount || 0,
+              entityCount: d.entityCount || 0,
+              lastIndexed: d.lastIndexed || d.updated_at || d.created_at || new Date().toISOString(),
+              status: d.status || "pending",
+              type: d.type || d.fileType || "unknown",
+            }))
+          );
+        }
+      }
+      if (graphRes.status === "fulfilled" && graphRes.value.data.success) {
+        setGraphStats(graphRes.value.data.data);
+      }
     } catch (error) {
-      console.error("Failed to load RAG stats:", error);
+      console.error("Failed to load knowledge base data:", error);
     } finally {
       setLoading(false);
     }
@@ -139,24 +122,42 @@ export default function KnowledgeBasePage() {
     if (!searchQuery.trim()) return;
     setSearching(true);
     setShowSearch(true);
-
-    // Simulate search with mock results
-    await new Promise((r) => setTimeout(r, 600));
-    setSearchResults(
-      MOCK_SEARCH_RESULTS.map((r) => ({
-        ...r,
-        content: r.content.replace(
-          "AI-powered",
-          searchQuery.length > 10 ? searchQuery.slice(0, 10) + "..." : searchQuery
-        ),
-      }))
-    );
+    setSearchResults([]);
+    try {
+      const res = await RAGAPI.searchByKeyword({ q: searchQuery });
+      const data = res.data.data || res.data;
+      if (Array.isArray(data)) {
+        setSearchResults(
+          data.map((r: any) => ({
+            chunkId: r._id || r.chunkId,
+            documentTitle: r.documentTitle || r.document_id?.title || "Document",
+            content: r.content || r.text || "",
+            score: r.score || 0,
+          }))
+        );
+      } else if (data.results && Array.isArray(data.results)) {
+        setSearchResults(
+          data.results.map((r: any) => ({
+            chunkId: r._id || r.chunkId,
+            documentTitle: r.documentTitle || r.document_id?.title || "Document",
+            content: r.content || r.text || "",
+            score: r.score || 0,
+          }))
+        );
+      }
+    } catch {
+      console.error("Search failed, no results available.");
+    }
     setSearching(false);
   };
 
   const handleReindex = async (docId: string) => {
     setReindexingDoc(docId);
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      await RAGAPI.ingest({ documentId: docId });
+    } catch {
+      console.error("Reindex failed");
+    }
     setReindexingDoc(null);
   };
 
@@ -167,22 +168,24 @@ export default function KnowledgeBasePage() {
       const res = await RAGAPI.getDocumentChunks(doc.id);
       if (res.data.success && Array.isArray(res.data.data)) {
         setDocChunks(res.data.data.slice(0, 10));
+      } else {
+        setDocChunks([]);
       }
     } catch {
-      // Use mock chunks
-      setDocChunks([
-        { _id: "chk_m1", content: `Chunk 1 of "${doc.title}": This section covers the introductory concepts and overview of the system architecture...`, index: 0 },
-        { _id: "chk_m2", content: `Chunk 2 of "${doc.title}": The core processing pipeline handles document ingestion, chunking, embedding, and vector storage...`, index: 1 },
-        { _id: "chk_m3", content: `Chunk 3 of "${doc.title}": Configuration options include chunk size, overlap, embedding model selection, and retrieval parameters...`, index: 2 },
-      ]);
+      setDocChunks([]);
     } finally {
       setLoadingChunks(false);
     }
   };
 
-  const documents = MOCK_DOCUMENTS;
   const totalChunks = documents.reduce((s, d) => s + d.chunkCount, 0);
   const indexedCount = documents.filter((d) => d.status === "indexed").length;
+  const graphStatsData = graphStats || {
+    totalNodes: 0,
+    totalEdges: 0,
+    documentsProcessed: indexedCount,
+    nodeTypes: [],
+  };
 
   if (loading) {
     return (
@@ -256,7 +259,7 @@ export default function KnowledgeBasePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Graph Nodes</p>
-              <p className="text-2xl font-bold mt-2">{MOCK_GRAPH_STATS.totalNodes.toLocaleString()}</p>
+              <p className="text-2xl font-bold mt-2">{graphStatsData.totalNodes.toLocaleString()}</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
               <Network size={20} className="text-accent-foreground" />
@@ -274,7 +277,7 @@ export default function KnowledgeBasePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Graph Edges</p>
-              <p className="text-2xl font-bold mt-2">{MOCK_GRAPH_STATS.totalEdges.toLocaleString()}</p>
+              <p className="text-2xl font-bold mt-2">{graphStatsData.totalEdges.toLocaleString()}</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-green-500/10 dark:bg-green-500/15 flex items-center justify-center">
               <Brain size={20} className="text-green-500" />
@@ -433,20 +436,24 @@ export default function KnowledgeBasePage() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Total Nodes</span>
-                    <span className="text-sm font-bold">{MOCK_GRAPH_STATS.totalNodes.toLocaleString()}</span>
+                    <span className="text-sm font-bold">{graphStatsData.totalNodes.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Total Edges</span>
-                    <span className="text-sm font-bold">{MOCK_GRAPH_STATS.totalEdges.toLocaleString()}</span>
+                    <span className="text-sm font-bold">{graphStatsData.totalEdges.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Documents Processed</span>
-                    <span className="text-sm font-bold">{MOCK_GRAPH_STATS.documentsProcessed}</span>
+                    <span className="text-sm font-bold">{graphStatsData.documentsProcessed}</span>
                   </div>
                   <div className="pt-2 border-t dark:border-white/[0.06]">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Node Types</p>
                     <div className="space-y-2">
-                      {MOCK_GRAPH_STATS.nodeTypes.map((nt) => (
+                      {(graphStatsData.nodeTypes.length > 0 ? graphStatsData.nodeTypes : [
+                        { type: "Concept", count: 0 },
+                        { type: "Entity", count: 0 },
+                        { type: "Feature", count: 0 },
+                      ]).map((nt) => (
                         <div key={nt.type} className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">{nt.type}</span>
                           <div className="flex items-center gap-2">
@@ -454,7 +461,7 @@ export default function KnowledgeBasePage() {
                               <div
                                 className="h-full bg-primary/60 rounded-full"
                                 style={{
-                                  width: `${(nt.count / MOCK_GRAPH_STATS.totalNodes) * 100}%`,
+                                  width: `${((nt.count || 0) / Math.max(graphStatsData.totalNodes, 1)) * 100}%`,
                                 }}
                               />
                             </div>
@@ -495,11 +502,11 @@ export default function KnowledgeBasePage() {
                     <div className="pt-4 border-t dark:border-white/[0.06]">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <ChevronRight size={12} />
-                        <span>Density: {(MOCK_GRAPH_STATS.totalEdges / MOCK_GRAPH_STATS.totalNodes).toFixed(1)} edges/node</span>
+                        <span>Density: {(graphStatsData.totalEdges / Math.max(graphStatsData.totalNodes, 1)).toFixed(1)} edges/node</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                         <ChevronRight size={12} />
-                        <span>Avg connections per entity: ~{(MOCK_GRAPH_STATS.totalEdges / MOCK_GRAPH_STATS.totalNodes * 1.5).toFixed(1)}</span>
+                        <span>Avg connections per entity: ~{(graphStatsData.totalEdges / Math.max(graphStatsData.totalNodes, 1) * 1.5).toFixed(1)}</span>
                       </div>
                     </div>
                   </div>

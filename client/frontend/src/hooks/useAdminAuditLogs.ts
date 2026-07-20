@@ -1,49 +1,27 @@
-import { useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { AdminAPI } from "@/api/admin.api";
-import {
-  setAuditLogs,
-  setLogPagination,
-  setLoading,
-} from "@/store/adminSlice";
-import type { RootState, AppDispatch } from "@/store/store";
+import { useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { setAuditLogs, setLogPagination, setLoading } from '@/store/adminSlice';
+import { AdminAPI } from '@/api/admin.api';
+import type { RootState, AppDispatch } from '@/store/store';
 
-export const useAdminAuditLogs = () => {
+export function useAdminAuditLogs() {
   const dispatch = useDispatch<AppDispatch>();
-  const { auditLogs, logPagination, loading } = useSelector(
-    (state: RootState) => state.admin
-  );
+  const { auditLogs, logPagination, loading } = useSelector((state: RootState) => state.admin);
 
-  const fetchAuditLogs = useCallback(
-    async (params?: {
-      page?: number;
-      limit?: number;
-      userId?: string;
-      action?: string;
-      tableName?: string;
-      from?: string;
-      to?: string;
-    }) => {
-      dispatch(setLoading(true));
-      try {
-        const res = await AdminAPI.getAuditLogs(params);
-        if (res.data.success) {
-          dispatch(setAuditLogs(res.data.data));
-          dispatch(setLogPagination(res.data.pagination));
-        }
-      } catch (error) {
-        console.error("Failed to fetch audit logs", error);
-      } finally {
-        dispatch(setLoading(false));
+  const fetchLogs = useCallback(async (params?: Record<string, any>) => {
+    dispatch(setLoading(true));
+    try {
+      const res = await AdminAPI.getAuditLogs(params);
+      dispatch(setAuditLogs(res.data.data || []));
+      if (res.data.pagination) {
+        dispatch(setLogPagination(res.data.pagination));
       }
-    },
-    [dispatch]
-  );
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }, [dispatch]);
 
-  return {
-    auditLogs,
-    logPagination,
-    loading,
-    fetchAuditLogs,
-  };
-};
+  const fetchAuditLogs = fetchLogs;
+
+  return { auditLogs, logPagination, logs: auditLogs, pagination: logPagination, loading, fetchLogs, fetchAuditLogs };
+}

@@ -1,35 +1,28 @@
-import { useCallback, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { AdminAPI } from "@/api/admin.api";
-import {
-  setDashboardStats,
-  setLoading,
-} from "@/store/adminSlice";
-import type { RootState, AppDispatch } from "@/store/store";
+import { useCallback, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { setDashboardStats, setLoading } from '@/store/adminSlice';
+import { AdminAPI } from '@/api/admin.api';
+import type { RootState, AppDispatch } from '@/store/store';
 
-export const useAdminDashboard = () => {
+export function useAdminDashboard() {
   const dispatch = useDispatch<AppDispatch>();
-  const { dashboardStats, loading } = useSelector(
-    (state: RootState) => state.admin
-  );
+  const { dashboardStats: stats, loading } = useSelector((state: RootState) => state.admin);
 
-  const fetchStats = useCallback(async () => {
+  const fetchDashboardData = useCallback(async () => {
     dispatch(setLoading(true));
     try {
       const res = await AdminAPI.getDashboardStats();
-      if (res.data.success) {
-        dispatch(setDashboardStats(res.data.data));
-      }
-    } catch (error) {
-      console.error("Failed to fetch dashboard stats", error);
+      dispatch(setDashboardStats(res.data.data));
+    } catch {
+      // fail silently
     } finally {
       dispatch(setLoading(false));
     }
   }, [dispatch]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
-  return { dashboardStats, loading, refetch: fetchStats };
-};
+  return { stats, dashboardStats: stats, loading, fetchDashboardData };
+}

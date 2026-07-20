@@ -2,6 +2,12 @@ import mongoose, { Schema } from "mongoose";
 
 const ticketSchema = new mongoose.Schema(
   {
+    chat_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Chat",
+      default: null,
+      index: true,
+    },
     user_id: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -34,7 +40,12 @@ const ticketSchema = new mongoose.Schema(
     },
     tags: [{ type: String, maxlength: 50 }],
     due_date: { type: Date },
+    sla_breached: { type: Boolean, default: false },
+    sla_breached_at: { type: Date },
+    escalation_count: { type: Number, default: 0 },
     resolved_at: { type: Date },
+    is_deleted: { type: Boolean, default: false, index: true },
+    deleted_at: { type: Date, default: null },
   },
   {
     timestamps: {
@@ -43,5 +54,8 @@ const ticketSchema = new mongoose.Schema(
     },
   }
 );
+
+ticketSchema.index({ organization_id: 1, assigned_to: 1, status: 1 });
+ticketSchema.index({ user_id: 1, status: 1 });
 
 export default mongoose.model("Ticket", ticketSchema);

@@ -2,8 +2,13 @@ import * as userService from "./user.service.js";
 
 export const getUsers = async (req, res) => {
   try {
-    const users = await userService.getAllUsers();
-    res.status(200).json({ success: true, data: users });
+    const { page, limit, status, role, search, sortBy, sortOrder } = req.query;
+    const result = await userService.getAllUsers({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      status, role, search, sortBy, sortOrder,
+    });
+    res.status(200).json({ success: true, ...(result.pagination ? result : { data: result }) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -89,10 +94,81 @@ export const searchUser = async (req, res) => {
   }
 };
 
+export const exportUsers = async (req, res) => {
+  try {
+    const users = await userService.getAllUsers();
+    const rows = Array.isArray(users) ? users : users.data || [];
+    const header = "Name,Email,Role,Status,Phone,Last Login,Created At\n";
+    const csv = rows.map((u) =>
+      `"${u.name || ""}","${u.email || ""}","${u.role_id?.role_name || ""}","${u.status || ""}","${u.phone || ""}","${u.last_login || ""}","${u.created_at || ""}"`
+    ).join("\n");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=users-export.csv");
+    res.status(200).send(header + csv);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+    const user = await userService.uploadAvatar(req.user.userId, req.file);
+    res.status(200).json({ success: true, message: "Avatar updated", data: user });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const getActivityLogs = async (req, res) => {
+  try {
+    const logs = await userService.getActivityLogs(req.user.userId);
+    res.status(200).json({ success: true, data: logs });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const patchUserStatus = async (req, res) => {
   try {
     const user = await userService.updateUserStatus(req.params.id, req.body.status);
     res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    const status = error.message === "User not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const getPendingUsers = async (req, res) => {
+  try {
+    const { page, limit } = req.query;
+    const result = await userService.getAllUsers({
+      status: "pending",
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 10,
+    });
+    res.status(200).json({ success: true, ...(result.pagination ? result : { data: result }) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const approveUser = async (req, res) => {
+  try {
+    const user = await userService.updateUserStatus(req.params.id, "active");
+    res.status(200).json({ success: true, message: "User approved successfully", data: user });
+  } catch (error) {
+    const status = error.message === "User not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const rejectUser = async (req, res) => {
+  try {
+    const user = await userService.updateUserStatus(req.params.id, "inactive");
+    res.status(200).json({ success: true, message: "User rejected", data: user });
   } catch (error) {
     const status = error.message === "User not found" ? 404 : 400;
     res.status(status).json({ success: false, message: error.message });

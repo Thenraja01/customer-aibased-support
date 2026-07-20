@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
+import { createHash } from "crypto";
 import User from "./modules/user/user.schema.js";
 import Role from "./modules/role/role.schema.js";
 import Organization from "./modules/organization/organization.schema.js";
@@ -10,13 +11,13 @@ import Chat from "./modules/chat/chat.schema.js";
 import Document from "./modules/document/document.schema.js";
 import DocumentType from "./modules/document-type/documentType.schema.js";
 import Notification from "./modules/notification/notification.schema.js";
-import DocumentChunk from "./modules/document/documentChunk.schema.js";
+import DocumentChunk from "./modules/document/documentChunk.model.js";
 import KnowledgeGraph from "./modules/knowledge-graph/knowledgeGraph.schema.js";
 import GraphEdge from "./modules/knowledge-graph/graphEdge.schema.js";
 
 dotenv.config();
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/customer-support-system";
+const MONGODB_URI = process.env.MONGODB_URI;
 
 async function seed() {
   try {
@@ -52,7 +53,7 @@ async function seed() {
     }
 
     // Create Roles
-    const rolesToCreate = ["super_admin", "admin", "agent", "customer"];
+    const rolesToCreate = ["super_admin", "admin", "support", "customer"];
     for (const roleName of rolesToCreate) {
       const existingRole = await Role.findOne({ role_name: roleName });
       if (!existingRole) {
@@ -63,7 +64,7 @@ async function seed() {
 
     const superAdminRole = await Role.findOne({ role_name: "super_admin" });
     const adminRole = await Role.findOne({ role_name: "admin" });
-    const agentRole = await Role.findOne({ role_name: "agent" });
+    const supportRole = await Role.findOne({ role_name: "support" });
     const customerRole = await Role.findOne({ role_name: "customer" });
 
     // Create Super Admin
@@ -103,23 +104,23 @@ async function seed() {
       console.log("Admin user created. Email: admin@test.com, Password: Admin@123");
     }
 
-    // Create Agent
-    let agent = await User.findOne({ email: "agent@test.com" });
-    if (!agent) {
+    // Create Support
+    let support = await User.findOne({ email: "support@test.com" });
+    if (!support) {
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash("Agent@123", salt);
-      agent = new User({
+      const hashedPassword = await bcrypt.hash("Support@123", salt);
+      support = new User({
         organization_id: testOrg._id,
-        role_id: agentRole._id,
-        name: "Test Agent",
-        email: "agent@test.com",
+        role_id: supportRole._id,
+        name: "Test Support",
+        email: "support@test.com",
         password: hashedPassword,
         phone: "555-0102",
         auth_type: "local",
         status: "active",
       });
-      await agent.save();
-      console.log("Agent user created. Email: agent@test.com, Password: Agent@123");
+      await support.save();
+      console.log("Support user created. Email: support@test.com, Password: Support@123");
     }
 
     // Create Customers
@@ -347,7 +348,10 @@ If you receive a damaged product, please contact us within 48 hours with photos 
             organization_id: testOrg._id,
             document_type_id: policyDocType?._id,
             title: docData.title,
-            file_url: "",
+            file_data: Buffer.from(docData.content, "utf-8"),
+            file_mimetype: "text/plain",
+            file_name: `${docData.title.replace(/\s+/g, "_").toLowerCase()}.txt`,
+            file_size: Buffer.byteLength(docData.content, "utf-8"),
             status: "approved",
           });
 
@@ -370,10 +374,11 @@ If you receive a damaged product, please contact us within 48 hours with photos 
 
               await DocumentChunk.create({
                 document_id: doc._id,
+                organization_id: testOrg._id,
                 chunk_index: chunkIndex,
                 content: sentence.trim(),
+                content_hash: createHash('sha256').update(sentence.trim()).digest('hex'),
                 embedding,
-                keywords,
                 token_count: sentence.split(/\s+/).length,
               });
               chunkIndex++;
@@ -444,7 +449,7 @@ If you receive a damaged product, please contact us within 48 hours with photos 
     console.log("Credentials:");
     console.log("Super Admin: superadmin@admin.com / Admin@123");
     console.log("Admin: admin@test.com / Admin@123");
-    console.log("Agent: agent@test.com / Agent@123");
+    console.log("Support: support@test.com / Support@123");
     console.log("Customer: john@test.com / Customer@123");
     console.log("Customer: jane@test.com / Customer@123");
     console.log("Customer: bob@test.com / Customer@123");

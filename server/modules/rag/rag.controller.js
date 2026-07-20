@@ -1,12 +1,18 @@
 import * as ragService from "./rag.service.js";
 import * as kgService from "../knowledge-graph/knowledgeGraph.service.js";
 import * as chunkService from "../document/documentChunk.service.js";
+import Document from "../document/document.schema.js";
 
 export const ingest = async (req, res) => {
   try {
-    const { documentId, text } = req.body;
-    const chunks = await ragService.ingestDocument(documentId, text);
-    res.status(201).json({ success: true, data: { chunks: chunks.length } });
+    const { documentId } = req.body;
+    const doc = await Document.findById(documentId).lean();
+    if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+    if (!doc.file_data) return res.status(400).json({ success: false, message: "Document has no file data" });
+
+    const orgId = doc.organization_id || req.user?.organization_id;
+    const result = await ragService.ingestViaWorker(doc._id, orgId, doc.file_data, doc.file_mimetype);
+    res.status(202).json({ success: true, message: result.message });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }

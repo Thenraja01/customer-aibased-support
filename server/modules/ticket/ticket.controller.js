@@ -11,8 +11,15 @@ export const create = async (req, res) => {
 
 export const getAll = async (req, res) => {
   try {
-    const tickets = await ticketService.getAllTickets();
-    res.status(200).json({ success: true, data: tickets });
+    const organizationId = req.organization?._id || req.user?.organization_id;
+    const { page, limit, status, priority, search, userId, assignedTo, sortBy, sortOrder } = req.query;
+    const result = await ticketService.getAllTickets({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      status, priority, search, userId, assignedTo, sortBy, sortOrder,
+      organizationId,
+    });
+    res.status(200).json({ success: true, ...(result.pagination ? result : { data: result }) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -88,6 +95,26 @@ export const resolve = async (req, res) => {
     res.status(200).json({ success: true, data: ticket });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const updateStatus = async (req, res) => {
+  try {
+    const ticket = await ticketService.updateTicketStatus(req.params.id, req.body.status);
+    res.status(200).json({ success: true, data: ticket });
+  } catch (error) {
+    const status = error.message === "Ticket not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const escalate = async (req, res) => {
+  try {
+    const ticket = await ticketService.escalateTicket(req.params.id, req.body.reason);
+    res.status(200).json({ success: true, data: ticket });
+  } catch (error) {
+    const status = error.message === "Ticket not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
   }
 };
 

@@ -1,0 +1,22 @@
+export const apiConfig = {
+  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
+  timeout: 30000,
+  retryAttempts: 3,
+  retryDelay: 1000,
+  endpoints: {
+    auth: 'auth/v1',
+    users: 'users/v1',
+    documents: 'documents/v1',
+    documentTypes: 'document-types/v1',
+    documentVerifications: 'document-verifications/v1',
+    chats: 'chats/v1',
+    messages: 'messages/v1',
+    tickets: 'tickets/v1',
+    notifications: 'notifications/v1',
+    analytics: 'analytics/v1',
+    search: 'search/v1',
+    admin: 'admin/v1',
+    faq: 'faq/v1',
+    ai: 'ai/v1',
+  },
+} as const;
