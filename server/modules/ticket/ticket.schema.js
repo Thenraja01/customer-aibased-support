@@ -42,6 +42,8 @@ const ticketSchema = new mongoose.Schema(
     due_date: { type: Date },
     sla_breached: { type: Boolean, default: false },
     sla_breached_at: { type: Date },
+    ai_classification: { type: String },
+    ai_suggested_reply: { type: String },
     escalation_count: { type: Number, default: 0 },
     resolved_at: { type: Date },
     is_deleted: { type: Boolean, default: false, index: true },

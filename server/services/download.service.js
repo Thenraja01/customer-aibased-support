@@ -29,12 +29,6 @@ class DownloadService {
 
     return jwt.sign(payload, this.secret);
   }
-
-  /**
-   * Verify a download token
-   * @param {String} token - Download token
-   * @returns {Object|null} - Decoded payload or null if invalid
-   */
   verifyDownloadToken(token) {
     try {
       return jwt.verify(token, this.secret);
@@ -42,27 +36,12 @@ class DownloadService {
       return null;
     }
   }
-
-  /**
-   * Generate a secure download URL
-   * @param {String} documentId - Document ID
-   * @param {String} userId - User ID requesting download
-   * @param {String} baseUrl - Base URL of the API
-   * @returns {String} - Secure download URL
-   */
   generateDownloadUrl(documentId, userId, baseUrl) {
     const token = this.generateDownloadToken(documentId, userId);
     const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
     return `${cleanBaseUrl}/documents/${documentId}/download?token=${token}`;
   }
 
-  /**
-   * Check if a download request is authorized
-   * @param {String} token - Download token
-   * @param {String} documentId - Document ID from request
-   * @param {String} userId - User ID from request
-   * @returns {Boolean} - Whether the request is authorized
-   */
   isAuthorized(token, documentId, userId) {
     const payload = this.verifyDownloadToken(token);
     

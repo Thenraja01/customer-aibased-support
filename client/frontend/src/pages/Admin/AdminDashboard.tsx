@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
-import { UsersAPI, TicketAPI, ChatAPI, DocumentAPI, AISessionAPI } from "@/api";
+import { AdminAPI } from "@/api";
 import { Users, Ticket, MessageSquare, FileText, Clock, CheckCircle2 } from "lucide-react";
 import { staggerContainer, staggerItem, slideUp } from "@/lib/animations";
 
@@ -23,32 +23,20 @@ export default function AdminDashboard() {
   }, [user]);
 
   const loadStats = async () => {
-    if (!user?.organization_id?._id) return;
+    if (!user?.organization_id) return;
+    const orgId = typeof user.organization_id === "string" ? user.organization_id : user.organization_id._id;
     try {
-      const [usersRes, ticketsRes, chatsRes, docsRes, sessionRes] = await Promise.all([
-        UsersAPI.getAll({ organization_id: user.organization_id._id }).catch(() => ({ data: { success: false, data: [] } })),
-        TicketAPI.getAll().catch(() => ({ data: { success: false, data: [] } })),
-        ChatAPI.getAll().catch(() => ({ data: { success: false, data: [] } })),
-        DocumentAPI.getAll().catch(() => ({ data: { success: false, data: [] } })),
-        AISessionAPI.getStats().catch(() => ({ data: { success: false, data: null } })),
-      ]);
-
-      const users = usersRes.data.success ? usersRes.data.data : [];
-      const tickets = ticketsRes.data.success ? ticketsRes.data.data : [];
-      const chats = chatsRes.data.success ? chatsRes.data.data : [];
-      const docs = docsRes.data.success ? docsRes.data.data : [];
-      const sessionData = sessionRes.data.success ? sessionRes.data.data : {};
-
-      const orgUsers = users.filter((u: any) => u.organization_id?._id === user.organization_id._id);
-
+      const res = await AdminAPI.getAnalyticsDashboard({ organizationId: orgId });
+      const data = res.data.data;
+      
       setStats({
-        totalUsers: orgUsers.length,
-        activeUsers: orgUsers.filter((u: any) => u.status === "active").length,
-        openTickets: tickets.filter((t: any) => t.status === "open").length,
-        pendingTickets: tickets.filter((t: any) => t.status === "in_progress").length,
-        resolvedTickets: tickets.filter((t: any) => t.status === "resolved").length,
-        aiSessions: sessionData.totalSessions || chats.length,
-        pendingDocs: docs.filter((d: any) => d.status === "pending").length,
+        totalUsers: data.users?.total || 0,
+        activeUsers: data.users?.byStatus?.active || 0,
+        openTickets: data.tickets?.byStatus?.open || 0,
+        pendingTickets: data.tickets?.byStatus?.in_progress || 0,
+        resolvedTickets: data.tickets?.byStatus?.resolved || 0,
+        aiSessions: data.usage?.totalSessions || 0,
+        pendingDocs: data.documents?.byStatus?.pending || 0,
       });
     } catch (error) {
       console.error("Failed to load dashboard stats:", error);

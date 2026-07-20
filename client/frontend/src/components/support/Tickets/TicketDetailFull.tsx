@@ -256,6 +256,40 @@ export function TicketDetailFull() {
               </span>
             )}
           </div>
+          
+          {/* AI Insights Section */}
+          {(ticket.ai_classification || ticket.ai_suggested_reply) && (
+            <div className="mt-4 pt-4 border-t dark:border-white/[0.06]">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5 mb-2 text-primary">
+                <MessageSquare size={14} /> AI Insights
+              </h3>
+              {ticket.ai_classification && (
+                <div className="mb-2">
+                  <span className="text-xs text-muted-foreground">Classification: </span>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    {ticket.ai_classification}
+                  </span>
+                </div>
+              )}
+              {ticket.ai_suggested_reply && (
+                <div className="text-sm bg-muted/40 dark:bg-white/[0.03] p-3 rounded-lg border dark:border-white/[0.05] relative group">
+                  <span className="absolute -top-2.5 left-3 bg-card px-1 text-[10px] text-muted-foreground font-semibold">Suggested Reply</span>
+                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{ticket.ai_suggested_reply}</p>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="mt-2 h-7 text-xs" 
+                    onClick={() => {
+                      setNewComment(ticket.ai_suggested_reply);
+                      setIsInternal(false);
+                    }}
+                  >
+                    Use this reply
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

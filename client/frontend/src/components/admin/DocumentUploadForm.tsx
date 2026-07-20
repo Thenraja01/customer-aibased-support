@@ -118,6 +118,7 @@ export default function DocumentUploadForm({
       if (user.organization_id) {
         formData.append("organization_id", typeof user.organization_id === 'string' ? user.organization_id : user.organization_id._id);
       }
+      formData.append("is_knowledge_base", "true"); // Always knowledge base for admin/support uploads
       referenceImages.forEach((f) => formData.append("reference_images", f));
       if (documentTypeId) formData.append("document_type_id", documentTypeId);
 

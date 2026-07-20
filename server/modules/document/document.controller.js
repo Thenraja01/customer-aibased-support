@@ -9,7 +9,7 @@ export const upload = async (req, res) => {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
     const organizationId = req.organization?._id || req.user.organizationId;
-    const isKnowledgeBase = req.body.is_knowledge_base === true || req.body.isOrgDoc === true;
+    const isKnowledgeBase = req.body.is_knowledge_base === true || req.body.is_knowledge_base === "true" || req.body.isOrgDoc === true || req.body.isOrgDoc === "true";
     
     const docData = {
       ...req.body,
@@ -198,7 +198,7 @@ export const bulkUpload = async (req, res) => {
     }
 
     const organizationId = req.organization?._id || req.user.organizationId;
-    const isKnowledgeBase = req.body.is_knowledge_base === true || req.body.isOrgDoc === true;
+    const isKnowledgeBase = req.body.is_knowledge_base === true || req.body.is_knowledge_base === "true" || req.body.isOrgDoc === true || req.body.isOrgDoc === "true";
     const results = [];
     const errors = [];
 

@@ -58,9 +58,6 @@ const ProfilePage = lazy(() => import("@/pages/Customer/ProfilePage"));
 const FAQPage = lazy(() => import("@/pages/Customer/FAQPage"));
 const ChatHistoryPage = lazy(() => import("@/pages/Customer/ChatHistoryPage"));
 const NotificationsPage = lazy(() => import("@/pages/Customer/NotificationsPage"));
-const CustomerDocumentsPage = lazy(() => import("@/pages/Customer/CustomerDocumentsPage"));
-const UserDetailsPage = lazy(() => import("@/pages/Admin/UserDetailsPage"));
-const AdminChatbotPage = lazy(() => import("@/pages/Admin/AdminChatbotPage"));
 
 const SupportDashboardPage = lazy(() => import("@/pages/support/DashboardPage"));
 const SupportTicketsPage = lazy(() => import("@/pages/support/TicketsPage"));

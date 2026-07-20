@@ -5,6 +5,7 @@ const url = "admin/v1";
 export const AdminAPI = {
   // Dashboard
   getDashboardStats: () => AxiosInstance.get(`/${url}/dashboard/stats`),
+  getAnalyticsDashboard: (params) => AxiosInstance.get(`/${url}/dashboard/analytics`, { params }),
 
   // Organizations
   getOrganizations: (params) => AxiosInstance.get(`/${url}/organizations`, { params }),
