@@ -6,9 +6,9 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("admin", "agent"), sessionController.create);
-router.get("/", restrict("admin", "agent"), sessionController.getAll);
-router.get("/stats", restrict("admin"), sessionController.getStats);
+router.post("/", restrict("super admin", "tenant admin", "admin", "agent"), sessionController.create);
+router.get("/", restrict("super admin", "tenant admin", "admin", "agent"), sessionController.getAll);
+router.get("/stats", restrict("super admin", "tenant admin", "admin"), sessionController.getStats);
 router.get("/chat/:chatId", sessionController.getByChat);
 router.get("/chat/:chatId/tokens", sessionController.getChatTokens);
 router.get("/:id", sessionController.getById);

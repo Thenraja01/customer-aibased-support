@@ -1,19 +1,15 @@
 import { memo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Headphones, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ChatInput from "./ChatInput";
 
 interface WelcomeScreenProps {
   onStartWithMessage: (message: string) => void;
-  onOpenTicket: () => void;
 }
 
-const WelcomeScreen = memo(function WelcomeScreen({ onStartWithMessage, onOpenTicket }: WelcomeScreenProps) {
-  const suggestions = [
-    { label: "Get help with your account", message: "I need help with my account" },
-    { label: "Report an issue", message: "I want to report an issue" },
-    { label: "Billing questions", message: "I have a billing question" },
-    { label: "General inquiry", message: "I have a general question" },
-  ];
+const WelcomeScreen = memo(function WelcomeScreen({ onStartWithMessage }: WelcomeScreenProps) {
+  const navigate = useNavigate();
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-y-auto">
@@ -27,28 +23,21 @@ const WelcomeScreen = memo(function WelcomeScreen({ onStartWithMessage, onOpenTi
         Ask questions, report issues, or get help with your account. Our AI assistant is here to assist.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md w-full mb-6">
-        {suggestions.map((s) => (
-          <Button
-            key={s.label}
-            variant="outline"
-            className="h-auto py-3 px-4 text-left text-sm justify-start rounded-xl dark:border-white/[0.06] dark:hover:bg-primary/10 dark:hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:shadow-primary/10"
-            onClick={() => onStartWithMessage(s.message)}
-          >
-            <span className="line-clamp-2">{s.label}</span>
-          </Button>
-        ))}
-      </div>
-
       <Button
         variant="ghost"
         size="sm"
-        onClick={onOpenTicket}
+        onClick={() => navigate("/tickets")}
         className="dark:hover:bg-primary/10 gap-2 text-muted-foreground"
       >
         <Plus size={16} />
         <span>Create a Support Ticket</span>
       </Button>
+      <ChatInput
+          onSend={(text) => {
+    console.log("WelcomeScreen onSend", text);
+    onStartWithMessage(text);
+  }}
+      />
     </div>
   );
 });

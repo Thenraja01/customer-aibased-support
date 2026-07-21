@@ -34,7 +34,7 @@ export function useChat() {
 
   const startNewChat = useCallback(
     (data: { user_id: string; organization_id: string; topic: string }) => {
-      return dispatch(createChat(data));
+      return dispatch(createChat(data)).unwrap();
     },
     [dispatch]
   );
@@ -62,7 +62,7 @@ export function useChat() {
 
   const sendWithAI = useCallback(
     (chatId: string, userId: string, content: string) => {
-      return dispatch(sendAndReceiveAI({ chatId, userId, content }));
+      return dispatch(sendAndReceiveAI({ chatId, userId, content })).unwrap();
     },
     [dispatch]
   );

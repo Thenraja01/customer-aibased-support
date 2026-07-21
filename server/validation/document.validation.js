@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const createDocumentSchema = z.object({
-  user_id: z.string().trim().min(1, "User ID is required"),
-  organization_id: z.string().trim().min(1, "Organization ID is required"),
+  user_id: z.string().optional(),
+  organization_id: z.string().optional(),
   document_type_id: z.string().trim().optional(),
   title: z.string().trim().min(1, "Title is required").max(255),
 });

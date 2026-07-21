@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import mongoose from "mongoose";
+import path from "path";
 
 import dbconnection from "./config/db.js";
 import env from "./config/env.js";
@@ -31,7 +32,7 @@ import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
 app.use(
   cors({
@@ -39,6 +40,8 @@ app.use(
     credentials: true,
   })
 );
+
+app.use("/uploads", express.static(path.resolve("uploads")));
 
 const globalLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,

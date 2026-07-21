@@ -8,10 +8,10 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("admin"), validate(createDocumentTypeSchema), dtController.create);
-router.get("/", restrict("admin", "agent"), dtController.getAll);
-router.get("/:id", restrict("admin", "agent"), dtController.getById);
-router.put("/:id", restrict("admin"), validate(updateDocumentTypeSchema), dtController.update);
-router.delete("/:id", restrict("admin"), dtController.remove);
+router.post("/", restrict("super admin", "tenant admin", "admin"), validate(createDocumentTypeSchema), dtController.create);
+router.get("/", restrict("super admin", "tenant admin", "admin", "agent"), dtController.getAll);
+router.get("/:id", restrict("super admin", "tenant admin", "admin", "agent"), dtController.getById);
+router.put("/:id", restrict("super admin", "tenant admin", "admin"), validate(updateDocumentTypeSchema), dtController.update);
+router.delete("/:id", restrict("super admin", "tenant admin", "admin"), dtController.remove);
 
 export default router;

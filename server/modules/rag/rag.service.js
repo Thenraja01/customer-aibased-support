@@ -52,8 +52,9 @@ export const cosineSimilarity = (a, b) => {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 };
 
-export const vectorSearch = async (embedding, documentId, limit = 5) => {
+export const vectorSearch = async (embedding, organizationId, documentId, limit = 5) => {
   const query = { embedding: { $exists: true, $ne: [] } };
+  if (organizationId) query.organization_id = organizationId;
   if (documentId) query.document_id = documentId;
   const chunks = await DocumentChunk.find(query).lean();
   return chunks
@@ -62,13 +63,14 @@ export const vectorSearch = async (embedding, documentId, limit = 5) => {
     .slice(0, limit);
 };
 
-export const keywordSearch = async (keywords, documentId) => {
+export const keywordSearch = async (keywords, organizationId, documentId) => {
   const query = { keywords: { $in: keywords } };
+  if (organizationId) query.organization_id = organizationId;
   if (documentId) query.document_id = documentId;
   return await DocumentChunk.find(query);
 };
 
-export const ingestDocument = async (documentId, text) => {
+export const ingestDocument = async (documentId, organizationId, text) => {
   const chunks = chunkText(text);
   const savedChunks = [];
   for (let i = 0; i < chunks.length; i++) {
@@ -76,6 +78,7 @@ export const ingestDocument = async (documentId, text) => {
     const embedding = computeEmbedding(chunks[i]);
     const doc = await DocumentChunk.create({
       document_id: documentId,
+      organization_id: organizationId,
       chunk_index: i,
       content: chunks[i],
       embedding,
@@ -92,13 +95,13 @@ export const ingestDocument = async (documentId, text) => {
   return savedChunks;
 };
 
-export const hybridQuery = async (query, documentId, limit = 5, userId = null, chatId = null) => {
+export const hybridQuery = async (query, organizationId, documentId, limit = 5, userId = null, chatId = null) => {
   const keywords = extractKeywords(query);
   const embedding = computeEmbedding(query);
 
   const [vectorResults, keywordResults, memoryContext] = await Promise.all([
-    vectorSearch(embedding, documentId, limit),
-    keywordSearch(keywords, documentId),
+    vectorSearch(embedding, organizationId, documentId, limit),
+    keywordSearch(keywords, organizationId, documentId),
     userId ? buildFullContext(userId, chatId, query, 10, 5) : Promise.resolve(""),
   ]);
 

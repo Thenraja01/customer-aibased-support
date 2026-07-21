@@ -1,14 +1,15 @@
 import { memo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Headphones, MessageCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Chat } from "@/types/chat";
 
 interface ChatHeaderProps {
   activeChat: Chat | null;
-  onOpenTicket: () => void;
 }
 
-const ChatHeader = memo(function ChatHeader({ activeChat, onOpenTicket }: ChatHeaderProps) {
+const ChatHeader = memo(function ChatHeader({ activeChat }: ChatHeaderProps) {
+  const navigate = useNavigate();
   const isNew = !activeChat;
   const isClosed = activeChat?.status === "closed";
 
@@ -48,7 +49,7 @@ const ChatHeader = memo(function ChatHeader({ activeChat, onOpenTicket }: ChatHe
         <Button
           variant="ghost"
           size="sm"
-          onClick={onOpenTicket}
+          onClick={() => navigate("/tickets")}
           className="dark:hover:bg-primary/10 gap-2"
         >
           <Plus size={16} />

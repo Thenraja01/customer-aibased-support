@@ -10,6 +10,8 @@ export interface IOrganization {
   address?: string;
   phone?: string;
   email?: string;
+  status?: "active" | "inactive";
+  customPrompt?: string;
 }
 
 export interface IUser {

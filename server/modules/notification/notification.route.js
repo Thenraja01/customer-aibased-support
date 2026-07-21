@@ -8,8 +8,8 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("admin", "agent"), validate(createNotificationSchema), notifController.create);
-router.post("/broadcast", restrict("admin"), validate(broadcastNotificationSchema), notifController.broadcast);
+router.post("/", restrict("super admin", "tenant admin", "admin", "agent"), validate(createNotificationSchema), notifController.create);
+router.post("/broadcast", restrict("super admin", "tenant admin", "admin"), validate(broadcastNotificationSchema), notifController.broadcast);
 router.get("/user/:userId", selfOrAdminParam("userId"), notifController.getByUser);
 router.get("/user/:userId/unread", selfOrAdminParam("userId"), notifController.getUnread);
 router.get("/user/:userId/unread/count", selfOrAdminParam("userId"), notifController.getUnreadCount);

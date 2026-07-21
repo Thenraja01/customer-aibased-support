@@ -3,12 +3,12 @@ import AxiosInstance from "./axiosInstance.js";
 const url = "document-verifications";
 
 const DocumentVerificationAPI = {
-  getAll: () => AxiosInstance.get(`/${url}`),
+  getAll: (params) => AxiosInstance.get(`/${url}`, { params }),
 
   getByDocument: (documentId) =>
     AxiosInstance.get(`/${url}/document/${documentId}`),
 
-  getByStatus: (status) => AxiosInstance.get(`/${url}/status/${status}`),
+  getByStatus: (status, params) => AxiosInstance.get(`/${url}/status/${status}`, { params }),
 
   create: (data) => AxiosInstance.post(`/${url}`, data),
 

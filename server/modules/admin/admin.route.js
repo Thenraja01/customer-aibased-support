@@ -5,27 +5,26 @@ import * as adminController from "./admin.controller.js";
 const router = express.Router();
 
 router.use(protect);
-router.use(restrict("super_admin"));
 
-router.get("/dashboard/stats", adminController.dashboardStats);
+router.get("/dashboard/stats", restrict("super admin"), adminController.dashboardStats);
 
-router.get("/organizations", adminController.getOrganizations);
-router.post("/organizations", adminController.createOrg);
-router.put("/organizations/:id", adminController.updateOrg);
-router.delete("/organizations/:id", adminController.deleteOrg);
-router.get("/organizations/:id/users", adminController.getOrganizationUsers);
+router.get("/organizations", restrict("super admin"), adminController.getOrganizations);
+router.post("/organizations", restrict("super admin"), adminController.createOrg);
+router.put("/organizations/:id", restrict("super admin"), adminController.updateOrg);
+router.delete("/organizations/:id", restrict("super admin"), adminController.deleteOrg);
+router.get("/organizations/:id/users", restrict("super admin", "admin"), adminController.getOrganizationUsers);
 
-router.get("/users", adminController.getUsers);
-router.post("/users", adminController.addUser);
-router.put("/users/:id", adminController.editUser);
-router.patch("/users/:id/status", adminController.patchUserStatus);
-router.delete("/users/:id", adminController.removeUser);
+router.get("/users", restrict("super admin"), adminController.getUsers);
+router.post("/users", restrict("super admin", "admin"), adminController.addUser);
+router.put("/users/:id", restrict("super admin", "admin"), adminController.editUser);
+router.patch("/users/:id/status", restrict("super admin", "admin"), adminController.patchUserStatus);
+router.delete("/users/:id", restrict("super admin", "admin"), adminController.removeUser);
 
-router.get("/roles", adminController.getRoles);
-router.post("/roles", adminController.addRole);
-router.put("/roles/:id", adminController.editRole);
-router.delete("/roles/:id", adminController.removeRole);
+router.get("/roles", restrict("super admin", "admin"), adminController.getRoles);
+router.post("/roles", restrict("super admin"), adminController.addRole);
+router.put("/roles/:id", restrict("super admin"), adminController.editRole);
+router.delete("/roles/:id", restrict("super admin"), adminController.removeRole);
 
-router.get("/audit-logs", adminController.getAuditLogs);
+router.get("/audit-logs", restrict("super admin"), adminController.getAuditLogs);
 
 export default router;

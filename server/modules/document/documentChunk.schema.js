@@ -8,6 +8,12 @@ const documentChunkSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    organization_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
     chunk_index: { type: Number, required: true },
     content: { type: String, required: true },
     content_hash: { type: String, index: true },

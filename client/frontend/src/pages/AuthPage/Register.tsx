@@ -54,6 +54,9 @@ const stepVariants = {
   exit: (dir: number) => ({ x: dir * -48, opacity: 0 }),
 };
 
+// Roles to hide from registration
+const HIDDEN_ROLES = ["tenant admin", "super admin"];
+
 export default function Register() {
   const navigate = useNavigate();
 
@@ -93,7 +96,17 @@ export default function Register() {
 
     setRolesLoading(true);
     AuthAPI.getRoles()
-      .then((res: any) => setRoles(res.data.data || []))
+      .then((res: any) => {
+        const allRoles = res.data.data || [];
+        // Filter out hidden roles
+        const filteredRoles = allRoles.filter(
+          (role: Role) => 
+            !HIDDEN_ROLES.some(hidden => 
+              role.role_name.toLowerCase() === hidden.toLowerCase()
+            )
+        );
+        setRoles(filteredRoles);
+      })
       .catch(() => setFetchError("Failed to load roles"))
       .finally(() => setRolesLoading(false));
   }, []);
@@ -615,6 +628,11 @@ export default function Register() {
                           </select>
                           <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                         </div>
+                        {!rolesLoading && roles.length === 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            No roles available for registration
+                          </p>
+                        )}
                       </div>
 
                       {error && (
@@ -637,7 +655,7 @@ export default function Register() {
                         </Button>
                         <Button
                           type="submit"
-                          disabled={loading || orgsLoading || rolesLoading}
+                          disabled={loading || orgsLoading || rolesLoading || roles.length === 0}
                           className="flex-1 h-11 bg-gradient-to-r from-primary via-primary/90 to-secondary hover:from-primary/90 hover:via-primary/80 hover:to-secondary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25"
                         >
                           {loading ? (

@@ -45,18 +45,23 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
     e.preventDefault();
     if (!form.subject.trim() || !form.description.trim()) return;
 
+    const payload = {
+      user_id: user?._id,
+      organization_id: user?.organization_id?._id || user?.organization_id,
+      subject: form.subject.trim(),
+      description: form.description.trim(),
+      priority: form.priority,
+    };
+    console.log("Creating ticket with payload:", payload);
+
     try {
-      await addTicket({
-        user_id: user?._id,
-        organization_id: user?.organization_id?._id || user?.organization_id,
-        subject: form.subject.trim(),
-        description: form.description.trim(),
-        priority: form.priority,
-      }).unwrap();
+      await addTicket(payload).unwrap();
       setSuccess(true);
       setTimeout(() => onClose(), 1500);
     } catch (err: any) {
-      setError(err || "Failed to create ticket");
+      const msg = typeof err === "string" ? err : err?.message || "Failed to create ticket";
+      console.error("Ticket creation error:", err);
+      setError(msg);
     }
   }, [form, user, addTicket, onClose]);
 

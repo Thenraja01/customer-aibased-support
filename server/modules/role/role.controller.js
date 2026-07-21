@@ -1,8 +1,9 @@
+// role.controller.js
 import * as roleService from "./role.service.js";
 
 export const create = async (req, res) => {
   try {
-    const role = await roleService.createRole(req.body.role_name);
+    const role = await roleService.createRole(req.body);
     res.status(201).json({ success: true, data: role });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -28,9 +29,19 @@ export const getById = async (req, res) => {
   }
 };
 
+export const getByName = async (req, res) => {
+  try {
+    const role = await roleService.getRoleByName(req.params.name);
+    res.status(200).json({ success: true, data: role });
+  } catch (error) {
+    const status = error.message === "Role not found" ? 404 : 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
 export const update = async (req, res) => {
   try {
-    const role = await roleService.updateRole(req.params.id, req.body.role_name);
+    const role = await roleService.updateRole(req.params.id, req.body);
     res.status(200).json({ success: true, data: role });
   } catch (error) {
     const status = error.message === "Role not found" ? 404 : 400;
@@ -45,5 +56,18 @@ export const remove = async (req, res) => {
   } catch (error) {
     const status = error.message === "Role not found" ? 404 : 500;
     res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const initialize = async (req, res) => {
+  try {
+    const results = await roleService.initializeRoles();
+    res.status(200).json({ 
+      success: true, 
+      message: "Roles initialized successfully",
+      data: results 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

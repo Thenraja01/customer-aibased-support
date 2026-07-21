@@ -35,7 +35,7 @@ export default function ProfilePage() {
     setSuccess("");
 
     try {
-      await UsersAPI.updateProfile(user._id, {
+      await UsersAPI.updateProfile({
         name: formData.name,
         phone: formData.phone,
       });

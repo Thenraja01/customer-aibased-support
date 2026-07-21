@@ -21,6 +21,17 @@ export default {
     API_SECRET: process.env.CLOUDINARY_API_SECRET,
   },
 
+  // LLM Configuration
+  LLM_PROVIDER: process.env.LLM_PROVIDER || "gemini",
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  GROQ_API_KEY: process.env.GROQ_API_KEY,
+  LLM_MODEL: process.env.LLM_MODEL || "gemini-2.0-flash",
+  GROQ_MODEL: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+  LLM_MIN_RAG_SCORE: Number(process.env.LLM_MIN_RAG_SCORE) || 0.35,
+  LLM_MAX_CONV_CHARS: Number(process.env.LLM_MAX_CONV_CHARS) || 3000,
+  LLM_TEMPERATURE: Number(process.env.LLM_TEMPERATURE) || 0.7,
+  LLM_MAX_TOKENS: Number(process.env.LLM_MAX_TOKENS) || 2048,
+
   // RAG Configuration
   RAG: {
     CHUNK_SIZE: Number(process.env.RAG_CHUNK_SIZE) || 500,

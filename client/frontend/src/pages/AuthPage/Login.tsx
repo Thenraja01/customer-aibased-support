@@ -13,7 +13,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Login() {
   const { login } = useAuth();

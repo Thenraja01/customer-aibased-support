@@ -29,6 +29,10 @@ const OrganizationSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    customPrompt: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: {

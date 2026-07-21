@@ -41,6 +41,9 @@ export default function OrganizationTable({
             <th className="text-left py-3 px-4 font-medium text-muted-foreground">
               Phone
             </th>
+            <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+              Custom Prompt
+            </th>
             <th className="text-right py-3 px-4 font-medium text-muted-foreground">
               Actions
             </th>
@@ -61,6 +64,15 @@ export default function OrganizationTable({
               </td>
               <td className="py-3 px-4 text-muted-foreground">
                 {org.phone || "-"}
+              </td>
+              <td className="py-3 px-4">
+                {org.customPrompt ? (
+                  <Badge variant="secondary" className="text-xs">
+                    Configured
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground text-xs">Default</span>
+                )}
               </td>
               <td className="py-3 px-4">
                 <div className="flex items-center justify-end gap-1">

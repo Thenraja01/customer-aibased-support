@@ -21,7 +21,7 @@ export const broadcast = async (req, res) => {
 
 export const getByUser = async (req, res) => {
   try {
-    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId !== req.params.userId) {
+    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId?.toString() !== req.params.userId) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     const notifs = await notifService.getNotificationsByUser(req.params.userId);
@@ -33,7 +33,7 @@ export const getByUser = async (req, res) => {
 
 export const getUnread = async (req, res) => {
   try {
-    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId !== req.params.userId) {
+    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId?.toString() !== req.params.userId) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     const notifs = await notifService.getUnreadNotifications(req.params.userId);
@@ -45,7 +45,7 @@ export const getUnread = async (req, res) => {
 
 export const getUnreadCount = async (req, res) => {
   try {
-    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId !== req.params.userId) {
+    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId?.toString() !== req.params.userId) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     const count = await notifService.countUnread(req.params.userId);
@@ -58,7 +58,7 @@ export const getUnreadCount = async (req, res) => {
 export const read = async (req, res) => {
   try {
     const notif = await notifService.getNotificationById(req.params.id);
-    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && notif.user_id.toString() !== req.user.userId) {
+    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && notif.user_id.toString() !== req.user.userId?.toString()) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     const updated = await notifService.markAsRead(req.params.id);
@@ -71,7 +71,7 @@ export const read = async (req, res) => {
 
 export const readAll = async (req, res) => {
   try {
-    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId !== req.params.userId) {
+    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId?.toString() !== req.params.userId) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     const result = await notifService.markAllAsRead(req.params.userId);
@@ -84,7 +84,7 @@ export const readAll = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     const notif = await notifService.getNotificationById(req.params.id);
-    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && notif.user_id.toString() !== req.user.userId) {
+    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && notif.user_id.toString() !== req.user.userId?.toString()) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     const result = await notifService.deleteNotification(req.params.id);
@@ -97,7 +97,7 @@ export const remove = async (req, res) => {
 
 export const clear = async (req, res) => {
   try {
-    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId !== req.params.userId) {
+    if (req.user.roleName !== "admin" && req.user.roleName !== "agent" && req.user.userId?.toString() !== req.params.userId) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     const result = await notifService.clearNotifications(req.params.userId);

@@ -21,6 +21,7 @@ export default function OrganizationForm({
     email: "",
     phone: "",
     address: "",
+    customPrompt: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,6 +33,7 @@ export default function OrganizationForm({
         email: organization.email || "",
         phone: organization.phone || "",
         address: organization.address || "",
+        customPrompt: organization.customPrompt || "",
       });
     }
   }, [organization]);
@@ -105,6 +107,19 @@ export default function OrganizationForm({
               onChange={(e) => setForm({ ...form, address: e.target.value })}
               placeholder="Address"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="customPrompt">Custom Prompt</Label>
+            <textarea
+              id="customPrompt"
+              value={form.customPrompt}
+              onChange={(e) => setForm({ ...form, customPrompt: e.target.value })}
+              placeholder="Enter custom system prompt for this organization (leave empty to use default)"
+              className="w-full min-h-[150px] px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+            />
+            <p className="text-xs text-muted-foreground">
+              Custom prompt will be used instead of the default system prompt. Use {{ORGANIZATION_NAME}} as a placeholder for the organization name.
+            </p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>

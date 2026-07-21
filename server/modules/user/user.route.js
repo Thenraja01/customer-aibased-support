@@ -8,15 +8,15 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get("/search", restrict("admin", "agent"), userController.searchUser);
-router.get("/", restrict("admin", "agent"), userController.getUsers);
+router.get("/search", restrict("super admin", "tenant admin", "admin", "agent"), userController.searchUser);
+router.get("/", restrict("super admin", "tenant admin", "admin", "agent"), userController.getUsers);
 router.get("/profile", userController.getProfile);
 router.get("/:id", selfOrAdmin, userController.getUser);
-router.post("/", restrict("admin"), validate(createUserSchema), userController.addUser);
+router.post("/", restrict("super admin", "tenant admin", "admin"), validate(createUserSchema), userController.addUser);
 router.put("/profile", validate(updateProfileSchema), userController.updateProfile);
 router.put("/password", validate(userPasswordSchema), userController.changePassword);
-router.put("/:id", restrict("admin"), validate(updateUserSchema), userController.editUser);
-router.patch("/:id/status", restrict("admin"), validate(updateUserStatusSchema), userController.patchUserStatus);
-router.delete("/:id", restrict("admin"), userController.removeUser);
+router.put("/:id", restrict("super admin", "tenant admin", "admin"), validate(updateUserSchema), userController.editUser);
+router.patch("/:id/status", restrict("super admin", "tenant admin", "admin"), validate(updateUserStatusSchema), userController.patchUserStatus);
+router.delete("/:id", restrict("super admin", "tenant admin", "admin"), userController.removeUser);
 
 export default router;

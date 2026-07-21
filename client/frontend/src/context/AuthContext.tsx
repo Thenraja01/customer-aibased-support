@@ -12,11 +12,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function normalizeUser(user: any) {
+  if (!user) return null;
+  return { ...user, _id: user._id || user.id };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const dispatch = useDispatch();
   const [user, setUser] = useState<any>(() => {
     const data = localStorage.getItem("user");
-    return data ? JSON.parse(data) : null;
+    return data ? normalizeUser(JSON.parse(data)) : null;
   });
   const [loading, setLoading] = useState(true);
 
@@ -32,11 +37,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await AuthAPI.login({ email, password });
       if (!res.data.success) return false;
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.data));
+      const normalized = normalizeUser(res.data.data);
 
-      setUser(res.data.data);
-      dispatch(setReduxUser(res.data.data));
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(normalized));
+
+      setUser(normalized);
+      dispatch(setReduxUser(normalized));
 
       return true;
     } catch {

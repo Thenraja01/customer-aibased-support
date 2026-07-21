@@ -6,32 +6,34 @@ import {
   Shield,
   ScrollText,
   FileText,
-  FileCheck,
-  BadgeCheck,
   ArrowLeft,
   LogOut,
   Settings,
+  Sparkles,
+  Search,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
-const links = [
+const superAdminLinks = [
   { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
   { name: "Organizations", path: "/admin/organizations", icon: Building2 },
   { name: "Users", path: "/admin/users", icon: Users },
   { name: "Roles", path: "/admin/roles", icon: Shield },
-  { name: "Documents", path: "/admin/documents", icon: FileText },
-  {
-    name: "Document Types",
-    path: "/admin/document-types",
-    icon: FileCheck,
-  },
-  {
-    name: "Verifications",
-    path: "/admin/document-verifications",
-    icon: BadgeCheck,
-  },
   { name: "Audit Logs", path: "/admin/audit-logs", icon: ScrollText },
+  { name: "AI Analytics", path: "/admin/ai-analytics", icon: Sparkles },
+  { name: "Search", path: "/admin/search", icon: Search },
+  { name: "Chatbot", path: "/admin/chatbot", icon: MessageCircle },
+];
+
+const adminLinks = [
+  { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
+  { name: "Team", path: "/admin/team", icon: Users },
+  { name: "Documents", path: "/admin/documents", icon: FileText },
+  { name: "AI Analytics", path: "/admin/ai-analytics", icon: Sparkles },
+  { name: "Search", path: "/admin/search", icon: Search },
+  { name: "Chatbot", path: "/admin/chatbot", icon: MessageCircle },
 ];
 
 export default function AdminSidebar({
@@ -42,7 +44,9 @@ export default function AdminSidebar({
   onClose: () => void;
 }) {
   const location = useLocation();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const roleName = user?.role_id?.role_name;
+  const links = roleName === "super_admin" ? superAdminLinks : adminLinks;
 
   return (
     <>
@@ -61,7 +65,7 @@ export default function AdminSidebar({
       >
         <div className="flex items-center justify-between h-16 px-6 border-b dark:border-white/[0.06]">
           <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Admin
+            {roleName === "super_admin" ? "Super Admin" : "Admin"}
           </span>
           <button
             className="lg:hidden text-muted-foreground hover:text-foreground"

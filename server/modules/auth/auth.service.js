@@ -1,14 +1,35 @@
 import bcrypt from "bcrypt";
 import User from "../user/user.schema.js";
+import Role from "../role/role.schema.js"; // Add this import
 import jwt from "jsonwebtoken";
 import env from "../../config/env.js";
+
+// Roles that cannot be assigned during registration
+const RESTRICTED_ROLES = ["tenant admin", "super admin"];
 
 export const register = async (userData) => {
   const { organization_id, role_id, name, email, phone, password, dob } =
     userData;
 
+  // Check if user already exists
   const existingUser = await User.findOne({ email });
   if (existingUser) throw new Error("Email already registered");
+
+  // Validate that the role is not restricted
+  if (role_id) {
+    const role = await Role.findById(role_id);
+    
+    if (!role) {
+      throw new Error("Invalid role selected");
+    }
+    
+    // Check if the role is restricted
+    if (RESTRICTED_ROLES.some(restricted => 
+      role.role_name.toLowerCase() === restricted.toLowerCase()
+    )) {
+      throw new Error("Cannot register with admin or super admin roles");
+    }
+  }
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = await User.create({

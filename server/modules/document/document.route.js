@@ -9,12 +9,14 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("admin", "agent"), handleUpload(uploadToCloud), validate(createDocumentSchema), docController.upload);
-router.get("/", restrict("admin", "agent"), docController.getAll);
-router.get("/user/:userId", restrict("admin", "agent"), selfOrAdminParam("userId"), docController.getByUser);
-router.get("/status/:status", restrict("admin", "agent"), docController.getByStatus);
-router.get("/:id", restrict("admin", "agent"), docController.getById);
-router.patch("/:id/status", restrict("admin", "agent"), validate(updateDocumentStatusSchema), docController.patchStatus);
-router.delete("/:id", restrict("admin"), docController.remove);
+router.post("/", restrict("super admin", "tenant admin", "admin", "agent"), handleUpload(uploadToCloud), validate(createDocumentSchema), docController.upload);
+router.get("/", restrict("super admin", "tenant admin", "admin", "agent"), docController.getAll);
+router.get("/user/:userId", restrict("super admin", "tenant admin", "admin", "agent"), selfOrAdminParam("userId"), docController.getByUser);
+router.get("/status/:status", restrict("super admin", "tenant admin", "admin", "agent"), docController.getByStatus);
+router.get("/:id", restrict("super admin", "tenant admin", "admin", "agent"), docController.getById);
+router.patch("/:id/approve", restrict("super admin", "tenant admin", "admin"), docController.approve);
+router.patch("/:id/reject", restrict("super admin", "tenant admin", "admin"), docController.reject);
+router.patch("/:id/status", restrict("super admin", "tenant admin", "admin", "agent"), validate(updateDocumentStatusSchema), docController.patchStatus);
+router.delete("/:id", restrict("super admin", "tenant admin", "admin"), docController.remove);
 
 export default router;

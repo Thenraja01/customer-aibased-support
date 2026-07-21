@@ -1,18 +1,29 @@
-import { useState, useRef, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 import { Send, Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
   onSend: (text: string, file?: File) => void;
-  disabled: boolean;
+  disabled?: boolean;
+  initialValue?: string;
 }
 
-const ChatInput = memo(function ChatInput({ onSend, disabled }: ChatInputProps) {
+const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialValue }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialValue !== undefined) {
+      setMessage(initialValue);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px";
+      }
+    }
+  }, [initialValue]);
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {

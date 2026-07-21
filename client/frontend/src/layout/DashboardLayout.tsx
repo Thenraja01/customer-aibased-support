@@ -9,6 +9,8 @@ import {
   Ticket,
   Bell,
   X,
+  HelpCircle,
+  History,
 } from "lucide-react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -35,6 +37,9 @@ const DashboardLayout = () => {
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { name: "Chat", path: "/chat", icon: MessageCircle },
     { name: "Tickets", path: "/tickets", icon: Ticket },
+    { name: "FAQ", path: "/faq", icon: HelpCircle },
+    { name: "Chat History", path: "/chat-history", icon: History },
+    { name: "Notifications", path: "/notifications", icon: Bell },
     { name: "Settings", path: "/profile", icon: Settings },
   ];
 
