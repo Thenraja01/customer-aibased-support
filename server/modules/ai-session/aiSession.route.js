@@ -6,8 +6,8 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("super admin", "tenant admin", "admin", "agent"), sessionController.create);
-router.get("/", restrict("super admin", "tenant admin", "admin", "agent"), sessionController.getAll);
+router.post("/", restrict("super admin", "tenant admin", "admin", "support"), sessionController.create);
+router.get("/", restrict("super admin", "tenant admin", "admin", "support"), sessionController.getAll);
 router.get("/stats", restrict("super admin", "tenant admin", "admin"), sessionController.getStats);
 router.get("/chat/:chatId", sessionController.getByChat);
 router.get("/chat/:chatId/tokens", sessionController.getChatTokens);

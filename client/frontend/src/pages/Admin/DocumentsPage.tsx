@@ -146,6 +146,12 @@ export default function DocumentsPage() {
                 </span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Assigned Role</span>
+                <span className="font-medium">
+                  {viewingDoc.assigned_role || "All"}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Type</span>
                 <span className="font-medium">
                   {viewingDoc.document_type_id?.name || "—"}

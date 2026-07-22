@@ -19,18 +19,24 @@ const documentSchema = new mongoose.Schema(
       ref: "DocumentType",
     },
     title: { type: String, required: true, maxlength: 255 },
-    file_url: { type: String, required: true },
+    file_id: { type: Schema.Types.ObjectId, required: true },
+    file_name: { type: String, required: true },
+    file_mimetype: { type: String, required: true },
     file_size: { type: Number, default: 0 },
+    assigned_role: {
+      type: String,
+      default: "All",
+    },
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
+      enum: ["draft", "pending", "approved", "rejected"],
+      default: "draft",
     },
-    approvedBy: {
+    approved_by: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-    approvedAt: { type: Date },
+    approved_at: { type: Date },
   },
   {
     timestamps: {

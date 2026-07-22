@@ -35,8 +35,8 @@ export default function ProtectedRoute({ allowedRoles, redirectTo }: Props) {
         ? "/admin"
         : roleName === "admin"
         ? "/admin/dashboard"
-        : roleName === "agent"
-        ? "/agent/dashboard"
+        : roleName === "support"
+        ? "/support/dashboard"
         : "/dashboard");
     return <Navigate to={fallback} replace />;
   }

@@ -1,13 +1,15 @@
 import { Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProdectedRoute";
-import AgentDashboard from "@/pages/Agent/AgentDashboard";
-import ChatPage from "@/pages/Customer/ChatPage";
+import SupportDashboard from "@/pages/Support/SupportDashboard";
+import SupportChatPage from "@/pages/Support/SupportChatPage";
 import TicketsPage from "@/pages/Customer/TicketsPage";
+import ChatPage from "@/pages/Customer/ChatPage";
 
 export const supportRoutes = [
-  <Route key="support" element={<ProtectedRoute allowedRoles={["agent"]} />}>
-    <Route path="/agent/dashboard" element={<AgentDashboard />} />
-    <Route path="/agent/chats" element={<ChatPage />} />
-    <Route path="/agent/tickets" element={<TicketsPage />} />
+  <Route key="support" element={<ProtectedRoute allowedRoles={["support"]} />}>
+    <Route path="/support/dashboard" element={<SupportDashboard />} />
+    <Route path="/support/support-chats" element={<SupportChatPage />} />
+    <Route path="/support/chats" element={<ChatPage />} />
+    <Route path="/support/tickets" element={<TicketsPage />} />
   </Route>,
 ];

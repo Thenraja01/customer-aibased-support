@@ -10,9 +10,9 @@ router.use(protect);
 
 router.post("/", validate(createChatSchema), chatController.createNewChat);
 router.post("/ai", chatController.processAI);
-router.get("/", restrict("super admin", "tenant admin", "admin", "agent"), chatController.getChats);
-router.get("/active", restrict("super admin", "tenant admin", "admin", "agent"), chatController.getActive);
-router.get("/search", restrict("super admin", "tenant admin", "admin", "agent"), chatController.search);
+router.get("/", restrict("super admin", "tenant admin", "admin", "support"), chatController.getChats);
+router.get("/active", restrict("super admin", "tenant admin", "admin", "support"), chatController.getActive);
+router.get("/search", restrict("super admin", "tenant admin", "admin", "support"), chatController.search);
 router.get("/user/:userId", selfOrAdminParam("userId"), chatController.getChatsByUserId);
 router.get("/user/:userId/count", selfOrAdminParam("userId"), chatController.getUserChatCount);
 router.get("/:id", chatController.getChat);

@@ -14,6 +14,17 @@ const documentChunkSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    assigned_role: {
+      type: String,
+      default: "All",
+      index: true,
+    },
+    status: {
+      type: String,
+      enum: ["draft", "pending", "approved", "rejected"],
+      default: "draft",
+      index: true,
+    },
     chunk_index: { type: Number, required: true },
     content: { type: String, required: true },
     content_hash: { type: String, index: true },

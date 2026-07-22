@@ -52,8 +52,8 @@ export default function Login() {
         case "admin":
           navigate("/admin/dashboard", { replace: true });
           break;
-        case "agent":
-          navigate("/agent/dashboard", { replace: true });
+        case "support":
+          navigate("/support/dashboard", { replace: true });
           break;
         case "customer":
         case "user":

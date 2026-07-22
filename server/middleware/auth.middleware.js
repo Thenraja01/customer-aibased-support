@@ -49,6 +49,7 @@ export const protect = async (req, res, next) => {
     req.user = {
       ...user,
       userId: user._id,
+      organizationId: user.organization_id?._id || user.organization_id,
       roleName: user.role_id?.role_name,
       permissions: user.role_id?.permissions || [],
       tokenData: decoded

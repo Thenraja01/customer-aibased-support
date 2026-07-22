@@ -15,15 +15,15 @@ export default function TicketsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const isAgent = user?.role_id?.role_name === "agent";
+  const isSupport = user?.role_id?.role_name === "support";
 
   useEffect(() => {
-    if (isAgent) {
+    if (isSupport) {
       loadAllTickets();
     } else if (user?._id) {
       loadUserTickets();
     }
-  }, [isAgent, user, loadAllTickets, loadUserTickets]);
+  }, [isSupport, user, loadAllTickets, loadUserTickets]);
 
   const filteredTickets = statusFilter
     ? tickets.filter((t: any) => t.status === statusFilter)
@@ -61,7 +61,7 @@ export default function TicketsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          {!isAgent && (
+          {!isSupport && (
             <button
               onClick={() => navigate("/dashboard")}
               className="p-2 rounded-lg hover:bg-muted transition-colors"
@@ -72,11 +72,11 @@ export default function TicketsPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Tickets</h1>
             <p className="text-muted-foreground">
-              {isAgent ? "Manage all support tickets" : "View and track your support tickets"}
+              {isSupport ? "Manage all support tickets" : "View and track your support tickets"}
             </p>
           </div>
         </div>
-        {!isAgent && (
+        {!isSupport && (
           <button
             onClick={() => setShowCreateDialog(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -146,7 +146,7 @@ export default function TicketsPage() {
                           {ticket.priority}
                         </span>
                       )}
-                      {isAgent && ticket.user_id?.name && (
+                      {isSupport && ticket.user_id?.name && (
                         <span className="text-[11px] text-muted-foreground">
                           by {ticket.user_id.name}
                         </span>

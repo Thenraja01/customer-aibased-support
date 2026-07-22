@@ -43,16 +43,16 @@ const DashboardLayout = () => {
     { name: "Settings", path: "/profile", icon: Settings },
   ];
 
-  const agentLinks = [
-    { name: "Dashboard", path: "/agent/dashboard", icon: LayoutDashboard },
-    { name: "Chats", path: "/agent/chats", icon: MessageCircle },
-    { name: "Tickets", path: "/agent/tickets", icon: Ticket },
+  const supportLinks = [
+    { name: "Dashboard", path: "/support/dashboard", icon: LayoutDashboard },
+    { name: "Chats", path: "/support/chats", icon: MessageCircle },
+    { name: "Tickets", path: "/support/tickets", icon: Ticket },
     { name: "Settings", path: "/profile", icon: Settings },
   ];
 
   let links: typeof customerLinks = [];
-  if (roleName === "agent") {
-    links = agentLinks;
+  if (roleName === "support") {
+    links = supportLinks;
   } else if (roleName !== "super_admin" && roleName !== "admin") {
     links = customerLinks;
   }
@@ -79,7 +79,7 @@ const DashboardLayout = () => {
           >
             <div className="flex items-center justify-between h-16 px-6 border-b dark:border-white/[0.06]">
               <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                {roleName === "agent" ? "Agent Portal" : "SupportAI"}
+                {roleName === "support" ? "Support Portal" : "SupportAI"}
               </span>
               <button
                 className="lg:hidden text-muted-foreground hover:text-foreground"
@@ -133,7 +133,7 @@ const DashboardLayout = () => {
             <Menu size={24} />
           </button>
           <div className="text-lg font-semibold lg:hidden">
-            {roleName === "super_admin" ? "Super Admin" : roleName === "support" ? "support Portal" : "Dashboard"}
+            {roleName === "super_admin" ? "Super Admin" : roleName === "support" ? "Support Portal" : "Dashboard"}
           </div>
           <div className="flex items-center gap-2 justify-end w-full">
             <div className="relative ">

@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Layout from "@/layout/layout";
 import DashboardLayout from "@/layout/DashboardLayout";
 import { publicRoutes } from "./PublicRoutes";
+import { sharedAdminRoutes } from "./SharedAdminRoutes";
 import { superAdminRoutes } from "./SuperAdminRoutes";
 import { adminRoutes } from "./AdminRoutes";
 import { supportRoutes } from "./SupportRoutes";
@@ -16,6 +17,7 @@ export default function AppRoutes() {
       </Route>
 
       <Route element={<DashboardLayout />}>
+        {sharedAdminRoutes}
         {superAdminRoutes}
         {adminRoutes}
         {supportRoutes}

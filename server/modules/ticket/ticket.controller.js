@@ -46,9 +46,9 @@ export const getByUser = async (req, res) => {
   }
 };
 
-export const getByAgent = async (req, res) => {
+export const getBySupport = async (req, res) => {
   try {
-    const tickets = await ticketService.getTicketsByAgent(req.params.agentId);
+    const tickets = await ticketService.getTicketsBySupport(req.params.supportId);
     res.status(200).json({ success: true, data: tickets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -66,7 +66,7 @@ export const getByStatus = async (req, res) => {
 
 export const assign = async (req, res) => {
   try {
-    const ticket = await ticketService.assignTicket(req.params.id, req.body.agentId);
+    const ticket = await ticketService.assignTicket(req.params.id, req.body.supportId);
     res.status(200).json({ success: true, data: ticket });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

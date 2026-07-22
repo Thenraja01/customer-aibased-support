@@ -10,7 +10,7 @@ export const createTicketSchema = z.object({
 });
 
 export const assignTicketSchema = z.object({
-  agentId: z.string().trim().min(1, "Agent ID is required"),
+  supportId: z.string().trim().min(1, "Support ID is required"),
 });
 
 export const updatePrioritySchema = z.object({

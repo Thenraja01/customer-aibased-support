@@ -122,7 +122,7 @@ export const getRoles = async (req, res) => {
 
 export const addRole = async (req, res) => {
   try {
-    const role = await roleService.createRole(req.body.role_name);
+    const role = await roleService.createRole(req.body);
     res.status(201).json({ success: true, data: role });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -156,5 +156,139 @@ export const getAuditLogs = async (req, res) => {
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getDocuments = async (req, res) => {
+  try {
+    const { page, limit, status, assigned_role, search } = req.query;
+    const result = await adminService.getDocumentsPaginated(
+      Number(page) || 1,
+      Number(limit) || 10,
+      { status, assigned_role, search }
+    );
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getDocumentById = async (req, res) => {
+  try {
+    const doc = await adminService.getDocumentById(req.params.id);
+    res.status(200).json({ success: true, data: doc });
+  } catch (error) {
+    const status = error.message === "Document not found" ? 404 : 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const getDocumentChunks = async (req, res) => {
+  try {
+    const { page, limit } = req.query;
+    const result = await adminService.getDocumentChunks(
+      req.params.id,
+      Number(page) || 1,
+      Number(limit) || 20
+    );
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getDocumentVerifications = async (req, res) => {
+  try {
+    const { page, limit, status } = req.query;
+    const result = await adminService.getDocumentVerificationsPaginated(
+      Number(page) || 1,
+      Number(limit) || 10,
+      status || ""
+    );
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const approveDocument = async (req, res) => {
+  try {
+    const result = await adminService.approveDocumentVerification(req.params.id);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    const status = error.message === "Verification not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const rejectDocument = async (req, res) => {
+  try {
+    const { remarks } = req.body;
+    const result = await adminService.rejectDocumentVerification(req.params.id, remarks);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    const status = error.message === "Verification not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const getRAGStats = async (req, res) => {
+  try {
+    const stats = await adminService.getRAGStats();
+    res.status(200).json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getKnowledgeGraphStats = async (req, res) => {
+  try {
+    const stats = await adminService.getKnowledgeGraphStats();
+    res.status(200).json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getDocumentTypes = async (req, res) => {
+  try {
+    const { page, limit, search } = req.query;
+    const result = await adminService.getDocumentTypesPaginated(
+      Number(page) || 1,
+      Number(limit) || 10,
+      search || ""
+    );
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const createDocumentType = async (req, res) => {
+  try {
+    const dt = await adminService.createDocumentType(req.body);
+    res.status(201).json({ success: true, data: dt });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const updateDocumentType = async (req, res) => {
+  try {
+    const dt = await adminService.updateDocumentType(req.params.id, req.body);
+    res.status(200).json({ success: true, data: dt });
+  } catch (error) {
+    const status = error.message === "Document type not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteDocumentType = async (req, res) => {
+  try {
+    const result = await adminService.deleteDocumentType(req.params.id);
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    const status = error.message === "Document type not found" ? 404 : 500;
+    res.status(status).json({ success: false, message: error.message });
   }
 };

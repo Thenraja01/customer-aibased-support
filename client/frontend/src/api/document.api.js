@@ -25,6 +25,9 @@ const DocumentAPI = {
   updateStatus: (id, status) =>
     AxiosInstance.patch(`/${url}/${id}/status`, { status }),
 
+  patchStatus: (id, data) =>
+    AxiosInstance.patch(`/${url}/${id}/status`, data),
+
   remove: (id) => AxiosInstance.delete(`/${url}/${id}`),
 };
 

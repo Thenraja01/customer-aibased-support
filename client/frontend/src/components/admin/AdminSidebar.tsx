@@ -22,6 +22,7 @@ const superAdminLinks = [
   { name: "Users", path: "/admin/users", icon: Users },
   { name: "Roles", path: "/admin/roles", icon: Shield },
   { name: "Audit Logs", path: "/admin/audit-logs", icon: ScrollText },
+  { name: "Document Types", path: "/admin/document-types", icon: FileText },
   { name: "AI Analytics", path: "/admin/ai-analytics", icon: Sparkles },
   { name: "Search", path: "/admin/search", icon: Search },
   { name: "Chatbot", path: "/admin/chatbot", icon: MessageCircle },
@@ -31,6 +32,8 @@ const adminLinks = [
   { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Team", path: "/admin/team", icon: Users },
   { name: "Documents", path: "/admin/documents", icon: FileText },
+  { name: "Document Types", path: "/admin/document-types", icon: FileText },
+  { name: "Verifications", path: "/admin/verifications", icon: Shield },
   { name: "AI Analytics", path: "/admin/ai-analytics", icon: Sparkles },
   { name: "Search", path: "/admin/search", icon: Search },
   { name: "Chatbot", path: "/admin/chatbot", icon: MessageCircle },
@@ -81,7 +84,7 @@ export default function AdminSidebar({
             const isActive =
               link.path === "/admin"
                 ? location.pathname === "/admin"
-                : location.pathname.startsWith(link.path);
+                : location.pathname === link.path || location.pathname.startsWith(link.path + "/");
             return (
               <Link
                 key={link.name}

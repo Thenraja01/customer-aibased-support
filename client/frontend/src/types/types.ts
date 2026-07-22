@@ -34,6 +34,7 @@ export interface IDocument {
   document_type_id?: string;
   title: string;
   file_url: string;
+  assigned_role?: string;
   status: "pending" | "approved" | "rejected";
   created_at?: string;
   updated_at?: string;

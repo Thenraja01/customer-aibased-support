@@ -25,8 +25,8 @@ export const getTicketsByUser = async (userId) => {
     .sort({ created_at: -1 });
 };
 
-export const getTicketsByAgent = async (agentId) => {
-  return await Ticket.find({ assigned_to: agentId })
+export const getTicketsBySupport = async (supportId) => {
+  return await Ticket.find({ assigned_to: supportId })
     .populate("user_id", "name email")
     .sort({ created_at: -1 });
 };
@@ -38,10 +38,10 @@ export const getTicketsByStatus = async (status) => {
     .sort({ created_at: -1 });
 };
 
-export const assignTicket = async (id, agentId) => {
+export const assignTicket = async (id, supportId) => {
   const ticket = await Ticket.findByIdAndUpdate(
     id,
-    { assigned_to: agentId, status: "in_progress" },
+    { assigned_to: supportId, status: "in_progress" },
     { new: true }
   );
   if (!ticket) throw new Error("Ticket not found");

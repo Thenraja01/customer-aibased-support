@@ -4,11 +4,13 @@ import Role from "./role.schema.js";
 export const createRole = async (roleData) => {
   const { role_name, permissions = [], status = 'active', description = '' } = roleData;
   
-  // Check if role already exists
+  if (role_name.trim().toLowerCase() === "super admin") {
+    throw new Error("Cannot create super admin role");
+  }
+  
   const existing = await Role.findOne({ role_name: role_name.trim() });
   if (existing) throw new Error("Role already exists");
   
-  // Create the role
   return await Role.create({ 
     role_name: role_name.trim(), 
     permissions,
@@ -36,6 +38,16 @@ export const getRoleByName = async (roleName) => {
 export const updateRole = async (id, roleData) => {
   const { role_name, permissions, status, description } = roleData;
   
+  if (role_name && role_name.trim().toLowerCase() === "super admin") {
+    throw new Error("Cannot rename role to super admin");
+  }
+  
+  const existingRole = await Role.findById(id);
+  if (!existingRole) throw new Error("Role not found");
+  if (existingRole.role_name.toLowerCase() === "super admin") {
+    throw new Error("Cannot modify super admin role");
+  }
+  
   const updateData = {};
   if (role_name) updateData.role_name = role_name.trim();
   if (permissions) updateData.permissions = permissions;
@@ -47,13 +59,16 @@ export const updateRole = async (id, roleData) => {
     updateData,
     { new: true, runValidators: true }
   );
-  if (!role) throw new Error("Role not found");
   return role;
 };
 
 export const deleteRole = async (id) => {
-  const role = await Role.findByIdAndDelete(id);
+  const role = await Role.findById(id);
   if (!role) throw new Error("Role not found");
+  if (role.role_name.toLowerCase() === "super admin") {
+    throw new Error("Cannot delete super admin role");
+  }
+  await Role.findByIdAndDelete(id);
   return { message: "Role deleted successfully" };
 };
 

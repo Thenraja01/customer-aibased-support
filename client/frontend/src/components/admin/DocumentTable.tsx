@@ -36,6 +36,7 @@ export default function DocumentTable({
           <tr className="border-b dark:border-white/[0.06]">
             <th className="text-left font-medium text-muted-foreground px-4 py-3">Title</th>
             <th className="text-left font-medium text-muted-foreground px-4 py-3">Type</th>
+            <th className="text-left font-medium text-muted-foreground px-4 py-3">Assigned Role</th>
             <th className="text-left font-medium text-muted-foreground px-4 py-3">Uploaded By</th>
             <th className="text-left font-medium text-muted-foreground px-4 py-3">Status</th>
             <th className="text-left font-medium text-muted-foreground px-4 py-3">Date</th>
@@ -48,6 +49,11 @@ export default function DocumentTable({
               <td className="px-4 py-3 font-medium">{doc.title}</td>
               <td className="px-4 py-3 text-muted-foreground">
                 {doc.document_type_id?.name || "—"}
+              </td>
+              <td className="px-4 py-3">
+                <Badge variant="outline">
+                  {doc.assigned_role || "All"}
+                </Badge>
               </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {doc.user_id?.name || "—"}

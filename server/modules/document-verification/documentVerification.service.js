@@ -30,7 +30,7 @@ export const approveVerification = async (id) => {
     { new: true }
   );
   if (!verification) throw new Error("Verification not found");
-  await updateDocumentStatus(verification.document_id, "approved");
+  await updateDocumentStatus(verification.document_id, { status: "approved" });
   return verification;
 };
 
@@ -41,7 +41,7 @@ export const rejectVerification = async (id, remarks) => {
     { new: true }
   );
   if (!verification) throw new Error("Verification not found");
-  await updateDocumentStatus(verification.document_id, "rejected");
+  await updateDocumentStatus(verification.document_id, { status: "rejected" });
   return verification;
 };
 

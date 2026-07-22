@@ -74,6 +74,12 @@ export const uploadToCloud = multer({
   fileFilter,
 }).single("file");
 
+export const uploadToGridFS = multer({
+  storage: memoryStorage,
+  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter,
+}).single("file");
+
 export const uploadMultiple = multer({
   storage: memoryStorage,
   limits: { fileSize: MAX_FILE_SIZE },

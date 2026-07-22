@@ -2,16 +2,21 @@ import * as docService from "./document.service.js";
 
 export const upload = async (req, res) => {
   try {
-    const fileUrl = req.file?.url || (req.file?.filename ? `/uploads/${req.file.filename}` : req.file?.path || "");
     const docData = {
       user_id: req.user.userId,
       organization_id: req.user.organization_id,
       title: req.body.title,
       document_type_id: req.body.document_type_id,
-      file_url: fileUrl,
-      file_size: req.file?.size || 0,
+      assigned_role: req.body.assigned_role || "All",
+      status: "draft",
     };
-    const doc = await docService.createDocument(docData, req.user.userId);
+    const doc = await docService.createDocument(
+      docData,
+      req.user.userId,
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype
+    );
     res.status(201).json({ success: true, data: doc });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -77,7 +82,13 @@ export const reject = async (req, res) => {
 
 export const patchStatus = async (req, res) => {
   try {
-    const doc = await docService.updateDocumentStatus(req.params.id, req.body.status);
+    const updateData = {
+      status: req.body.status,
+    };
+    if (req.body.assigned_role) {
+      updateData.assigned_role = req.body.assigned_role;
+    }
+    const doc = await docService.updateDocumentStatus(req.params.id, updateData);
     res.status(200).json({ success: true, data: doc });
   } catch (error) {
     const status = error.message === "Document not found" ? 404 : 400;

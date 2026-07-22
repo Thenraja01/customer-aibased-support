@@ -8,8 +8,8 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get("/search", restrict("super admin", "tenant admin", "admin", "agent"), userController.searchUser);
-router.get("/", restrict("super admin", "tenant admin", "admin", "agent"), userController.getUsers);
+router.get("/search", restrict("super admin", "tenant admin", "admin", "support"), userController.searchUser);
+router.get("/", restrict("super admin", "tenant admin", "admin", "support"), userController.getUsers);
 router.get("/profile", userController.getProfile);
 router.get("/:id", selfOrAdmin, userController.getUser);
 router.post("/", restrict("super admin", "tenant admin", "admin"), validate(createUserSchema), userController.addUser);

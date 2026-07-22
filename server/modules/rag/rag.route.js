@@ -8,13 +8,13 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/ingest", restrict("super admin", "tenant admin", "admin", "agent"), validate(ingestSchema), ragController.ingest);
+router.post("/ingest", restrict("super admin", "tenant admin", "admin", "support"), validate(ingestSchema), ragController.ingest);
 router.post("/query", validate(querySchema), ragController.query);
 router.get("/stats", restrict("super admin", "tenant admin", "admin"), ragController.getStats);
 router.get("/graph/stats", restrict("super admin", "tenant admin", "admin"), ragController.getGlobalStats);
-router.get("/graph/:documentId", restrict("super admin", "tenant admin", "admin", "agent"), ragController.getDocumentGraph);
-router.get("/chunks/:documentId", restrict("super admin", "tenant admin", "admin", "agent"), ragController.getDocumentChunks);
-router.get("/search", restrict("super admin", "tenant admin", "admin", "agent"), ragController.searchByKeyword);
+router.get("/graph/:documentId", restrict("super admin", "tenant admin", "admin", "support"), ragController.getDocumentGraph);
+router.get("/chunks/:documentId", restrict("super admin", "tenant admin", "admin", "support"), ragController.getDocumentChunks);
+router.get("/search", restrict("super admin", "tenant admin", "admin", "support"), ragController.searchByKeyword);
 router.delete("/:documentId", restrict("super admin", "tenant admin", "admin"), ragController.removeDocumentData);
 
 export default router;

@@ -8,9 +8,10 @@ import DocumentVerificationTable from "@/components/admin/DocumentVerificationTa
 import DocumentAPI from "@/api/document.api";
 import DocumentVerificationAPI from "@/api/documentVerification.api";
 import DocumentTypeAPI from "@/api/documentType.api";
+import { AdminAPI } from "@/api/admin.api";
 import { useAuth } from "@/hooks/useAuth";
 
-const statusFilters = ["", "pending", "approved", "rejected"];
+const statusFilters = ["", "draft", "pending", "approved", "rejected"];
 
 export default function DocumentsManagementPage() {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export default function DocumentsManagementPage() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [verifications, setVerifications] = useState<any[]>([]);
   const [documentTypes, setDocumentTypes] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -82,6 +84,17 @@ export default function DocumentsManagementPage() {
     }
   }, []);
 
+  const fetchRoles = useCallback(async () => {
+    try {
+      const res = await AdminAPI.getRoles({ limit: 100 });
+      if (res.data.success) {
+        setRoles(res.data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch roles", error);
+    }
+  }, []);
+
   useEffect(() => {
     if (statusFilter) {
       fetchDocumentsByStatus(statusFilter);
@@ -97,6 +110,10 @@ export default function DocumentsManagementPage() {
   useEffect(() => {
     fetchDocumentTypes();
   }, [fetchDocumentTypes]);
+
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
 
   const handleUpload = async (formData: FormData) => {
     if (orgId) {
@@ -226,6 +243,7 @@ export default function DocumentsManagementPage() {
       {showUpload && (
         <DocumentUploadForm
           documentTypes={documentTypes}
+          roles={roles}
           onSubmit={handleUpload}
           onClose={() => setShowUpload(false)}
         />
@@ -244,6 +262,10 @@ export default function DocumentsManagementPage() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status</span>
                 <span className="font-medium capitalize">{viewingDoc.status}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Assigned Role</span>
+                <span className="font-medium">{viewingDoc.assigned_role || "All"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Type</span>

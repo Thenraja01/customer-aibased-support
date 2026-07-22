@@ -5,15 +5,18 @@ import { X } from "lucide-react";
 
 export default function DocumentUploadForm({
   documentTypes,
+  roles = [],
   onSubmit,
   onClose,
 }: {
   documentTypes: any[];
+  roles?: any[];
   onSubmit: (formData: FormData) => Promise<any>;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [documentTypeId, setDocumentTypeId] = useState("");
+  const [assigned_role, setAssignedRole] = useState("All");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,6 +28,7 @@ export default function DocumentUploadForm({
     try {
       const formData = new FormData();
       formData.append("title", title);
+      formData.append("assigned_role", assigned_role);
       formData.append("file", file);
       if (documentTypeId) formData.append("document_type_id", documentTypeId);
 
@@ -69,6 +73,22 @@ export default function DocumentUploadForm({
               {documentTypes.map((dt) => (
                 <option key={dt._id} value={dt._id}>
                   {dt.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Assign Role</label>
+            <select
+              value={assigned_role}
+              onChange={(e) => setAssignedRole(e.target.value)}
+              className="select-field"
+            >
+              <option value="All">All</option>
+              {roles.map((r) => (
+                <option key={r._id} value={r.role_name}>
+                  {r.role_name}
                 </option>
               ))}
             </select>

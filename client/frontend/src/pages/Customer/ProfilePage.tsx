@@ -88,8 +88,8 @@ export default function ProfilePage() {
           onClick={() => {
             if (roleName === "super_admin" || roleName === "admin") {
               navigate("/admin");
-            } else if (roleName === "agent") {
-              navigate("/agent/dashboard");
+            } else if (roleName === "support") {
+              navigate("/support/dashboard");
             } else {
               navigate("/dashboard");
             }

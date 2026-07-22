@@ -45,15 +45,13 @@ const getDocumentTitles = async (documentIds) => {
 const formatRAGContext = (ragResults, docTitles) => {
   if (!ragResults || !ragResults.document_results || ragResults.document_results.length === 0) return null;
 
-  const bestScore = Math.max(...ragResults.document_results.map((r) => r.score));
-  const minScore = ragResults.document_results.length === 0 ? 0 : bestScore * 0.6;
+  const sorted = [...ragResults.document_results].sort((a, b) => b.score - a.score);
+  const bestScore = sorted[0].score;
+  const minScore = bestScore * 0.6;
   const effectiveMin = Math.max(MIN_RAG_SCORE, minScore);
 
-  const relevant = ragResults.document_results
-    .filter((r) => r.score >= effectiveMin)
-    .slice(0, 5);
-
-  if (relevant.length === 0) return null;
+  let relevant = sorted.filter((r) => r.score >= effectiveMin).slice(0, 5);
+  if (relevant.length === 0) relevant = sorted.slice(0, 1);
 
   return relevant.map((r) => {
     const docId = r.document_id?.toString();
@@ -81,14 +79,39 @@ const buildConversationContext = (recentMessages) => {
   return result;
 };
 
-export const processAIMessage = async ({ chatId, userId, userMessage, organizationId }) => {
+export const processAIMessage = async ({ chatId, userId, userMessage, organizationId, roleName }) => {
   const intent = detectIntent(userMessage);
 
   const [ragResults, memoryResults, recentMessages] = await Promise.all([
-    ragService.hybridQuery(userMessage, organizationId, null, 5, userId, chatId).catch(() => null),
+    ragService.hybridQuery(userMessage, organizationId, null, 5, userId, chatId, roleName).catch(() => null),
     memoryService.getRelevantMemories(userId, userMessage, 5).catch(() => []),
     Message.find({ chat_id: chatId }).sort({ created_at: -1 }).limit(20).lean().catch(() => []),
   ]);
+
+  // Hard denial paths — return early, no LLM call
+  if (ragResults?.authorized === false) {
+    const denialMap = {
+      no_org: "Your account is not associated with an organization. Contact your administrator.",
+      org_not_found: "Your organization could not be found. Contact your administrator.",
+      org_inactive: "Your organization account is inactive. Contact your administrator.",
+      role_not_authorized: "Your role does not have access to knowledge base documents. Contact your administrator.",
+    };
+    const denialText = denialMap[ragResults.reason];
+    if (denialText) {
+      const denialMessage = await Message.create({
+        chat_id: chatId, sender_id: userId, content: denialText, message_type: "text", is_ai: true,
+      });
+      await AISession.findOneAndUpdate(
+        { chat_id: chatId },
+        { $inc: { messages_count: 2, tokens_used: 0 } },
+        { upsert: true, new: true }
+      );
+      await memoryService.appendToShortTerm(chatId, {
+        role: "assistant", content: denialText, sender: "Support Assistant", timestamp: new Date(),
+      });
+      return denialMessage;
+    }
+  }
 
   const docIds = new Set();
   if (ragResults?.document_results) {
@@ -99,7 +122,14 @@ export const processAIMessage = async ({ chatId, userId, userMessage, organizati
   const docTitles = await getDocumentTitles([...docIds]);
 
   const convCtx = buildConversationContext(recentMessages.reverse());
-  const ragCtx = formatRAGContext(ragResults, docTitles);
+
+  let ragCtx = null;
+  if (ragResults?.authorized === false) {
+    ragCtx = "[Access Restricted] No organization documents are accessible. Respond based on general knowledge only.";
+  } else {
+    ragCtx = formatRAGContext(ragResults, docTitles);
+  }
+
   const memCtx = formatMemoryContext(memoryResults);
 
   const prompt = await buildPrompt({

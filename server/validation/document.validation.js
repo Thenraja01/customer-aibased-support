@@ -5,8 +5,10 @@ export const createDocumentSchema = z.object({
   organization_id: z.string().optional(),
   document_type_id: z.string().trim().optional(),
   title: z.string().trim().min(1, "Title is required").max(255),
+  assigned_role: z.string().trim().optional(),
 });
 
 export const updateDocumentStatusSchema = z.object({
-  status: z.enum(["pending", "approved", "rejected"]),
+  status: z.enum(["draft", "pending", "approved", "rejected"]),
+  assigned_role: z.string().trim().optional(),
 });
