@@ -1,5 +1,6 @@
 // middleware/auth.middleware.js
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import env from "../config/env.js";
 import User from "../modules/user/user.schema.js";
 
@@ -50,6 +51,7 @@ export const protect = async (req, res, next) => {
       ...user,
       userId: user._id,
       organizationId: user.organization_id?._id || user.organization_id,
+      roleId: decoded.roleId || user.role_id?._id,
       roleName: user.role_id?.role_name,
       permissions: user.role_id?.permissions || [],
       tokenData: decoded
@@ -127,10 +129,11 @@ export const restrict = (...allowedRoles) => {
       });
     }
 
-    // Case-insensitive comparison
-    const normalizedUserRole = userRole.toLowerCase().trim();
+    // Case-insensitive comparison (normalize spaces/underscores)
+    const normalize = (s) => s.toLowerCase().trim().replace(/[\s_]+/g, "");
+    const normalizedUserRole = normalize(userRole);
     const isAllowed = allowedRoles.some(role =>
-      role.toLowerCase().trim() === normalizedUserRole
+      normalize(role) === normalizedUserRole
     );
 
     if (!isAllowed) {
@@ -192,8 +195,8 @@ export const selfOrAdmin = (req, res, next) => {
   const paramId = req.params.id || req.params.userId;
   const userId = req.user?.userId || req.user?._id;
   const userRole = req.user?.roleName || req.user?.role_id?.role_name;
-  const isAdmin = ['super admin', 'tenant admin', 'admin'].includes(
-    userRole?.toLowerCase()
+  const isAdmin = ['super admin', 'tenant admin', 'admin'].some(
+    (r) => r.toLowerCase().replace(/[\s_]+/g, " ") === userRole?.toLowerCase().replace(/[\s_]+/g, " ")
   );
 
   // If no user, return unauthorized
@@ -229,8 +232,8 @@ export const selfOrAdminParam = (paramName = 'id') => {
     const paramId = req.params[paramName];
     const userId = req.user?.userId || req.user?._id;
     const userRole = req.user?.roleName || req.user?.role_id?.role_name;
-    const isAdmin = ['super admin', 'tenant admin', 'admin'].includes(
-      userRole?.toLowerCase()
+    const isAdmin = ['super admin', 'tenant admin', 'admin'].some(
+      (r) => r.toLowerCase().replace(/[\s_]+/g, " ") === userRole?.toLowerCase().replace(/[\s_]+/g, " ")
     );
 
     if (!req.user) {
@@ -264,8 +267,8 @@ export const ownerOrAdmin = (getResourceOwnerId) => {
     try {
       const userId = req.user?.userId || req.user?._id;
       const userRole = req.user?.roleName || req.user?.role_id?.role_name;
-      const isAdmin = ['super admin', 'tenant admin', 'admin'].includes(
-        userRole?.toLowerCase()
+      const isAdmin = ['super admin', 'tenant admin', 'admin'].some(
+        (r) => r.toLowerCase().replace(/[\s_]+/g, " ") === userRole?.toLowerCase().replace(/[\s_]+/g, " ")
       );
 
       if (!req.user) {
@@ -302,6 +305,48 @@ export const ownerOrAdmin = (getResourceOwnerId) => {
   };
 };
 
+/**
+ * Self or Admin by chat ownership
+ * Allows chat owners and admins to access chat resources
+ * @param {string} paramName - Name of the chatId parameter (default: 'chatId')
+ */
+export const selfOrAdminByChatOwner = (paramName = 'chatId') => {
+  return async (req, res, next) => {
+    const chatId = req.params[paramName];
+    const userId = req.user?.userId || req.user?._id;
+    const userRole = req.user?.roleName || req.user?.role_id?.role_name;
+    const isAdmin = ['super admin', 'tenant admin', 'admin'].some(
+      (r) => r.toLowerCase().replace(/[\s_]+/g, " ") === userRole?.toLowerCase().replace(/[\s_]+/g, " ")
+    );
+
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: User not authenticated"
+      });
+    }
+
+    if (isAdmin) {
+      return next();
+    }
+
+    try {
+      const Chat = mongoose.model('Chat');
+      const chat = await Chat.findById(chatId).select('user_id').lean();
+      if (chat && chat.user_id?.toString() === userId.toString()) {
+        return next();
+      }
+    } catch {
+      // fall through to forbidden
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: "Forbidden: You can only access your own conversations",
+    });
+  };
+};
+
 export default {
   protect,
   protectSimple,
@@ -309,5 +354,6 @@ export default {
   requirePermissions,
   selfOrAdmin,
   selfOrAdminParam,
-  ownerOrAdmin
+  ownerOrAdmin,
+  selfOrAdminByChatOwner
 };

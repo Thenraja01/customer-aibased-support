@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Bot, Mail, Phone } from "lucide-react";
+import { Bot } from "lucide-react";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
 const footerLinks = {
   Product: [
@@ -21,30 +22,27 @@ const footerLinks = {
 };
 
 export default function Footer() {
+  const { settings } = useAppSettings();
+  const appName = settings?.app_name || "SupportAI";
+
   return (
     <footer className="border-t bg-muted/40 dark:bg-gradient-to-b dark:from-background dark:to-background/80 dark:border-white/[0.06]">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-2">
-              <Bot className="h-6 w-6 text-primary" />
+              {settings?.logo?.url ? (
+                <img src={settings.logo.url} alt={appName} className="h-6 w-auto" />
+              ) : (
+                <Bot className="h-6 w-6 text-primary" />
+              )}
               <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                SupportAI
+                {appName}
               </span>
             </Link>
             <p className="text-sm text-muted-foreground">
-              Transforming customer service with AI-powered automation for businesses worldwide.
+              {settings?.marketing?.footer_text || "Transforming customer service with AI-powered automation for businesses worldwide."}
             </p>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                <span>support@company.com</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                <span>+91 XXXXX XXXXX</span>
-              </div>
-            </div>
           </div>
 
           {Object.entries(footerLinks).map(([category, links]) => (
@@ -67,7 +65,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 pt-8 border-t dark:border-white/[0.06] text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} SupportAI. All rights reserved.
+          &copy; {new Date().getFullYear()} {appName}. All rights reserved.
         </div>
       </div>
     </footer>

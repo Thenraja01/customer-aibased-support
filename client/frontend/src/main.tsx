@@ -4,6 +4,8 @@ import { Provider } from "react-redux";
 import { store } from "./store/store";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider } from "./components/ui/toast";
+import { SocketProvider } from "./context/SocketContext";
 import App from "./App.js";
 import "./index.css";
 
@@ -14,7 +16,11 @@ if (root) {
       <Provider store={store}>
         <ThemeProvider>
           <AuthProvider>
-            <App />
+            <ToastProvider>
+              <SocketProvider>
+                <App />
+              </SocketProvider>
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
       </Provider>

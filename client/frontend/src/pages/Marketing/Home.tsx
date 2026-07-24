@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import {
   Card,
   CardContent,
@@ -90,6 +91,10 @@ const statCards = [
 ];
 
 export default function Home() {
+  const { settings } = useAppSettings();
+  const m = settings?.marketing || {};
+  const appName = settings?.app_name || "SupportAI";
+
   return (
     <div className="flex flex-col gap-16 pb-16">
       {/* Hero */}
@@ -100,7 +105,7 @@ export default function Home() {
         <div className="container mx-auto max-w-5xl text-center">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <Badge className="mb-6 dark:bg-primary/15 dark:text-primary dark:border-primary/20" variant="secondary">
-              AI-Powered Customer Support
+              {m.hero_title || "AI-Powered Customer Support"}
             </Badge>
           </motion.div>
           <motion.h1
@@ -109,7 +114,7 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl mb-6"
           >
-            AI Customer Support
+            {appName}
             <br />
             <span className="text-primary bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text dark:text-transparent dark:bg-[length:200%_auto] dark:animate-gradient-x">
               That Works 24/7
@@ -121,9 +126,7 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mx-auto max-w-2xl text-lg text-muted-foreground mb-8 leading-relaxed"
           >
-            Deliver instant, intelligent customer support across chat, email, and messaging
-            platforms. Reduce response times, increase customer satisfaction, and let your team
-            focus on complex issues.
+            {m.hero_subtitle || "Deliver instant, intelligent customer support across chat, email, and messaging platforms."}
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -132,7 +135,7 @@ export default function Home() {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <Button size="lg" variant="outline" className="dark:border-primary/30 dark:hover:bg-primary/10 dark:hover:border-primary/50 dark:shadow-lg dark:shadow-primary/10">
-              <Link to="/contact">Request a Demo</Link>
+              <Link to="/contact">{m.hero_cta_text || "Request a Demo"}</Link>
             </Button>
             <Button size="lg" variant="ghost" className="dark:hover:bg-primary/10">
               <Link to="/contact">Start Free Trial</Link>
@@ -205,7 +208,7 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div variants={fadeUp} custom={0}>
               <h2 className="text-3xl font-bold tracking-tight mb-4">
-                Powerful Features for Modern Support
+                {m.features_title || "Powerful Features for Modern Support"}
               </h2>
               <p className="text-muted-foreground mb-8">
                 Everything you need to deliver exceptional customer experiences at scale.
@@ -253,7 +256,7 @@ export default function Home() {
               Ready to Transform Your Customer Support?
             </h2>
             <p className="max-w-2xl mx-auto mb-8 text-primary-foreground/90">
-              Join hundreds of businesses using SupportAI to deliver faster, smarter customer
+              Join hundreds of businesses using {appName} to deliver faster, smarter customer
               experiences.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

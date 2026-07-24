@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Target, Eye, Users } from "lucide-react";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
 const staggerContainer = {
   hidden: {},
@@ -43,6 +44,22 @@ const cards = [
 ];
 
 export default function About() {
+  const { settings } = useAppSettings();
+  const aboutText = settings?.legal?.about_text;
+
+  if (aboutText) {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-4xl">
+        <h1 className="text-4xl font-bold tracking-tight mb-8">About Us</h1>
+        <div className="prose prose-slate dark:prose-invert max-w-none">
+          {aboutText.split("\n").map((paragraph, i) => (
+            paragraph.trim() ? <p key={i} className="text-muted-foreground mb-4">{paragraph}</p> : null
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-16">
       <motion.div

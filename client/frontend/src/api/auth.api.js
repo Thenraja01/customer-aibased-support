@@ -1,4 +1,3 @@
-// auth.api.js
 import AxiosInstance from "./axiosInstance.js";
 
 const BASE_URL = "/auth/v1";
@@ -6,44 +5,67 @@ const BASE_URL = "/auth/v1";
 export const AuthAPI = {
   signup: async (data) => {
     try {
-      console.log("Sending signup data:", data);
       const response = await AxiosInstance.post(`${BASE_URL}/register`, data);
-      console.log("Signup response:", response.data);
       return response;
     } catch (error) {
-      console.error("Signup error:", error.response?.data || error.message);
       throw error;
     }
   },
-  
+
   login: async (data) => {
     try {
-      console.log("Sending login data:", data);
       const response = await AxiosInstance.post(`${BASE_URL}/login`, data);
-      console.log("Login response:", response.data);
       return response;
     } catch (error) {
-      console.error("Login error:", error.response?.data || error.message);
       throw error;
     }
   },
-  
+
+  loginWithOrg: async (email, password, organizationId) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/login`, {
+        email,
+        password,
+        organization_id: organizationId,
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   getOrganizations: async () => {
     try {
       const response = await AxiosInstance.get(`${BASE_URL}/organizations`);
       return response;
     } catch (error) {
-      console.error("Get organizations error:", error.response?.data || error.message);
       throw error;
     }
   },
-  
+
+  getOrgByDomain: async (domain) => {
+    try {
+      const response = await AxiosInstance.get(`${BASE_URL}/organizations/by-domain`, { params: { domain } });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   getRoles: async () => {
     try {
       const response = await AxiosInstance.get(`${BASE_URL}/roles`);
       return response;
     } catch (error) {
-      console.error("Get roles error:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  getAppSettings: async () => {
+    try {
+      const response = await AxiosInstance.get(`${BASE_URL}/app-settings`);
+      return response;
+    } catch (error) {
       throw error;
     }
   },

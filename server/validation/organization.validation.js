@@ -6,6 +6,7 @@ export const createOrganizationSchema = z.object({
   address: z.string().trim().max(500).optional(),
   phone: z.string().trim().max(20).optional(),
   email: z.string().trim().email("Invalid email").max(255),
+  domain: z.string().trim().max(255).optional(),
 });
 
 export const updateOrganizationSchema = z.object({
@@ -13,4 +14,5 @@ export const updateOrganizationSchema = z.object({
   address: z.string().trim().max(500).optional(),
   phone: z.string().trim().max(20).optional(),
   email: z.string().trim().email("Invalid email").max(255).optional(),
+  domain: z.string().trim().max(255).optional(),
 });

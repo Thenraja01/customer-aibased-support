@@ -14,4 +14,13 @@ export const TicketAPI = {
   resolve: (id, data) => AxiosInstance.patch(`/tickets/${id}/resolve`, data),
   close: (id) => AxiosInstance.patch(`/tickets/${id}/close`),
   delete: (id) => AxiosInstance.delete(`/tickets/${id}`),
+  setPending: (id) => AxiosInstance.patch(`/tickets/${id}/pending`),
+  setInProgress: (id) => AxiosInstance.patch(`/tickets/${id}/in-progress`),
+  reopen: (id) => AxiosInstance.patch(`/tickets/${id}/reopen`),
+  getMessages: (id) => AxiosInstance.get(`/tickets/${id}/messages`),
+  sendMessage: (id, data) => AxiosInstance.post(`/tickets/${id}/messages`, data),
+  deleteMessage: (ticketId, messageId) => AxiosInstance.delete(`/tickets/${ticketId}/messages/${messageId}`),
+  escalateFromChat: (data) => AxiosInstance.post("/tickets/escalate-from-chat", data),
+  getQueue: () => AxiosInstance.get("/tickets/queue"),
+  smartAssign: (ticketId) => AxiosInstance.post(`/tickets/${ticketId}/smart-assign`),
 };

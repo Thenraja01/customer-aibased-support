@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Search, Users, FileText, MessageSquare, Ticket } from "lucide-react";
-import { ChatAPI, UsersAPI, TicketAPI, DocumentAPI } from "@/api";
+import { SearchAPI } from "@/api/search.api";
 
 export default function GlobalSearchPage() {
   const [query, setQuery] = useState("");
@@ -17,25 +17,17 @@ export default function GlobalSearchPage() {
 
     setLoading(true);
     try {
-      const [usersRes, chatsRes, ticketsRes, docsRes] = await Promise.all([
-        UsersAPI.getAll({ search: searchQuery }).catch(() => ({ data: { success: false, data: [] } })),
-        ChatAPI.search({ q: searchQuery }).catch(() => ({ data: { success: false, data: [] } })),
-        TicketAPI.getAll({ search: searchQuery }).catch(() => ({ data: { success: false, data: [] } })),
-        DocumentAPI.getAll().catch(() => ({ data: { success: false, data: [] } })),
-      ]);
-
-      const filteredDocs = docsRes.data.success 
-        ? docsRes.data.data.filter((doc: any) => 
-            doc.title?.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        : [];
-
-      setResults({
-        users: usersRes.data.success ? usersRes.data.data : [],
-        chats: chatsRes.data.success ? chatsRes.data.data : [],
-        tickets: ticketsRes.data.success ? ticketsRes.data.data : [],
-        documents: filteredDocs,
-      });
+      const res = await SearchAPI.query({ q: searchQuery });
+      if (res.data.success) {
+        const data = res.data.data || {};
+        setResults({
+          users: data.users || [],
+          chats: data.chats || [],
+          tickets: data.tickets || [],
+          documents: data.documents || [],
+          faqs: data.faqs || [],
+        });
+      }
     } catch (error) {
       console.error("Search failed:", error);
     } finally {

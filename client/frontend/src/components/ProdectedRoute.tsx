@@ -4,10 +4,11 @@ import { Navigate, Outlet } from "react-router-dom";
 interface Props {
   allowedRoles: string[];
   redirectTo?: string;
+  requirePermissions?: string[];
 }
 
-export default function ProtectedRoute({ allowedRoles, redirectTo }: Props) {
-  const { user, loading } = useAuthContext();
+export default function ProtectedRoute({ allowedRoles, redirectTo, requirePermissions }: Props) {
+  const { user, loading, can } = useAuthContext();
 
   if (loading) {
     return (
@@ -32,12 +33,24 @@ export default function ProtectedRoute({ allowedRoles, redirectTo }: Props) {
     const fallback =
       redirectTo ||
       (roleName === "super_admin"
-        ? "/admin"
+        ? "/superadmin/dashboard"
         : roleName === "admin"
         ? "/admin/dashboard"
         : roleName === "support"
         ? "/support/dashboard"
         : "/dashboard");
+    return <Navigate to={fallback} replace />;
+  }
+
+  if (requirePermissions && requirePermissions.length > 0 && !can(...requirePermissions)) {
+    const fallback =
+      roleName === "super_admin"
+        ? "/superadmin/dashboard"
+        : roleName === "admin"
+        ? "/admin/dashboard"
+        : roleName === "support"
+        ? "/support/dashboard"
+        : "/dashboard";
     return <Navigate to={fallback} replace />;
   }
 

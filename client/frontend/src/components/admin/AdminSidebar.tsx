@@ -12,20 +12,22 @@ import {
   Sparkles,
   Search,
   MessageCircle,
+  User,
+  Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
 const superAdminLinks = [
-  { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
-  { name: "Organizations", path: "/admin/organizations", icon: Building2 },
-  { name: "Users", path: "/admin/users", icon: Users },
-  { name: "Roles", path: "/admin/roles", icon: Shield },
-  { name: "Audit Logs", path: "/admin/audit-logs", icon: ScrollText },
-  { name: "Document Types", path: "/admin/document-types", icon: FileText },
-  { name: "AI Analytics", path: "/admin/ai-analytics", icon: Sparkles },
-  { name: "Search", path: "/admin/search", icon: Search },
-  { name: "Chatbot", path: "/admin/chatbot", icon: MessageCircle },
+  { name: "Dashboard", path: "/superadmin/dashboard", icon: LayoutDashboard },
+  { name: "Organizations", path: "/superadmin/organizations", icon: Building2 },
+  { name: "Users", path: "/superadmin/users", icon: Users },
+  { name: "Roles", path: "/superadmin/roles", icon: Shield },
+  { name: "Audit Logs", path: "/superadmin/audit-logs", icon: ScrollText },
+  { name: "AI Analytics", path: "/superadmin/ai-analytics", icon: Sparkles },
+  { name: "Search", path: "/superadmin/search", icon: Search },
+  { name: "Chatbot", path: "/superadmin/chatbot", icon: MessageCircle },
+  { name: "Knowledge Graph", path: "/superadmin/knowledge-graph", icon: Share2 },
 ];
 
 const adminLinks = [
@@ -34,9 +36,11 @@ const adminLinks = [
   { name: "Documents", path: "/admin/documents", icon: FileText },
   { name: "Document Types", path: "/admin/document-types", icon: FileText },
   { name: "Verifications", path: "/admin/verifications", icon: Shield },
-  { name: "AI Analytics", path: "/admin/ai-analytics", icon: Sparkles },
-  { name: "Search", path: "/admin/search", icon: Search },
-  { name: "Chatbot", path: "/admin/chatbot", icon: MessageCircle },
+  { name: "FAQ", path: "/admin/faq", icon: ScrollText },
+  { name: "AI Control", path: "/admin/ai", icon: Sparkles },
+  { name: "Settings", path: "/admin/settings", icon: Settings },
+  { name: "Profile", path: "/admin/profile", icon: User },
+  { name: "Chatbot", path: "/admin/chat-bot", icon: MessageCircle },
 ];
 
 export default function AdminSidebar({
@@ -81,10 +85,10 @@ export default function AdminSidebar({
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {links.map((link) => {
             const Icon = link.icon;
-            const isActive =
-              link.path === "/admin"
-                ? location.pathname === "/admin"
-                : location.pathname === link.path || location.pathname.startsWith(link.path + "/");
+            const segments = link.path.split("/").filter(Boolean).length;
+            const isActive = segments <= 1
+              ? location.pathname === link.path
+              : location.pathname === link.path || location.pathname.startsWith(link.path + "/");
             return (
               <Link
                 key={link.name}

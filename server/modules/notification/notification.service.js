@@ -1,7 +1,31 @@
 import Notification from "./notification.schema.js";
+import User from "../user/user.schema.js";
+import { getIO } from "../../config/socket.js";
+import { sendPushNotification } from "../../config/firebase.js";
 
 export const createNotification = async (data) => {
-  return await Notification.create(data);
+  const notif = await Notification.create(data);
+  try {
+    const io = getIO();
+    io.to(`user:${data.user_id}`).emit("notification", notif);
+  } catch {
+    // socket not available
+  }
+
+  try {
+    const recipient = await User.findById(data.user_id).select("fcm_token");
+    if (recipient?.fcm_token) {
+      await sendPushNotification(recipient.fcm_token, {
+        title: data.title,
+        body: data.message,
+        data: { link: data.link || "" },
+      });
+    }
+  } catch {
+    // push notification error
+  }
+
+  return notif;
 };
 
 export const broadcastNotification = async (data, userIds) => {
@@ -11,7 +35,16 @@ export const broadcastNotification = async (data, userIds) => {
     message: data.message,
     type: data.type || "info",
   }));
-  return await Notification.insertMany(notifications);
+  const created = await Notification.insertMany(notifications);
+  try {
+    const io = getIO();
+    created.forEach((notif) => {
+      io.to(`user:${notif.user_id}`).emit("notification", notif);
+    });
+  } catch {
+    // socket not available
+  }
+  return created;
 };
 
 export const getNotificationsByUser = async (userId) => {

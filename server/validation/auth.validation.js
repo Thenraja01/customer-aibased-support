@@ -19,6 +19,7 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Password is required"),
+  organization_id: z.string().trim().min(1, "Organization is required").optional(),
 });
 
 export const changePasswordSchema = z.object({
