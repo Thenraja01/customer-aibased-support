@@ -10,7 +10,23 @@ const faqSchema = new mongoose.Schema(
     },
     question: { type: String, required: true, maxlength: 500 },
     answer: { type: String, required: true },
+    category: { type: String, maxlength: 100, default: "general" },
+    status: {
+      type: String,
+      enum: ["draft", "pending", "approved", "rejected"],
+      default: "draft",
+      index: true,
+    },
     is_active: { type: Boolean, default: true, index: true },
+    created_by: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    approved_by: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    approved_at: { type: Date },
   },
   {
     timestamps: {

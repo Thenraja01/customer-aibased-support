@@ -6,13 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Mail, Phone, Clock, MapPin, Send } from "lucide-react";
-
-const contactItems = [
-  { icon: Mail, label: "support@company.com" },
-  { icon: Phone, label: "+91 XXXXX XXXXX" },
-  { icon: Clock, label: "Monday\u2013Friday, 9:00 AM\u20136:00 PM" },
-  { icon: MapPin, label: "Available globally with 24/7 AI support" },
-];
+import { useAuth } from "@/hooks/useAuth";
 
 const staggerContainer = {
   hidden: {},
@@ -26,6 +20,26 @@ const itemVariant = {
 
 export default function Contact() {
   const [submitted, setSubmitted] = useState(false);
+  const { orgSettings } = useAuth();
+
+  const wh = orgSettings?.working_hours;
+
+  const workingHoursLabel = wh
+    ? Object.entries({
+        monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu",
+        friday: "Fri", saturday: "Sat", sunday: "Sun",
+      })
+        .filter(([key]) => wh[key]?.enabled)
+        .map(([key, label]) => `${label} ${wh[key].open}\u2013${wh[key].close}`)
+        .join(", ") || "Monday\u2013Friday, 9:00 AM\u20136:00 PM"
+    : "Monday\u2013Friday, 9:00 AM\u20136:00 PM";
+
+  const contactItems = [
+    { icon: Mail, label: orgSettings?.email || "support@company.com" },
+    { icon: Phone, label: orgSettings?.phone || "+91 XXXXX XXXXX" },
+    { icon: Clock, label: workingHoursLabel },
+    { icon: MapPin, label: orgSettings?.address || "Available globally with 24/7 AI support" },
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +60,7 @@ export default function Contact() {
         </p>
       </motion.div>
 
-      <div className="grid lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
+      <div className="max-w-3xl mx-auto space-y-6">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -70,66 +84,66 @@ export default function Contact() {
               </CardContent>
             </Card>
           </motion.div>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <Card className="dark:bg-card/50 dark:border-white/[0.06] dark:shadow-lg dark:shadow-black/10">
-            <CardHeader>
-              <CardTitle>Send us a Message</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {submitted ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4 }}
-                  className="text-center py-8"
-                >
-                  <div className="h-12 w-12 bg-gradient-to-br from-primary/15 to-secondary/10 dark:from-primary/20 dark:to-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Send className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">Message Sent!</h3>
-                  <p className="text-muted-foreground">
-                    Thank you for reaching out. We'll get back to you shortly.
-                  </p>
-                </motion.div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Name</Label>
-                      <Input required placeholder="Your name" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <Card className="dark:bg-card/50 dark:border-white/[0.06] dark:shadow-lg dark:shadow-black/10">
+              <CardHeader>
+                <CardTitle>Send us a Message</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {submitted ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4 }}
+                    className="text-center py-8"
+                  >
+                    <div className="h-12 w-12 bg-gradient-to-br from-primary/15 to-secondary/10 dark:from-primary/20 dark:to-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Send className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Message Sent!</h3>
+                    <p className="text-muted-foreground">
+                      Thank you for reaching out. We'll get back to you shortly.
+                    </p>
+                  </motion.div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Name</Label>
+                        <Input required placeholder="Your name" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email</Label>
+                        <Input type="email" required placeholder="your@email.com" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Company</Label>
+                        <Input placeholder="Your company" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Phone</Label>
+                        <Input type="tel" placeholder="+91 XXXXX XXXXX" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input type="email" required placeholder="your@email.com" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
+                      <Label>Message</Label>
+                      <Textarea required rows={5} placeholder="How can we help you?" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
                     </div>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Company</Label>
-                      <Input placeholder="Your company" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Phone</Label>
-                      <Input type="tel" placeholder="+91 XXXXX XXXXX" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Message</Label>
-                    <Textarea required rows={5} placeholder="How can we help you?" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
-                  </div>
-                  <Button type="submit" className="w-full dark:bg-primary dark:hover:bg-primary/90 dark:shadow-lg dark:shadow-primary/20">
-                    Send Message
-                  </Button>
-                </form>
-              )}
-            </CardContent>
-          </Card>
+                    <Button type="submit" className="w-full dark:bg-primary dark:hover:bg-primary/90 dark:shadow-lg dark:shadow-primary/20">
+                      Send Message
+                    </Button>
+                  </form>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         </motion.div>
       </div>
     </div>

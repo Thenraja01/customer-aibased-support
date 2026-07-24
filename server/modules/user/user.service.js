@@ -4,8 +4,10 @@ import Role from "../role/role.schema.js";
 import bcrypt from "bcrypt";
 import { escapeRegex } from "../../utils/escapeRegex.js";
 
-export const getAllUsers = async () => {
-  return await User.find()
+export const getAllUsers = async (organizationId = null) => {
+  const filter = {};
+  if (organizationId) filter.organization_id = organizationId;
+  return await User.find(filter)
     .populate("organization_id", "name email")
     .populate("role_id", "role_name")
     .select("-password");

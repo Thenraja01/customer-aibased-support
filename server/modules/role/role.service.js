@@ -1,26 +1,29 @@
-// role.service.js
 import Role from "./role.schema.js";
 
 export const createRole = async (roleData) => {
-  const { role_name, permissions = [], status = 'active', description = '' } = roleData;
-  
+  const { role_name, organization_id = null, permissions = [], status = 'active', description = '' } = roleData;
+
   if (role_name.trim().toLowerCase() === "super admin") {
     throw new Error("Cannot create super admin role");
   }
-  
-  const existing = await Role.findOne({ role_name: role_name.trim() });
-  if (existing) throw new Error("Role already exists");
-  
-  return await Role.create({ 
-    role_name: role_name.trim(), 
+
+  const existing = await Role.findOne({ role_name: role_name.trim(), organization_id: organization_id || null });
+  if (existing) throw new Error("Role already exists in this organization");
+
+  return await Role.create({
+    role_name: role_name.trim(),
+    organization_id: organization_id || null,
     permissions,
     status,
     description
   });
 };
 
-export const getAllRoles = async () => {
-  return await Role.find().sort({ role_name: 1 });
+export const getAllRoles = async (organizationId = null) => {
+  const filter = organizationId
+    ? { $or: [{ organization_id: organizationId }, { organization_id: null }] }
+    : {};
+  return await Role.find(filter).sort({ role_name: 1 });
 };
 
 export const getRoleById = async (id) => {
@@ -29,31 +32,33 @@ export const getRoleById = async (id) => {
   return role;
 };
 
-export const getRoleByName = async (roleName) => {
-  const role = await Role.findOne({ role_name: roleName.trim() });
+export const getRoleByName = async (roleName, organizationId = null) => {
+  const filter = { role_name: roleName.trim() };
+  if (organizationId) filter.organization_id = organizationId;
+  const role = await Role.findOne(filter);
   if (!role) throw new Error("Role not found");
   return role;
 };
 
 export const updateRole = async (id, roleData) => {
   const { role_name, permissions, status, description } = roleData;
-  
+
   if (role_name && role_name.trim().toLowerCase() === "super admin") {
     throw new Error("Cannot rename role to super admin");
   }
-  
+
   const existingRole = await Role.findById(id);
   if (!existingRole) throw new Error("Role not found");
   if (existingRole.role_name.toLowerCase() === "super admin") {
     throw new Error("Cannot modify super admin role");
   }
-  
+
   const updateData = {};
   if (role_name) updateData.role_name = role_name.trim();
   if (permissions) updateData.permissions = permissions;
   if (status) updateData.status = status;
   if (description) updateData.description = description;
-  
+
   const role = await Role.findByIdAndUpdate(
     id,
     updateData,

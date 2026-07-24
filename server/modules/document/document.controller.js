@@ -2,20 +2,26 @@ import * as docService from "./document.service.js";
 
 export const upload = async (req, res) => {
   try {
+    const userRole = req.user?.roleName || req.user?.role_id?.role_name;
+    const isAdmin = ["super admin", "tenant admin", "admin"].includes(
+      userRole?.toLowerCase()
+    );
+
     const docData = {
       user_id: req.user.userId,
-      organization_id: req.user.organization_id,
+      organization_id: req.user.organizationId,
       title: req.body.title,
       document_type_id: req.body.document_type_id,
       assigned_role: req.body.assigned_role || "All",
-      status: "draft",
+      role_ids: req.body.role_ids,
     };
     const doc = await docService.createDocument(
       docData,
       req.user.userId,
       req.file.buffer,
       req.file.originalname,
-      req.file.mimetype
+      req.file.mimetype,
+      isAdmin
     );
     res.status(201).json({ success: true, data: doc });
   } catch (error) {
@@ -25,7 +31,8 @@ export const upload = async (req, res) => {
 
 export const getAll = async (req, res) => {
   try {
-    const docs = await docService.getAllDocuments();
+    const organizationId = req.user?.organizationId;
+    const docs = await docService.getAllDocuments(organizationId);
     res.status(200).json({ success: true, data: docs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -44,7 +51,10 @@ export const getById = async (req, res) => {
 
 export const getByUser = async (req, res) => {
   try {
-    const docs = await docService.getDocumentsByUser(req.params.userId);
+    const roleName = req.user?.roleName;
+    const roleId = req.user?.roleId;
+    const organizationId = req.user?.organizationId;
+    const docs = await docService.getDocumentsByUser(req.params.userId, roleName, roleId, organizationId);
     res.status(200).json({ success: true, data: docs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -103,5 +113,26 @@ export const remove = async (req, res) => {
   } catch (error) {
     const status = error.message === "Document not found" ? 404 : 500;
     res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const getRoles = async (req, res) => {
+  try {
+    const roles = await docService.getDocumentRoleAccess(req.params.id);
+    res.status(200).json({ success: true, data: roles });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const setRoles = async (req, res) => {
+  try {
+    const { role_ids } = req.body;
+    const orgId = req.user.organizationId;
+    await docService.setDocumentRoleAccess(req.params.id, role_ids, orgId);
+    const roles = await docService.getDocumentRoleAccess(req.params.id);
+    res.status(200).json({ success: true, data: roles });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

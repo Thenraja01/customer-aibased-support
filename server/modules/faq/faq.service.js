@@ -1,24 +1,52 @@
 import Faq from "./faq.schema.js";
 import { escapeRegex } from "../../utils/escapeRegex.js";
 
-export const createFaq = async (data) => {
-  return await Faq.create(data);
+const ADMIN_ROLES = ["super admin", "tenant admin", "admin"];
+
+export const createFaq = async (data, user) => {
+  const payload = { ...data, created_by: user.userId };
+
+  if (ADMIN_ROLES.includes(user.roleName?.toLowerCase())) {
+    payload.status = "approved";
+    payload.approved_by = user.userId;
+    payload.approved_at = new Date();
+  } else {
+    payload.status = "pending";
+  }
+
+  return await Faq.create(payload);
 };
 
 export const getActiveFaqs = async (organizationId) => {
-  const query = { is_active: true };
+  const query = { is_active: true, status: "approved" };
   if (organizationId) query.organization_id = organizationId;
   return await Faq.find(query).sort({ created_at: -1 });
 };
 
-export const getAllFaqs = async () => {
-  return await Faq.find()
+export const getAllFaqs = async (organizationId = null) => {
+  const filter = {};
+  if (organizationId) filter.organization_id = organizationId;
+  return await Faq.find(filter)
     .populate("organization_id", "name")
+    .populate("created_by", "name email")
+    .populate("approved_by", "name email")
+    .sort({ created_at: -1 });
+};
+
+export const getFaqsByStatus = async (status, organizationId = null) => {
+  const filter = { status };
+  if (organizationId) filter.organization_id = organizationId;
+  return await Faq.find(filter)
+    .populate("created_by", "name email")
+    .populate("approved_by", "name email")
     .sort({ created_at: -1 });
 };
 
 export const getFaqById = async (id) => {
-  const faq = await Faq.findById(id).populate("organization_id", "name");
+  const faq = await Faq.findById(id)
+    .populate("organization_id", "name")
+    .populate("created_by", "name email")
+    .populate("approved_by", "name email");
   if (!faq) throw new Error("FAQ not found");
   return faq;
 };
@@ -30,6 +58,35 @@ export const updateFaq = async (id, data) => {
   });
   if (!faq) throw new Error("FAQ not found");
   return faq;
+};
+
+export const approveFaq = async (id, userId) => {
+  const faq = await Faq.findByIdAndUpdate(
+    id,
+    { status: "approved", approved_by: userId, approved_at: new Date(), is_active: true },
+    { new: true }
+  );
+  if (!faq) throw new Error("FAQ not found");
+  return faq;
+};
+
+export const rejectFaq = async (id) => {
+  const faq = await Faq.findByIdAndUpdate(
+    id,
+    { status: "rejected" },
+    { new: true }
+  );
+  if (!faq) throw new Error("FAQ not found");
+  return faq;
+};
+
+export const getFaqsByUser = async (userId, organizationId = null) => {
+  const filter = { created_by: userId };
+  if (organizationId) filter.organization_id = organizationId;
+  return await Faq.find(filter)
+    .populate("created_by", "name email")
+    .populate("approved_by", "name email")
+    .sort({ created_at: -1 });
 };
 
 export const deleteFaq = async (id) => {

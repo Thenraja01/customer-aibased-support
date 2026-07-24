@@ -21,6 +21,7 @@ export const updateUserSchema = z.object({
   organization_id: z.string().trim().optional(),
   role_id: z.string().trim().optional(),
   dob: z.string().optional(),
+  fcm_token: z.string().trim().optional(),
 });
 
 export const updateUserStatusSchema = z.object({
@@ -31,6 +32,7 @@ export const updateProfileSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   phone: z.string().trim().max(20).optional(),
   dob: z.string().optional(),
+  fcm_token: z.string().trim().optional(),
 });
 
 export const userPasswordSchema = z.object({

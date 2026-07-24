@@ -71,3 +71,19 @@ export const searchChats = async (keyword) => {
     topic: { $regex: safe, $options: "i" },
   }).populate("user_id", "name email");
 };
+
+export const closeInactiveChats = async () => {
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+  const result = await Chat.updateMany(
+    {
+      status: "open",
+      last_message_at: { $lt: thirtyMinutesAgo },
+    },
+    { status: "closed" }
+  );
+  return result;
+};
+
+export const updateLastMessageTime = async (chatId) => {
+  await Chat.findByIdAndUpdate(chatId, { last_message_at: new Date() });
+};

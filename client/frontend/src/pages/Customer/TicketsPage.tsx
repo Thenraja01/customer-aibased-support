@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTickets } from "@/hooks/useTickets";
 import CreateTicketDialog from "@/components/ticket/CreateTicketDialog";
 
-const statusFilters = ["", "open", "in_progress", "resolved", "closed"];
+const statusFilters = ["", "open", "in_progress", "waiting_for_customer", "resolved", "closed"];
 
 export default function TicketsPage() {
   const { user } = useAuth();
@@ -34,7 +34,9 @@ export default function TicketsPage() {
       case "open":
         return <AlertCircle size={14} className="text-primary" />;
       case "in_progress":
-        return <Clock size={14} className="text-accent-foreground" />;
+        return <Clock size={14} className="text-blue-500" />;
+      case "waiting_for_customer":
+        return <Clock size={14} className="text-amber-500" />;
       case "resolved":
         return <CheckCircle2 size={14} className="text-primary" />;
       default:
@@ -47,7 +49,9 @@ export default function TicketsPage() {
       case "open":
         return "bg-primary/10 text-primary";
       case "in_progress":
-        return "bg-accent text-accent-foreground";
+        return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+      case "waiting_for_customer":
+        return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
       case "resolved":
         return "bg-primary/10 text-primary";
       case "closed":
@@ -122,7 +126,8 @@ export default function TicketsPage() {
             {filteredTickets.map((ticket: any) => (
               <div
                 key={ticket._id}
-                className="px-4 py-4 flex items-center justify-between hover:bg-muted/50 dark:hover:bg-white/[0.03] transition-colors"
+                onClick={() => navigate(`/tickets/${ticket._id}`)}
+                className="px-4 py-4 flex items-center justify-between hover:bg-muted/50 dark:hover:bg-white/[0.03] transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   {getStatusIcon(ticket.status)}

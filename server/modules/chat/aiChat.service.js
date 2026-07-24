@@ -79,11 +79,11 @@ const buildConversationContext = (recentMessages) => {
   return result;
 };
 
-export const processAIMessage = async ({ chatId, userId, userMessage, organizationId, roleName }) => {
+export const processAIMessage = async ({ chatId, userId, userMessage, organizationId, roleName, roleId }) => {
   const intent = detectIntent(userMessage);
 
   const [ragResults, memoryResults, recentMessages] = await Promise.all([
-    ragService.hybridQuery(userMessage, organizationId, null, 5, userId, chatId, roleName).catch(() => null),
+    ragService.hybridQuery(userMessage, organizationId, null, 5, userId, chatId, roleName, roleId).catch(() => null),
     memoryService.getRelevantMemories(userId, userMessage, 5).catch(() => []),
     Message.find({ chat_id: chatId }).sort({ created_at: -1 }).limit(20).lean().catch(() => []),
   ]);
@@ -94,7 +94,7 @@ export const processAIMessage = async ({ chatId, userId, userMessage, organizati
       no_org: "Your account is not associated with an organization. Contact your administrator.",
       org_not_found: "Your organization could not be found. Contact your administrator.",
       org_inactive: "Your organization account is inactive. Contact your administrator.",
-      role_not_authorized: "Your role does not have access to knowledge base documents. Contact your administrator.",
+      role_not_authorized: "I couldn't find information available for your role or in the approved knowledge base. Contact your administrator if you need access to additional resources.",
     };
     const denialText = denialMap[ragResults.reason];
     if (denialText) {

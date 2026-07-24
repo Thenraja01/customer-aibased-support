@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Headphones, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ChatInput from "./ChatInput";
+import { useAuth } from "@/hooks/useAuth";
 
 interface WelcomeScreenProps {
   onStartWithMessage: (message: string) => void;
@@ -10,6 +11,9 @@ interface WelcomeScreenProps {
 
 const WelcomeScreen = memo(function WelcomeScreen({ onStartWithMessage }: WelcomeScreenProps) {
   const navigate = useNavigate();
+  const { orgSettings } = useAuth();
+  const greeting = orgSettings?.greeting_message || "How can I help you today?";
+  const botName = orgSettings?.chatbot_name || "Support Assistant";
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-y-auto">
@@ -17,10 +21,10 @@ const WelcomeScreen = memo(function WelcomeScreen({ onStartWithMessage }: Welcom
         <Headphones className="w-8 h-8 text-primary-foreground" />
       </div>
       <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-        How can I help you today?
+        {greeting}
       </h2>
       <p className="text-sm text-muted-foreground mb-8 text-center max-w-sm">
-        Ask questions, report issues, or get help with your account. Our AI assistant is here to assist.
+        Ask questions, report issues, or get help with your account. {botName} is here to assist.
       </p>
 
       <Button

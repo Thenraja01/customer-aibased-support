@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema(
       maxlength: 20,
       default: "active",
     },
+    fcm_token: { type: String, default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: false } }
 );

@@ -13,3 +13,5 @@ export { FAQAPI } from "./faq.api.js";
 export { KnowledgeGraphAPI } from "./knowledgeGraph.api.js";
 export { MemoryAPI } from "./memory.api.js";
 export { AISessionAPI } from "./aiSession.api.js";
+export { SearchAPI } from "./search.api.js";
+export { TicketTemplateAPI } from "./ticketTemplate.api.js";

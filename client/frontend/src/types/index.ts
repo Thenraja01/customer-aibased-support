@@ -12,6 +12,54 @@ export interface IOrganization {
   email?: string;
   status?: "active" | "inactive";
   customPrompt?: string;
+  chatbot_name?: string;
+  default_language?: string;
+  greeting_message?: string;
+  logo?: { url?: string; public_id?: string };
+  brand_colors?: { primary?: string; secondary?: string; accent?: string };
+  chart_colors?: {
+    primary?: string;
+    secondary?: string;
+    tertiary?: string;
+    quaternary?: string;
+    grid?: string;
+    text?: string;
+    background?: string;
+  };
+  show_charts?: boolean;
+  ai_settings?: {
+    temperature?: number;
+    top_k?: number;
+    similarity_threshold?: number;
+    max_tokens?: number;
+    response_style?: "concise" | "balanced" | "detailed";
+  };
+  guardrails?: Array<{ rule: string; enabled: boolean }>;
+  working_hours?: {
+    timezone?: string;
+    monday?: WorkingDay;
+    tuesday?: WorkingDay;
+    wednesday?: WorkingDay;
+    thursday?: WorkingDay;
+    friday?: WorkingDay;
+    saturday?: WorkingDay;
+    sunday?: WorkingDay;
+  };
+  email_templates?: {
+    ticket_assigned?: EmailTemplate;
+    ticket_resolved?: EmailTemplate;
+  };
+}
+
+export interface WorkingDay {
+  open?: string;
+  close?: string;
+  enabled?: boolean;
+}
+
+export interface EmailTemplate {
+  subject?: string;
+  body?: string;
 }
 
 export interface IUser {
