@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Headphones, User } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import type { ChatMessage as MessageType } from "@/types/chat";
 
 interface ChatMessageProps {
@@ -33,6 +34,8 @@ function renderMarkdown(text: string) {
 
 const ChatMessage = memo(function ChatMessage({ message, isOwn }: ChatMessageProps) {
   const isAI = message.is_ai;
+  const { orgSettings } = useAuth();
+  const botName = orgSettings?.chatbot_name || "Support Assistant";
 
   const renderedContent = useMemo(() => {
     if (!isAI) return null;
@@ -61,7 +64,7 @@ const ChatMessage = memo(function ChatMessage({ message, isOwn }: ChatMessagePro
 
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold mb-1">
-              {isAI ? "Support Assistant" : "You"}
+              {isAI ? botName : "You"}
             </div>
             {isAI ? (
               <div

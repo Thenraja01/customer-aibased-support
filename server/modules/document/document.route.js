@@ -9,8 +9,10 @@ const router = express.Router();
 
 router.use(protect);
 
-// Admin only: Upload documents
-router.post("/", restrict("super admin", "tenant admin", "admin"), handleUpload(uploadToGridFS), validate(createDocumentSchema), docController.upload);
+// All authenticated users: Upload documents
+// Admin: Auto-approve → Direct to RAG (no verification queue)
+// Non-admin: Draft → Pending → Admin approval → RAG indexing
+router.post("/", handleUpload(uploadToGridFS), validate(createDocumentSchema), docController.upload);
 
 // Admin and Support: View all documents (including drafts/pending for admin)
 router.get("/", restrict("super admin", "tenant admin", "admin", "support"), docController.getAll);
@@ -24,7 +26,7 @@ router.get("/status/:status", restrict("super admin", "tenant admin", "admin", "
 // Admin and Support: View specific document
 router.get("/:id", restrict("super admin", "tenant admin", "admin", "support"), docController.getById);
 
-// Admin only: Approve documents
+// Admin only: Approve documents (triggers RAG indexing)
 router.patch("/:id/approve", restrict("super admin", "tenant admin", "admin"), docController.approve);
 
 // Admin only: Reject documents
@@ -35,5 +37,9 @@ router.patch("/:id/status", restrict("super admin", "tenant admin", "admin", "su
 
 // Admin only: Delete documents
 router.delete("/:id", restrict("super admin", "tenant admin", "admin"), docController.remove);
+
+// Admin only: Role access management
+router.get("/:id/roles", restrict("super admin", "tenant admin", "admin"), docController.getRoles);
+router.put("/:id/roles", restrict("super admin", "tenant admin", "admin"), docController.setRoles);
 
 export default router;

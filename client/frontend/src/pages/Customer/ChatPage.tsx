@@ -1,10 +1,12 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "@/store/store";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, TicketCheck } from "lucide-react";
 import { useChat } from "@/hooks/useChat";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { clearError } from "@/store/chatSlice";
+import { useSocket } from "@/context/SocketContext";
+import { TicketAPI } from "@/api";
 import ChatHeader from "@/components/chat/ChatHeader";
 import WelcomeScreen from "@/components/chat/WelcomeScreen";
 import ChatMessage from "@/components/chat/ChatMessage";
@@ -14,6 +16,7 @@ import TypingIndicator from "@/components/chat/TypingIndigator";
 export default function ChatPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.user);
+  const { socket } = useSocket();
 
   const {
     activeChat,
@@ -32,6 +35,8 @@ export default function ChatPage() {
 
   const isCreatingRef = useRef(false);
   const { containerRef, handleScroll } = useChatScroll(messages);
+  const [escalating, setEscalating] = useState(false);
+  const [escalated, setEscalated] = useState(false);
 
   useEffect(() => {
     if (!user?._id) return;
@@ -43,6 +48,15 @@ export default function ChatPage() {
       loadMessages(activeChat._id);
     }
   }, [activeChat?._id, loadMessages]);
+
+  useEffect(() => {
+    if (activeChat?._id && socket) {
+      socket.emit("join:chat", activeChat._id);
+      return () => {
+        socket.emit("leave:chat", activeChat._id);
+      };
+    }
+  }, [activeChat?._id, socket]);
 
   useEffect(() => {
     return () => {
@@ -94,6 +108,19 @@ export default function ChatPage() {
     },
     [activeChat, user, sending, aiThinking, sendWithAI]
   );
+
+  const handleEscalate = useCallback(async () => {
+    if (!activeChat?._id || escalating) return;
+    setEscalating(true);
+    try {
+      await TicketAPI.escalateFromChat({ chatId: activeChat._id });
+      setEscalated(true);
+    } catch {
+      // silent
+    } finally {
+      setEscalating(false);
+    }
+  }, [activeChat, escalating]);
 
   if (!activeChat && !loading) {
     return (
@@ -156,9 +183,26 @@ export default function ChatPage() {
       </div>
 
       <div className="border-t bg-white bg-background/80 backdrop-blur-xl shrink-0">
+        {activeChat && messages.length > 0 && (
+          <div className="px-4 py-2 border-b">
+            <button
+              onClick={handleEscalate}
+              disabled={escalating || escalated}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 transition-colors"
+            >
+              {escalating ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <TicketCheck size={14} />
+              )}
+              {escalated ? "Escalated to Ticket" : "Escalate to Ticket"}
+            </button>
+          </div>
+        )}
         <ChatInput
           onSend={handleSend}
           disabled={sending || aiThinking || loading}
+          chatId={activeChat?._id}
         />
       </div>
     </div>

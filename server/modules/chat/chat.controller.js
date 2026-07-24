@@ -26,6 +26,7 @@ export const processAI = async (req, res) => {
       userMessage: message,
       organizationId,
       roleName: req.user?.roleName,
+      roleId: req.user?.roleId,
     });
 
     res.status(200).json({ success: true, data: aiMessage });

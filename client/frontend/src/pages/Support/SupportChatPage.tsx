@@ -5,6 +5,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { useChat } from "@/hooks/useChat";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { clearError } from "@/store/chatSlice";
+import { useSocket } from "@/context/SocketContext";
 import ChatHeader from "@/components/chat/ChatHeader";
 import WelcomeScreen from "@/components/chat/WelcomeScreen";
 import ChatMessage from "@/components/chat/ChatMessage";
@@ -14,6 +15,7 @@ import TypingIndicator from "@/components/chat/TypingIndigator";
 export default function SupportChatPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.user);
+  const { socket } = useSocket();
 
   const {
     activeChat,
@@ -43,6 +45,15 @@ export default function SupportChatPage() {
       loadMessages(activeChat._id);
     }
   }, [activeChat?._id, loadMessages]);
+
+  useEffect(() => {
+    if (activeChat?._id && socket) {
+      socket.emit("join:chat", activeChat._id);
+      return () => {
+        socket.emit("leave:chat", activeChat._id);
+      };
+    }
+  }, [activeChat?._id, socket]);
 
   useEffect(() => {
     return () => {
@@ -112,7 +123,7 @@ export default function SupportChatPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-background dark:bg-gradient-to-b dark:from-background dark:to-background/80">
-      <ChatHeader activeChat={activeChat} />
+      <ChatHeader activeChat={activeChat} isSupportView />
 
       {error && (
         <div className="mx-6 mt-3 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-xs text-destructive dark:bg-destructive/15 max-w-3xl self-center w-full">
@@ -147,7 +158,7 @@ export default function SupportChatPage() {
               <ChatMessage
                 key={msg._id}
                 message={msg}
-                isOwn={!msg.is_ai && msg.sender_id === user?._id}
+                isOwn={msg.sender_id === user?._id}
               />
             ))}
             {(sending || aiThinking) && <TypingIndicator />}
@@ -159,6 +170,7 @@ export default function SupportChatPage() {
         <ChatInput
           onSend={handleSend}
           disabled={sending || aiThinking || loading}
+          chatId={activeChat?._id}
         />
       </div>
     </div>

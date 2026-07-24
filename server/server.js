@@ -1,4 +1,5 @@
 import express from "express";
+import { createServer } from "http";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -7,6 +8,7 @@ import path from "path";
 
 import dbconnection from "./config/db.js";
 import env from "./config/env.js";
+import { initSocket } from "./config/socket.js";
 
 import { notFound, errorHandler } from "./middleware/errorHandler.middleware.js";
 
@@ -14,7 +16,7 @@ import { authRouter } from "./modules/auth/index.js";
 import { userRouter } from "./modules/user/index.js";
 import { chatRouter } from "./modules/chat/index.js";
 import { messageRouter } from "./modules/message/index.js";
-import { ticketRouter } from "./modules/ticket/index.js";
+import { ticketRouter, ticketTemplateRouter } from "./modules/ticket/index.js";
 import { notificationRouter } from "./modules/notification/index.js";
 import { documentRouter } from "./modules/document/index.js";
 import { documentVerificationRouter } from "./modules/document-verification/index.js";
@@ -28,7 +30,10 @@ import { ragRouter } from "./modules/rag/index.js";
 import { memoryRouter } from "./modules/memory/index.js";
 import { adminRouter } from "./modules/admin/index.js";
 import { knowledgeGraphRouter } from "./modules/knowledge-graph/index.js";
+import { searchRouter } from "./modules/search/index.js";
+import { promptVersionRouter } from "./modules/prompt-version/index.js";
 import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
+import { closeInactiveChats } from "./modules/chat/chat.service.js";
 
 const app = express();
 
@@ -57,7 +62,7 @@ app.use(globalLimiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: env.NODE_ENV === "development" ? 200 : 20,
   message: {
     success: false,
     message: "Too many authentication attempts, please try again in 15 minutes.",
@@ -72,6 +77,7 @@ app.use("/users", userRouter);
 app.use("/chats", chatRouter);
 app.use("/messages", messageRouter);
 app.use("/tickets", ticketRouter);
+app.use("/ticket-templates", ticketTemplateRouter);
 app.use("/notifications", notificationRouter);
 app.use("/documents", documentRouter);
 app.use("/document-verifications", documentVerificationRouter);
@@ -85,6 +91,8 @@ app.use("/rag", ragRouter);
 app.use("/memory", memoryRouter);
 app.use("/knowledge-graph", knowledgeGraphRouter);
 app.use("/admin/v1", adminRouter);
+app.use("/search/v1", searchRouter);
+app.use("/admin/v1/prompt", promptVersionRouter);
 
 app.get("/api/health/v1", (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;
@@ -114,7 +122,10 @@ const startServer = async () => {
       );
     }, 60 * 60 * 1000);
 
-    app.listen(port, () => {
+    const httpServer = createServer(app);
+    initSocket(httpServer);
+
+    httpServer.listen(port, () => {
       console.log(`Server running on port ${port} [${env.NODE_ENV}]`);
     });
   } catch (error) {

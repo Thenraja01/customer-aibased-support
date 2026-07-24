@@ -8,12 +8,16 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("super admin", "tenant admin", "admin", "support"), validate(createVerificationSchema), dvController.create);
+// Admin and Support: View verification queue
 router.get("/", restrict("super admin", "tenant admin", "admin", "support"), dvController.getAll);
 router.get("/document/:documentId", restrict("super admin", "tenant admin", "admin", "support"), dvController.getByDocument);
 router.get("/status/:status", restrict("super admin", "tenant admin", "admin", "support"), dvController.getByStatus);
-router.patch("/:id/approve", restrict("super admin", "tenant admin", "admin", "support"), dvController.approve);
-router.patch("/:id/reject", restrict("super admin", "tenant admin", "admin", "support"), validate(rejectVerificationSchema), dvController.reject);
+
+// Admin only: Approve/Reject documents (triggers RAG indexing on approve)
+router.patch("/:id/approve", restrict("super admin", "tenant admin", "admin"), dvController.approve);
+router.patch("/:id/reject", restrict("super admin", "tenant admin", "admin"), validate(rejectVerificationSchema), dvController.reject);
+
+// Admin only: Delete verification entries
 router.delete("/:id", restrict("super admin", "tenant admin", "admin"), dvController.remove);
 
 export default router;

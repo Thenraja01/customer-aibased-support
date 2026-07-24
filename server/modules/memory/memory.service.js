@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import ChatMemory from "./memory.schema.js";
 import Message from "../message/message.schema.js";
 import Chat from "../chat/chat.schema.js";
@@ -30,6 +31,8 @@ export const setShortTermMemory = (chatId, messages) => {
 
 // Fetch recent messages from DB and cache in HashMap
 export const loadShortTermMemory = async (chatId, limit = 20) => {
+  if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) return [];
+
   const cached = getShortTermMemory(chatId, limit);
   if (cached) return cached;
 

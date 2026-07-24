@@ -28,4 +28,33 @@ export const AdminAPI = {
 
   // Audit Logs
   getAuditLogs: (params) => AxiosInstance.get(`/${url}/audit-logs`, { params }),
+
+  // Organization Settings
+  getOrgSettings: () => AxiosInstance.get(`/${url}/organization/settings`),
+  updateOrgSettings: (data) => AxiosInstance.put(`/${url}/organization/settings`, data),
+
+  // Chat History
+  getChats: (params) => AxiosInstance.get(`/${url}/chats`, { params }),
+  getChatDetail: (id) => AxiosInstance.get(`/${url}/chats/${id}`),
+  deleteChat: (id) => AxiosInstance.delete(`/${url}/chats/${id}`),
+
+  // Users (basic list for filters)
+  getUsersBasic: (params) => AxiosInstance.get(`/${url}/users/basic`, { params }),
+
+  // Command Center
+  getCommandCenterStatus: () => AxiosInstance.get(`/${url}/command-center/status`),
+  toggleMaintenanceMode: (enabled) => AxiosInstance.post(`/${url}/command-center/toggle-maintenance`, { enabled }),
+  sendGlobalNotification: (data) => AxiosInstance.post(`/${url}/command-center/global-notification`, data),
+  impersonateOrg: (organizationId) => AxiosInstance.post(`/${url}/command-center/impersonate`, { organizationId }),
+  clearSystemCache: () => AxiosInstance.post(`/${url}/command-center/clear-cache`),
+  restartBackgroundJobs: () => AxiosInstance.post(`/${url}/command-center/restart-jobs`),
+  backupDatabase: () => AxiosInstance.post(`/${url}/command-center/backup-db`),
+
+  // Global Application Settings
+  getGlobalSettings: () => AxiosInstance.get(`/${url}/global-settings`),
+  updateGlobalSettings: (data) => AxiosInstance.put(`/${url}/global-settings`, data),
+
+  // Organization Full Details & Analytics
+  getOrgFullDetails: (id) => AxiosInstance.get(`/${url}/organizations/${id}/full-details`),
+  getOrgAnalytics: (id) => AxiosInstance.get(`/${url}/organizations/${id}/analytics`),
 };

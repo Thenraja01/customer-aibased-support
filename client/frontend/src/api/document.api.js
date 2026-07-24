@@ -29,6 +29,10 @@ const DocumentAPI = {
     AxiosInstance.patch(`/${url}/${id}/status`, data),
 
   remove: (id) => AxiosInstance.delete(`/${url}/${id}`),
+
+  getRoles: (id) => AxiosInstance.get(`/${url}/${id}/roles`),
+
+  setRoles: (id, roleIds) => AxiosInstance.put(`/${url}/${id}/roles`, { role_ids: roleIds }),
 };
 
 export default DocumentAPI;

@@ -172,6 +172,7 @@
           state.loading = false;
           state.chats.unshift(action.payload);
           state.activeChat = action.payload;
+          state.messages = [];
         })
         .addCase(createChat.rejected, (state, action) => {
           state.loading = false;

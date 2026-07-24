@@ -58,18 +58,33 @@ export const register = async (userData) => {
   };
 };
 
-export const login = async ({ email, password }) => {
-  const user = await User.findOne({ email })
+export const login = async ({ email, password, organization_id }) => {
+  const query = { email };
+  if (organization_id) {
+    query.organization_id = organization_id;
+  }
+  console.log("[Login] Query:", JSON.stringify(query));
+  const user = await User.findOne(query)
     .populate("organization_id")
     .populate("role_id");
 
-  if (!user || user.status !== "active") {
-    throw new Error("Invalid email or current password");
+  if (!user) {
+    console.log("[Login] User not found for query");
+    throw new Error("Invalid email, password, or organization");
+  }
+  if (user.status !== "active") {
+    console.log(`[Login] User found but status is: ${user.status}`);
+    throw new Error("Invalid email, password, or organization");
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
-    throw new Error("Invalid email or current password");
+    throw new Error("Invalid email, password, or organization");
+  }
+
+  if (!user.organization_id || !user.role_id) {
+    console.log("[Login] User has invalid organization or role reference");
+    throw new Error("Invalid email, password, or organization");
   }
 
   const token = jwt.sign(

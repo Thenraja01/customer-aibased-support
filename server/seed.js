@@ -19,6 +19,7 @@ const DEFAULT_ORG = {
   email: 'default@supportai.com',
   phone: '000-0000',
   status: 'active',
+  domain: '',
 };
 
 const args = process.argv.slice(2);
@@ -58,7 +59,18 @@ async function seedDefault() {
 
   const existing = await User.findOne({ email: ADMIN_EMAIL });
   if (existing) {
-    console.log(`Super admin already exists: ${ADMIN_EMAIL}`);
+    const needsUpdate =
+      existing.organization_id?.toString() !== org._id.toString() ||
+      existing.role_id?.toString() !== role._id.toString();
+    if (needsUpdate) {
+      await User.findByIdAndUpdate(existing._id, {
+        organization_id: org._id,
+        role_id: role._id,
+      });
+      console.log(`Super admin updated with fresh org/role refs: ${ADMIN_EMAIL}`);
+    } else {
+      console.log(`Super admin already exists: ${ADMIN_EMAIL}`);
+    }
   } else {
     const hashed = await bcrypt.hash(ADMIN_PASSWORD, 10);
     await User.create({

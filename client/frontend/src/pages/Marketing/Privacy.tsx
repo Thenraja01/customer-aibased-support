@@ -1,4 +1,22 @@
+import { useAppSettings } from "@/hooks/useAppSettings";
+
 export default function Privacy() {
+  const { settings } = useAppSettings();
+  const privacyContent = settings?.legal?.privacy_policy;
+
+  if (privacyContent) {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-4xl">
+        <h1 className="text-4xl font-bold tracking-tight mb-8">Privacy Policy</h1>
+        <div className="prose prose-slate dark:prose-invert max-w-none">
+          {privacyContent.split("\n").map((paragraph, i) => (
+            paragraph.trim() ? <p key={i} className="text-muted-foreground mb-4">{paragraph}</p> : null
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-16 max-w-4xl">
       <h1 className="text-4xl font-bold tracking-tight mb-8">Privacy Policy</h1>

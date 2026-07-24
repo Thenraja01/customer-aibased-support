@@ -1,5 +1,6 @@
 import DocumentChunk from "../document/documentChunk.schema.js";
 import Document from "../document/document.schema.js";
+import DocumentRoleAccess from "../document/documentRoleAccess.schema.js";
 import Organization from "../organization/organization.schema.js";
 import {
   deleteNodesByDocument,
@@ -73,6 +74,26 @@ export const cosineSimilarity = (a, b) => {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 };
 
+export const getAuthorizedDocumentIds = async (organizationId, roleId) => {
+  if (!organizationId || !roleId) return [];
+
+  const accessEntries = await DocumentRoleAccess.find({
+    organization_id: organizationId,
+    role_id: roleId,
+  }).select("document_id").lean();
+
+  const directDocIds = accessEntries.map((e) => e.document_id);
+
+  const allDocs = await Document.find({
+    organization_id: organizationId,
+    assigned_role: { $in: ["all", "All"] },
+  }).select("_id").lean();
+
+  const allDocIds = allDocs.map((d) => d._id);
+
+  return [...new Set([...directDocIds.map(String), ...allDocIds.map(String)])];
+};
+
 export const getRoleFilter = (roleName) => {
   if (!roleName) return null;
   const normalizedRole = roleName.toLowerCase().trim();
@@ -82,12 +103,13 @@ export const getRoleFilter = (roleName) => {
   return { $in: [normalizedRole, "all"] };
 };
 
-export const vectorSearch = async (embedding, organizationId, documentId, limit = 5, roleFilter = null, statusFilter = "approved") => {
+export const vectorSearch = async (embedding, organizationId, documentId, limit = 5, roleFilter = null, statusFilter = "approved", authorizedDocIds = null) => {
   const query = { embedding: { $exists: true, $ne: [] } };
   if (organizationId) query.organization_id = organizationId;
   if (documentId) query.document_id = documentId;
   if (roleFilter) query.assigned_role = roleFilter;
   if (statusFilter) query.status = statusFilter;
+  if (authorizedDocIds) query.document_id = { $in: authorizedDocIds };
   const chunks = await DocumentChunk.find(query).lean();
   return chunks
     .map((c) => ({ ...c, score: cosineSimilarity(embedding, c.embedding || []) }))
@@ -95,7 +117,7 @@ export const vectorSearch = async (embedding, organizationId, documentId, limit 
     .slice(0, limit);
 };
 
-export const keywordSearch = async (keywords, organizationId, documentId, roleFilter = null, statusFilter = "approved") => {
+export const keywordSearch = async (keywords, organizationId, documentId, roleFilter = null, statusFilter = "approved", authorizedDocIds = null) => {
   const orConditions = [{ keywords: { $in: keywords } }];
   if (keywords.length > 0) {
     const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -106,6 +128,7 @@ export const keywordSearch = async (keywords, organizationId, documentId, roleFi
   if (documentId) query.document_id = documentId;
   if (roleFilter) query.assigned_role = roleFilter;
   if (statusFilter) query.status = statusFilter;
+  if (authorizedDocIds) query.document_id = { $in: authorizedDocIds };
   return await DocumentChunk.find(query);
 };
 
@@ -137,8 +160,17 @@ export const ingestDocument = async (documentId, organizationId, assignedRole, t
   return savedChunks;
 };
 
-export const hybridQuery = async (query, organizationId, documentId, limit = 5, userId = null, chatId = null, roleName = null) => {
-  // Step 1: Verify organization exists and is active
+export const getRoleAccessibleDocumentIds = async (organizationId, roleId, roleName) => {
+  const normalizedRole = (roleName || "").toLowerCase().trim();
+  if (["super admin", "tenant admin", "admin"].includes(normalizedRole)) {
+    return null;
+  }
+
+  const authorizedDocIds = await getAuthorizedDocumentIds(organizationId, roleId);
+  return authorizedDocIds.length > 0 ? authorizedDocIds : [];
+};
+
+export const hybridQuery = async (query, organizationId, documentId, limit = 5, userId = null, chatId = null, roleName = null, roleId = null) => {
   if (!organizationId) {
     return {
       document_results: [],
@@ -172,39 +204,73 @@ export const hybridQuery = async (query, organizationId, documentId, limit = 5, 
     };
   }
 
-  // Step 2: Determine role authorization
   const roleFilter = getRoleFilter(roleName);
 
-  // Step 3: Explicit role pre-authorization check (non-admin roles)
+  let authorizedDocIds = null;
   if (roleName && roleFilter !== null) {
-    const normalizedRole = roleName.toLowerCase().trim();
-    const accessibleCount = await DocumentChunk.countDocuments({
-      organization_id: organizationId,
-      assigned_role: { $in: [normalizedRole, "all"] },
-    });
-    if (accessibleCount === 0) {
-      return {
-        document_results: [],
-        memory_context: "",
-        memory_results: [],
-        total: 0,
-        authorized: false,
-        reason: "role_not_authorized",
-      };
+    if (roleId) {
+      // Get documents from DocumentRoleAccess table
+      const accessDocIds = await getRoleAccessibleDocumentIds(organizationId, roleId, roleName);
+      
+      // Also get documents with assigned_role matching the role or 'all'
+      const normalizedRole = roleName.toLowerCase().trim();
+      const assignedRoleDocs = await DocumentChunk.find({
+        organization_id: organizationId,
+        assigned_role: { $in: [normalizedRole, "all"] },
+        status: "approved",
+      }).select("document_id").lean();
+      
+      const assignedRoleDocIds = assignedRoleDocs.map(d => d.document_id.toString());
+      
+      // Combine both sources
+      const combinedDocIds = new Set([
+        ...(accessDocIds || []),
+        ...assignedRoleDocIds
+      ]);
+      
+      authorizedDocIds = combinedDocIds.size > 0 ? [...combinedDocIds] : null;
+      
+      if (!authorizedDocIds || authorizedDocIds.length === 0) {
+        return {
+          document_results: [],
+          memory_context: "",
+          memory_results: [],
+          total: 0,
+          authorized: false,
+          reason: "role_not_authorized",
+        };
+      }
+    } else {
+      const normalizedRole = roleName.toLowerCase().trim();
+      const accessibleCount = await DocumentChunk.countDocuments({
+        organization_id: organizationId,
+        $or: [
+          { assigned_role: { $in: [normalizedRole, "all"] } },
+          ...(authorizedDocIds ? [{ document_id: { $in: authorizedDocIds } }] : []),
+        ],
+      });
+      if (accessibleCount === 0) {
+        return {
+          document_results: [],
+          memory_context: "",
+          memory_results: [],
+          total: 0,
+          authorized: false,
+          reason: "role_not_authorized",
+        };
+      }
     }
   }
 
-  // Step 4: Retrieve chunks
   const keywords = extractKeywords(query);
   const embedding = computeEmbedding(query);
 
   const [vectorResults, keywordResults, memoryContext] = await Promise.all([
-    vectorSearch(embedding, organizationId, documentId, limit, roleFilter, "approved"),
-    keywordSearch(keywords, organizationId, documentId, roleFilter, "approved"),
+    vectorSearch(embedding, organizationId, documentId, limit, roleFilter, "approved", authorizedDocIds),
+    keywordSearch(keywords, organizationId, documentId, roleFilter, "approved", authorizedDocIds),
     userId ? buildFullContext(userId, chatId, query, 10, 5) : Promise.resolve(""),
   ]);
 
-  // Merge short-term + long-term memory into results
   const scoreMap = new Map();
   vectorResults.forEach((r) => {
     scoreMap.set(r._id.toString(), { ...r, score: r.score * 0.6 });
@@ -219,7 +285,6 @@ export const hybridQuery = async (query, organizationId, documentId, limit = 5, 
     }
   });
 
-  // Append memory-augmented results (factual context)
   let memoryResults = [];
   if (userId) {
     const relevant = await getRelevantMemories(userId, query, 3);
