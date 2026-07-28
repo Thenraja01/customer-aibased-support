@@ -6,6 +6,7 @@ import UserTable from "@/components/admin/UserTable";
 import UserForm from "@/components/admin/UserForm";
 import { AdminAPI } from "@/api/admin.api";
 import { useAuth } from "@/hooks/useAuth";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function OrgUsersPage() {
   const { user } = useAuth();
@@ -19,6 +20,8 @@ export default function OrgUsersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [roles, setRoles] = useState<any[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
   const limit = 10;
 
   const fetchUsers = useCallback(async () => {
@@ -67,9 +70,11 @@ export default function OrgUsersPage() {
   };
 
   const handleDelete = async (u: any) => {
-    if (!confirm(`Delete user "${u.name}"?`)) return;
-    await AdminAPI.deleteUser(u._id);
-    fetchUsers();
+    setConfirmAction(() => async () => {
+      await AdminAPI.deleteUser(u._id);
+      fetchUsers();
+    });
+    setConfirmOpen(true);
   };
 
   const handleToggleStatus = async (u: any) => {
@@ -131,6 +136,14 @@ export default function OrgUsersPage() {
           onClose={() => { setShowForm(false); setEditingUser(null); }}
         />
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete User"
+        message="Are you sure you want to delete this user? This action cannot be undone."
+        variant="danger"
+        onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
+        onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
     </div>
   );
 }

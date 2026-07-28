@@ -26,7 +26,14 @@ export const cosineSimilarity = (a, b) => {
   return normA && normB ? dot / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
 };
 
-export const computeEmbedding = (text, dim = 128) => {
+export const computeEmbedding = async (text, dim = 128) => {
+  try {
+    const { getEmbedding } = await import("../services/embedding.service.js");
+    const emb = await getEmbedding(text);
+    if (emb) return emb;
+  } catch (err) {
+    console.error(`[AI Utils] Ollama embedding failed, using fallback:`, err.message);
+  }
   const words = text
     .toLowerCase()
     .replace(/[^\w\s]/g, "")

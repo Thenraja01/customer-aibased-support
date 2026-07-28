@@ -14,6 +14,8 @@ import ChatPage from "@/pages/Customer/ChatPage";
 import ProfilePage from "@/pages/Customer/ProfilePage";
 import ChatHistoryPage from "@/pages/Admin/ChatHistoryManagementPage";
 import NotificationsPage from "@/pages/Admin/NotificationsPage";
+import KnowledgeGapPage from "@/pages/Admin/KnowledgeGapPage";
+import PendingApprovalsPage from "@/pages/Admin/PendingApprovalsPage";
 
 export const adminRoutes = (
   <Route path="/admin/*" element={<ProtectedRoute allowedRoles={["admin"]} />}>
@@ -31,5 +33,7 @@ export const adminRoutes = (
     <Route path="profile" element={<ProfilePage />} />
     <Route path="chat-history" element={<ChatHistoryPage />} />
     <Route path="notifications" element={<NotificationsPage />} />
+    <Route path="knowledge-gaps" element={<KnowledgeGapPage />} />
+    <Route path="pending-approvals" element={<PendingApprovalsPage />} />
   </Route>
 );

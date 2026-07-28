@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AuthAPI } from "@/api/auth.api";
+import { useToast } from "@/components/ui/toast";
 import {
   Bot,
   Eye,
@@ -29,6 +30,10 @@ import {
   AlertCircle,
   Loader2,
   Check,
+  Shield,
+  Info,
+  Users,
+  Briefcase,
 } from "lucide-react";
 
 interface Org {
@@ -39,6 +44,7 @@ interface Org {
 interface Role {
   _id: string;
   role_name: string;
+  description?: string;
 }
 
 type Step = 1 | 2;
@@ -59,6 +65,7 @@ const HIDDEN_ROLES = ["tenant admin", "super admin"];
 
 export default function Register() {
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [step, setStep] = useState<Step>(1);
   const [direction, setDirection] = useState(1);
@@ -81,24 +88,21 @@ export default function Register() {
   const [success, setSuccess] = useState(false);
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
-
   const [orgsLoading, setOrgsLoading] = useState(true);
   const [rolesLoading, setRolesLoading] = useState(true);
-  const [fetchError, setFetchError] = useState("");
+  const [registrationId, setRegistrationId] = useState("");
 
   useEffect(() => {
     setOrgsLoading(true);
-    setFetchError("");
     AuthAPI.getOrganizations()
       .then((res: any) => setOrgs(res.data.data || []))
-      .catch(() => setFetchError("Failed to load organizations"))
+      .catch(() => toast.warning("Warning", "Failed to load organizations"))
       .finally(() => setOrgsLoading(false));
 
     setRolesLoading(true);
     AuthAPI.getRoles()
       .then((res: any) => {
         const allRoles = res.data.data || [];
-        // Filter out hidden roles
         const filteredRoles = allRoles.filter(
           (role: Role) => 
             !HIDDEN_ROLES.some(hidden => 
@@ -107,16 +111,27 @@ export default function Register() {
         );
         setRoles(filteredRoles);
       })
-      .catch(() => setFetchError("Failed to load roles"))
+      .catch(() => toast.warning("Warning", "Failed to load roles"))
       .finally(() => setRolesLoading(false));
   }, []);
 
   useEffect(() => {
     if (success) {
-      const timer = setTimeout(() => navigate("/login", { replace: true }), 2000);
+      const timer = setTimeout(() => {
+        navigate("/registration-pending", { 
+          state: { 
+            email: form.email,
+            organizationName: orgs.find(o => o._id === form.organization_id)?.name || "",
+            registrationId: registrationId,
+            name: form.name,
+            role: roles.find(r => r._id === form.role_id)?.role_name || ""
+          },
+          replace: true 
+        });
+      }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [success, navigate]);
+  }, [success, navigate, form, orgs, roles, registrationId]);
 
   const updateField = useCallback(
     (field: string, value: string) => {
@@ -128,14 +143,16 @@ export default function Register() {
 
   /* ---------------- Password strength ---------------- */
   const passwordChecks = [
-    { label: "At least 6 characters", met: form.password.length >= 6 },
+    { label: "At least 8 characters", met: form.password.length >= 8 },
     { label: "Contains a number", met: /\d/.test(form.password) },
     { label: "Contains uppercase", met: /[A-Z]/.test(form.password) },
+    { label: "Contains special character", met: /[^A-Za-z0-9]/.test(form.password) },
   ];
-  const strengthScore = passwordChecks.filter((c) => c.met).length; // 0–3
+  const strengthScore = passwordChecks.filter((c) => c.met).length; // 0–4
   const strengthMeta = [
     { label: "Weak", bar: "bg-destructive", text: "text-destructive" },
     { label: "Fair", bar: "bg-amber-500", text: "text-amber-500" },
+    { label: "Good", bar: "bg-blue-500", text: "text-blue-500" },
     { label: "Strong", bar: "bg-emerald-500", text: "text-emerald-500" },
   ] as const;
   const strength = strengthScore > 0 ? strengthMeta[strengthScore - 1] : null;
@@ -154,8 +171,16 @@ export default function Register() {
       setError("Please enter a valid email address.");
       return false;
     }
-    if (form.password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return false;
+    }
+    if (!/[A-Z]/.test(form.password)) {
+      setError("Password must contain at least one uppercase letter.");
+      return false;
+    }
+    if (!/[0-9]/.test(form.password)) {
+      setError("Password must contain at least one number.");
       return false;
     }
     if (form.password !== form.confirmPassword) {
@@ -201,7 +226,8 @@ export default function Register() {
 
       setLoading(true);
       try {
-        const res = await AuthAPI.signup({
+        // Register with approval workflow
+        const res = await AuthAPI.registerWithApproval({
           name: form.name,
           email: form.email,
           phone: form.phone || undefined,
@@ -209,15 +235,24 @@ export default function Register() {
           dob: form.dob || undefined,
           organization_id: form.organization_id,
           role_id: form.role_id,
+          status: "pending", // Pending admin approval
         });
 
         if (res.data.success) {
+          setRegistrationId(res.data.data.registrationId || res.data.data._id);
           setSuccess(true);
+          toast.success(
+            "Registration Submitted", 
+            "Your account is pending admin approval. You'll receive an email once approved."
+          );
         } else {
-          setError(res.data.message || "Registration failed. Please check your inputs.");
+          toast.error("Registration Failed", res.data.message || "Please check your inputs.");
         }
       } catch (err: any) {
-        setError(err.response?.data?.message || "Registration failed. Please try again.");
+        toast.error(
+          "Registration Failed", 
+          err.response?.data?.message || "Something went wrong. Please try again."
+        );
       } finally {
         setLoading(false);
       }
@@ -244,22 +279,7 @@ export default function Register() {
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ type: "spring", stiffness: 260, damping: 18 }}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-8 h-8 text-primary-foreground"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <motion.path
-                      d="M20 6L9 17l-5-5"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      transition={{ delay: 0.25, duration: 0.45, ease: "easeOut" }}
-                    />
-                  </svg>
+                  <Shield className="w-8 h-8 text-primary-foreground" />
                 </motion.div>
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -267,13 +287,35 @@ export default function Register() {
                   transition={{ delay: 0.5 }}
                   className="space-y-4"
                 >
-                  <h2 className="text-2xl font-bold">Registration Successful!</h2>
+                  <h2 className="text-2xl font-bold">Registration Submitted!</h2>
                   <p className="text-muted-foreground">
-                    Your account has been created. Redirecting to login...
+                    Your account registration has been submitted for review.
                   </p>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-left space-y-2">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">{form.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-primary" />
+                      <span className="text-sm">{form.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-primary" />
+                      <span className="text-sm">
+                        {orgs.find(o => o._id === form.organization_id)?.name || "Organization"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-primary" />
+                      <span className="text-sm">
+                        {roles.find(r => r._id === form.role_id)?.role_name || "Role"}
+                      </span>
+                    </div>
+                  </div>
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Loader2 size={14} className="animate-spin" />
-                    <span>Redirecting in 2 seconds</span>
+                    <span>Redirecting to pending page...</span>
                   </div>
                 </motion.div>
               </CardContent>
@@ -301,7 +343,7 @@ export default function Register() {
           <Card className="border-0 shadow-2xl bg-card/95 backdrop-blur-md px-6 py-10 sm:px-12 sm:py-12 dark:bg-card/80 dark:border-white/[0.06] dark:shadow-2xl dark:shadow-black/10">
             <CardHeader className="text-center space-y-4 pb-6">
               <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25">
-                <Bot className="w-8 h-8 text-primary-foreground" />
+                <Users className="w-8 h-8 text-primary-foreground" />
               </div>
               <div>
                 <CardTitle className="text-3xl font-bold">Create an account</CardTitle>
@@ -360,13 +402,6 @@ export default function Register() {
             </div>
 
             <CardContent className="p-0">
-              {fetchError && (
-                <div className="mb-4 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  <AlertCircle size={14} />
-                  {fetchError}
-                </div>
-              )}
-
               <form onSubmit={handleSubmit}>
                 <AnimatePresence mode="wait" custom={direction}>
                   {step === 1 ? (
@@ -473,7 +508,7 @@ export default function Register() {
                         {form.password.length > 0 && strength && (
                           <div className="flex items-center gap-2 mt-2">
                             <div className="flex flex-1 gap-1">
-                              {[0, 1, 2].map((i) => (
+                              {[0, 1, 2, 3].map((i) => (
                                 <div
                                   key={i}
                                   className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -622,7 +657,7 @@ export default function Register() {
                             </option>
                             {roles.map((role) => (
                               <option key={role._id} value={role._id}>
-                                {role.role_name}
+                                {role.role_name} {role.description ? `- ${role.description}` : ""}
                               </option>
                             ))}
                           </select>
@@ -633,6 +668,20 @@ export default function Register() {
                             No roles available for registration
                           </p>
                         )}
+                      </div>
+
+                      {/* Approval Notice */}
+                      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+                        <div className="flex items-start gap-2">
+                          <Shield size={16} className="text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                          <div className="text-xs">
+                            <p className="font-medium text-foreground">Admin Approval Required</p>
+                            <p className="text-muted-foreground">
+                              Your registration will be reviewed by an administrator. 
+                              You'll receive a verification email once approved.
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
                       {error && (
@@ -662,7 +711,7 @@ export default function Register() {
                             <div className="h-5 w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
                           ) : (
                             <>
-                              Create Account
+                              Submit for Approval
                               <ArrowRight className="ml-2 h-4 w-4" />
                             </>
                           )}

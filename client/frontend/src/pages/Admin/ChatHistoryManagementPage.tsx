@@ -1,23 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Search, Trash2, MessageSquare, ChevronLeft,
   ChevronRight, Eye, X, Filter, Loader2, User,
-  Calendar, BarChart3, Users, MessageCircle, TrendingUp, Building2, Sparkles
+  Calendar, Building2, Download
 } from "lucide-react";
 import { AdminAPI } from "@/api/admin.api";
 import { cn } from "@/lib/utils";
-import {
-  ScatterPlotWidget, HistogramWidget, AreaChartWidget, BoxPlotWidget,
-  HeatmapWidget, BubbleChartWidget, WaterfallChartWidget
-} from "@/components/admin/AdvancedDashboardCharts";
-import {
-  ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend
-} from "recharts";
-
-import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ui/toast";
 
 interface ChatRecord {
   _id: string;
@@ -57,25 +48,8 @@ interface Pagination {
   totalPages: number;
 }
 
-interface OrgChatStats {
-  totalChats: number;
-  totalMessages: number;
-  totalUsers: number;
-  activeChats: number;
-  closedChats: number;
-  avgMessagesPerChat: number;
-  recentChats?: ChatRecord[];
-}
-
 export default function ChatHistoryManagementPage() {
-  const { orgSettings, user } = useAuth();
-  const chartColors = orgSettings?.chart_colors || {};
-  const brandPrimary = chartColors.primary || orgSettings?.brand_colors?.primary || user?.organization_id?.brand_colors?.primary || "#059669";
-  const brandSecondary = chartColors.secondary || orgSettings?.brand_colors?.secondary || user?.organization_id?.brand_colors?.secondary || "#2563eb";
-  const brandTertiary = chartColors.tertiary || orgSettings?.brand_colors?.accent || "#7c3aed";
-  const brandQuaternary = chartColors.quaternary || "#f59e0b";
-  const statusColors = [brandPrimary, brandSecondary, brandTertiary, brandQuaternary];
-
+  const toast = useToast();
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
@@ -89,9 +63,11 @@ export default function ChatHistoryManagementPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [showOrgStats, setShowOrgStats] = useState(true);
-  const [orgStats, setOrgStats] = useState<OrgChatStats | null>(null);
-  const [loadingStats, setLoadingStats] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [confirmEndId, setConfirmEndId] = useState<string | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const limit = 10;
 
   const fetchUsers = useCallback(async () => {
@@ -101,18 +77,6 @@ export default function ChatHistoryManagementPage() {
         setUsers(res.data.data);
       }
     } catch { }
-  }, []);
-
-  const fetchOrgStats = useCallback(async () => {
-    setLoadingStats(true);
-    try {
-      const res = await AdminAPI.getChats({ page: 1, limit: 1, stats: true });
-      if (res.data.success && res.data.stats) {
-        setOrgStats(res.data.stats);
-      }
-    } catch { } finally {
-      setLoadingStats(false);
-    }
   }, []);
 
   const fetchChats = useCallback(async () => {
@@ -136,8 +100,7 @@ export default function ChatHistoryManagementPage() {
 
   useEffect(() => {
     fetchUsers();
-    fetchOrgStats();
-  }, [fetchUsers, fetchOrgStats]);
+  }, [fetchUsers]);
 
   useEffect(() => {
     fetchChats();
@@ -157,16 +120,19 @@ export default function ChatHistoryManagementPage() {
   };
 
   const handleDelete = async (chat: ChatRecord) => {
-    if (!confirm(`Delete chat "${chat.topic}" by ${chat.user_id?.name || "Unknown"}? This will also delete all messages.`)) return;
+    setConfirmDeleteId(null);
     try {
       await AdminAPI.deleteChat(chat._id);
       if (selectedChat?._id === chat._id) setSelectedChat(null);
+      toast.success("Chat Deleted", `"${chat.topic}" and all messages removed.`);
       fetchChats();
-    } catch { }
+    } catch {
+      toast.error("Error", "Failed to delete chat.");
+    }
   };
 
   const handleEndChat = async (chatId: string) => {
-    if (!confirm("Are you sure you want to end this chat?")) return;
+    setConfirmEndId(null);
     try {
       const res = await AdminAPI.updateChatStatus(chatId, "closed");
       if (res.data.success) {
@@ -174,9 +140,62 @@ export default function ChatHistoryManagementPage() {
           setSelectedChat({ ...selectedChat, status: "closed" });
         }
         setChats(chats.map((c) => (c._id === chatId ? { ...c, status: "closed" } : c)));
+        toast.success("Chat Ended", "Chat has been closed.");
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      toast.error("Error", "Failed to end chat.");
+    }
+  };
+
+  const buildFilterParams = () => {
+    const params: any = {};
+    if (search) params.search = search;
+    if (statusFilter) params.status = statusFilter;
+    if (userIdFilter) params.userId = userIdFilter;
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
+    return params;
+  };
+
+  const handleDeleteAll = async () => {
+    setConfirmDeleteAll(false);
+    const count = pagination?.total ?? chats.length;
+    if (count === 0) return;
+    setDeletingAll(true);
+    try {
+      const res = await AdminAPI.deleteAllChats(buildFilterParams());
+      if (res.data.success) {
+        setChats([]);
+        setPagination(null);
+        if (selectedChat) setSelectedChat(null);
+        toast.success("Deleted", `${res.data.deletedCount || count} chat(s) deleted successfully.`);
+      }
+    } catch {
+      toast.error("Error", "Failed to delete chats.");
+    } finally {
+      setDeletingAll(false);
+      fetchChats();
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await AdminAPI.exportChats(buildFilterParams());
+      const blob = new Blob([res.data], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `chat-history-export-${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success("Exported", "Chat history exported as CSV.");
+    } catch {
+      toast.error("Error", "Failed to export chats.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -207,176 +226,43 @@ export default function ChatHistoryManagementPage() {
 
   const hasActiveFilters = statusFilter || userIdFilter || dateFrom || dateTo;
 
-  // Real backend dynamic status breakdown dataset
-  const activeCount = orgStats?.activeChats ?? chats.filter(c => c.status === "open").length;
-  const closedCount = orgStats?.closedChats ?? chats.filter(c => c.status === "closed").length;
-
-  const statusPieData = [
-    { name: "Active Chats (Open)", value: activeCount },
-    { name: "Closed Chats", value: closedCount },
-  ];
-
-  const chatVolumeAreaData = [
-    { time: "Total", volume: orgStats?.totalChats || chats.length },
-    { time: "Messages", volume: orgStats?.totalMessages || 0 },
-    { time: "Users", volume: orgStats?.totalUsers || 0 },
-    { time: "Active", volume: activeCount },
-    { time: "Closed", volume: closedCount },
-  ];
-
-  const msgHistogramData = [
-    { interval: "1-3 msgs", count: Math.max(0, Math.round((orgStats?.totalChats || chats.length) * 0.45)) },
-    { interval: "4-7 msgs", count: Math.max(0, Math.round((orgStats?.totalChats || chats.length) * 0.35)) },
-    { interval: "8-15 msgs", count: Math.max(0, Math.round((orgStats?.totalChats || chats.length) * 0.15)) },
-    { interval: "15+ msgs", count: Math.max(0, Math.round((orgStats?.totalChats || chats.length) * 0.05)) },
-  ];
-
-  const scatterChatData = [
-    { x: 3, y: 15, z: 20, name: "Quick Inquiry" },
-    { x: 8, y: 45, z: 80, name: "Technical Issue" },
-    { x: 14, y: 120, z: 180, name: "Billing Dispute" },
-    { x: 22, y: 240, z: 320, name: "Complex Onboarding" },
-  ];
-
-  const waterfallChatData = [
-    { step: "New Opened", base: 0, value: 165, isTotal: true },
-    { step: "AI Auto-Solved", base: 95, value: -70 },
-    { step: "Agent Closed", base: 30, value: -65 },
-    { step: "Active Backlog", base: 0, value: 30, isTotal: true },
-  ];
-
-  const heatmapChatData = [
-    { day: "Mon", h02: 5, h06: 12, h10: 45, h14: 68, h18: 35, h22: 10 },
-    { day: "Tue", h02: 8, h06: 18, h10: 52, h14: 75, h18: 42, h22: 14 },
-    { day: "Wed", h02: 10, h06: 22, h10: 60, h14: 85, h18: 48, h22: 18 },
-    { day: "Thu", h02: 6, h06: 15, h10: 48, h14: 70, h18: 38, h22: 12 },
-    { day: "Fri", h02: 4, h06: 10, h10: 38, h14: 55, h18: 28, h22: 8 },
-  ];
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4 dark:border-white/[0.06]">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
             <MessageSquare className="text-primary" size={26} />
-            Overall Chat History & Visual Analytics
+            Chat History Management
           </h1>
           <p className="text-muted-foreground text-sm">
-            Monitor, inspect, and analyze all multi-tenant user chat conversations across the platform.
+            View, search, and manage all chat conversations.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowOrgStats(!showOrgStats)}
-          className="gap-2"
-        >
-          <BarChart3 size={16} />
-          {showOrgStats ? "Hide Analytics Charts" : "Show Analytics Charts"}
-        </Button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {loadingStats ? (
-          <div className="col-span-full flex items-center justify-center py-8 text-muted-foreground">
-            <Loader2 size={20} className="animate-spin mr-2" />
-            Loading statistics...
-          </div>
-        ) : orgStats ? (
-          <>
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <MessageCircle size={16} />
-                <span className="text-xs font-medium">Total Chats</span>
-              </div>
-              <div className="text-2xl font-bold">{orgStats.totalChats}</div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || chats.length === 0} className="gap-2">
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Export
+          </Button>
+          {confirmDeleteAll ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Delete all matching chats?</span>
+              <button onClick={() => setConfirmDeleteAll(false)} className="px-2 py-1 text-xs text-muted-foreground hover:bg-muted rounded-md">Cancel</button>
+              <button onClick={handleDeleteAll} disabled={deletingAll} className="px-3 py-1.5 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors">
+                {deletingAll ? <Loader2 size={12} className="animate-spin" /> : "Confirm"}
+              </button>
             </div>
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <MessageSquare size={16} />
-                <span className="text-xs font-medium">Total Messages</span>
-              </div>
-              <div className="text-2xl font-bold">{orgStats.totalMessages}</div>
-            </div>
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <Users size={16} />
-                <span className="text-xs font-medium">Total Users</span>
-              </div>
-              <div className="text-2xl font-bold">{orgStats.totalUsers}</div>
-            </div>
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
-                <TrendingUp size={16} />
-                <span className="text-xs font-medium">Active Chats</span>
-              </div>
-              <div className="text-2xl font-bold">{orgStats.activeChats}</div>
-            </div>
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <X size={16} />
-                <span className="text-xs font-medium">Closed Chats</span>
-              </div>
-              <div className="text-2xl font-bold">{orgStats.closedChats}</div>
-            </div>
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <BarChart3 size={16} />
-                <span className="text-xs font-medium">Avg Messages</span>
-              </div>
-              <div className="text-2xl font-bold">{orgStats.avgMessagesPerChat ? orgStats.avgMessagesPerChat.toFixed(1) : 0}</div>
-            </div>
-          </>
-        ) : null}
-      </div>
-
-      {/* Visual Analytics Showcase Section (3 Purpose-Driven Charts) */}
-      {showOrgStats && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b dark:border-white/[0.06] pb-2">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Sparkles size={18} className="text-primary" />
-              Chat History Visual Analytics (Top 3 Purpose-Driven Metrics)
-            </h2>
-            <Badge variant="outline" className="text-xs">Recharts Engine</Badge>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Chart 1: Daily Chat Volume (Purpose: Volume Trajectory) */}
-            <AreaChartWidget title="1. Support Volume Trajectory" data={chatVolumeAreaData} dataKey="volume" color={brandPrimary} />
-
-            {/* Chart 2: Messages per Chat (Purpose: Conversation Depth) */}
-            <HistogramWidget title="2. Conversation Depth Bins" data={msgHistogramData} color={brandSecondary} />
-
-            {/* Chart 3: Donut Chart (Purpose: Active vs Closed Ratio) */}
-            <div className="rounded-xl border bg-card p-4 space-y-2 dark:border-white/[0.06] shadow-xs">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">3. Active vs Closed Ratio</p>
-                <p className="text-[11px] text-muted-foreground/80">Current status breakdown</p>
-              </div>
-              <div className="h-52 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={statusPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={4}>
-                      {statusPieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={statusColors[index % statusColors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: "11px" }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <Button variant="destructive" size="sm" onClick={() => setConfirmDeleteAll(true)} disabled={deletingAll || chats.length === 0} className="gap-2">
+              <Trash2 size={14} />
+              Delete All
+            </Button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="w-auto flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-full">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -401,7 +287,7 @@ export default function ChatHistoryManagementPage() {
       </div>
 
       {showFilters && (
-        <div className="flex flex-wrap items-end gap-3 p-4 rounded-xl border bg-card">
+        <div className="flex w-full flex-wrap items-end gap-3 p-4 rounded-xl border bg-card">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
             <select
@@ -439,7 +325,7 @@ export default function ChatHistoryManagementPage() {
       )}
 
       {/* Main Grid: Overall History Table + Detailed Transcript Drawer */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="flext gap-12 mt-4 w-full">
         {/* Table Section */}
         <div className={cn("xl:col-span-2", selectedChat && "xl:col-span-1")}>
           <div className="rounded-xl border bg-card">
@@ -513,9 +399,16 @@ export default function ChatHistoryManagementPage() {
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewChat(chat._id)} title="View Transcript">
                               <Eye size={14} className="text-primary" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(chat)} title="Delete Chat">
-                              <Trash2 size={14} />
-                            </Button>
+                            {confirmDeleteId === chat._id ? (
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-1 text-xs text-muted-foreground hover:bg-muted rounded-md">Cancel</button>
+                                <button onClick={() => handleDelete(chat)} className="px-2 py-1 text-xs text-destructive hover:bg-destructive/10 rounded-md font-medium">Delete</button>
+                              </div>
+                            ) : (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteId(chat._id)} title="Delete Chat">
+                                <Trash2 size={14} />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -543,7 +436,7 @@ export default function ChatHistoryManagementPage() {
 
         {/* Detailed Transcript Content Viewer Drawer */}
         {(selectedChat || loadingDetail) && (
-          <div className="xl:col-span-1">
+          <div className="mt-12 p-12 z-50 fixed top-0 right-0 w-full max-w-2xl h-full overflow-y-auto">
             <div className="rounded-xl border bg-card h-full flex flex-col shadow-lg dark:border-white/[0.06]">
               {loadingDetail ? (
                 <div className="flex items-center justify-center py-16 text-muted-foreground">
@@ -564,10 +457,17 @@ export default function ChatHistoryManagementPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {selectedChat.status === "open" && (
-                        <Button variant="outline" size="sm" onClick={() => handleEndChat(selectedChat._id)} className="h-7 text-xs px-2 gap-1" title="End Chat">
-                          <X size={12} className="text-rose-500" />
-                          End Chat
-                        </Button>
+                        confirmEndId === selectedChat._id ? (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setConfirmEndId(null)} className="px-2 py-1 text-xs text-muted-foreground hover:bg-muted rounded-md">Cancel</button>
+                            <button onClick={() => handleEndChat(selectedChat._id)} className="px-2 py-1 text-xs text-rose-600 hover:bg-rose-500/10 rounded-md font-medium">End</button>
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={() => setConfirmEndId(selectedChat._id)} className="h-7 text-xs px-2 gap-1" title="End Chat">
+                            <X size={12} className="text-rose-500" />
+                            End Chat
+                          </Button>
+                        )
                       )}
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedChat(null)}>
                         <X size={14} />

@@ -11,6 +11,7 @@ import {
 import { useAuthContext } from "@/context/AuthContext";
 import { AuthAPI } from "@/api/auth.api";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import { useToast } from "@/components/ui/toast";
 
 interface OrgOption {
   _id: string;
@@ -27,10 +28,10 @@ export default function Login() {
   const { loginWithOrg, tenant, tenantLoading } = useAuthContext();
   const { settings: appSettings } = useAppSettings();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [organizations, setOrganizations] = useState<OrgOption[]>([]);
   const [orgsLoading, setOrgsLoading] = useState(true);
-  const [orgsError, setOrgsError] = useState("");
 
   const [formData, setFormData] = useState({
     organizationId: "",
@@ -40,7 +41,6 @@ export default function Login() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
-  const [apiError, setApiError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
@@ -53,10 +53,9 @@ export default function Login() {
     if (tenantLoading) return;
 
     setOrgsLoading(true);
-    setOrgsError("");
     AuthAPI.getOrganizations()
       .then((res: any) => setOrganizations(res.data.data || []))
-      .catch(() => setOrgsError("Failed to load organizations"))
+      .catch(() => toast.warning("Warning", "Failed to load organizations"))
       .finally(() => setOrgsLoading(false));
   }, [tenant, tenantLoading]);
 
@@ -112,8 +111,7 @@ export default function Login() {
     if (touched[name]) {
       setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
     }
-    if (apiError) setApiError("");
-  }, [touched, validateField, apiError]);
+  }, [touched, validateField]);
 
   const handleBlur = useCallback((e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -127,7 +125,6 @@ export default function Login() {
     if (!validateForm()) return;
 
     setLoading(true);
-    setApiError("");
 
     try {
       const success = await loginWithOrg(
@@ -137,7 +134,7 @@ export default function Login() {
       );
 
       if (!success) {
-        setApiError("Invalid email, password, or organization.");
+        toast.error("Login Failed", "Invalid email, password, or organization.");
         return;
       }
 
@@ -146,7 +143,7 @@ export default function Login() {
 
       switch (role) {
         case "super_admin":
-          navigate("/superadmin", { replace: true });
+          navigate("/superadmin/dashboard", { replace: true });
           break;
         case "admin":
           navigate("/admin/dashboard", { replace: true });
@@ -162,11 +159,11 @@ export default function Login() {
           navigate("/", { replace: true });
       }
     } catch {
-      setApiError("Something went wrong. Please try again.");
+      toast.error("Login Failed", "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [loading, validateForm, loginWithOrg, formData, navigate]);
+  }, [loading, validateForm, loginWithOrg, formData, navigate, toast]);
 
   const showOrgSelector = !tenant && !tenantLoading;
 
@@ -258,12 +255,6 @@ export default function Login() {
                         {errors.organization}
                       </p>
                     )}
-                    {orgsError && (
-                      <p className="text-xs text-destructive flex items-center gap-1 mt-1" role="alert">
-                        <AlertCircle size={12} />
-                        {orgsError}
-                      </p>
-                    )}
                   </div>
                 )}
 
@@ -343,14 +334,7 @@ export default function Login() {
                   )}
                 </div>
 
-                {apiError && (
-                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive flex items-center gap-2" role="alert">
-                    <AlertCircle size={14} />
-                    <span>{apiError}</span>
-                  </div>
-                )}
-
-                {Object.keys(errors).length > 0 && !apiError && Object.values(errors).some(Boolean) && (
+                {Object.keys(errors).length > 0 && Object.values(errors).some(Boolean) && (
                   <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive flex items-center gap-2" role="alert">
                     <AlertCircle size={14} />
                     <span>Please fix the errors above before signing in.</span>

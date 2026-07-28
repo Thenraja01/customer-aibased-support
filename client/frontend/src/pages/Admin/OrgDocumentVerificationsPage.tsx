@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import DocumentVerificationTable from "@/components/admin/DocumentVerificationTable";
 import DocumentVerificationAPI from "@/api/documentVerification.api";
 import { useAuth } from "@/hooks/useAuth";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const statusFilters = ["", "pending", "approved", "rejected"];
 
@@ -16,6 +17,8 @@ export default function OrgDocumentVerificationsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [rejectTarget, setRejectTarget] = useState<any>(null);
   const [rejectRemarks, setRejectRemarks] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   const fetchVerifications = useCallback(async () => {
     if (!orgId) return;
@@ -56,13 +59,15 @@ export default function OrgDocumentVerificationsPage() {
   }, [statusFilter, fetchVerifications, fetchVerificationsByStatus]);
 
   const handleApprove = async (v: any) => {
-    if (!confirm("Approve this verification?")) return;
-    await DocumentVerificationAPI.approve(v._id);
-    if (statusFilter) {
-      fetchVerificationsByStatus(statusFilter);
-    } else {
-      fetchVerifications();
-    }
+    setConfirmAction(() => async () => {
+      await DocumentVerificationAPI.approve(v._id);
+      if (statusFilter) {
+        fetchVerificationsByStatus(statusFilter);
+      } else {
+        fetchVerifications();
+      }
+    });
+    setConfirmOpen(true);
   };
 
   const handleReject = async () => {
@@ -78,13 +83,15 @@ export default function OrgDocumentVerificationsPage() {
   };
 
   const handleDelete = async (v: any) => {
-    if (!confirm("Delete this verification?")) return;
-    await DocumentVerificationAPI.remove(v._id);
-    if (statusFilter) {
-      fetchVerificationsByStatus(statusFilter);
-    } else {
-      fetchVerifications();
-    }
+    setConfirmAction(() => async () => {
+      await DocumentVerificationAPI.remove(v._id);
+      if (statusFilter) {
+        fetchVerificationsByStatus(statusFilter);
+      } else {
+        fetchVerifications();
+      }
+    });
+    setConfirmOpen(true);
   };
 
   return (
@@ -178,6 +185,14 @@ export default function OrgDocumentVerificationsPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Confirm Action"
+        message="Are you sure you want to perform this action?"
+        variant="danger"
+        onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
+        onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
     </div>
   );
 }

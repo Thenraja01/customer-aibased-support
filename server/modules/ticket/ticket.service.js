@@ -3,9 +3,30 @@ import User from "../user/user.schema.js";
 import Role from "../role/role.schema.js";
 import Chat from "../chat/chat.schema.js";
 import Message from "../message/message.schema.js";
+import { getNextIndex } from "../../utils/roundRobin.js";
 
-export const createTicket = async (data) => {
-  return await Ticket.create(data);
+export const getNextAgent = async (organizationId) => {
+  const supportRole = await Role.findOne({ role_name: /support/i });
+  if (!supportRole) return null;
+  const agents = await User.find({ role_id: supportRole._id, organization_id: organizationId, status: "active" }).select("_id name email");
+  if (agents.length === 0) return null;
+  const index = getNextIndex(organizationId, agents.length);
+  return agents[index];
+};
+
+export const createTicket = async (data, organizationId) => {
+  const ticket = await Ticket.create(data);
+  if (organizationId && !ticket.assigned_to) {
+    const agent = await getNextAgent(organizationId);
+    if (agent) {
+      return await Ticket.findByIdAndUpdate(
+        ticket._id,
+        { assigned_to: agent._id, status: "assigned" },
+        { new: true }
+      ).populate("assigned_to", "name email");
+    }
+  }
+  return ticket;
 };
 
 export const escalateFromChat = async ({ chatId, subject, description, userId, organizationId }) => {
@@ -35,6 +56,15 @@ export const escalateFromChat = async ({ chatId, subject, description, userId, o
       conversation_preview: conversationPreview.substring(0, 2000),
     },
   });
+
+  const agent = await getNextAgent(organizationId);
+  if (agent) {
+    return await Ticket.findByIdAndUpdate(
+      ticket._id,
+      { assigned_to: agent._id, status: "assigned" },
+      { new: true }
+    ).populate("assigned_to", "name email");
+  }
 
   return ticket;
 };

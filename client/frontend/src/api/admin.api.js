@@ -38,6 +38,8 @@ export const AdminAPI = {
   getChatDetail: (id) => AxiosInstance.get(`/${url}/chats/${id}`),
   updateChatStatus: (id, status) => AxiosInstance.patch(`/${url}/chats/${id}/status`, { status }),
   deleteChat: (id) => AxiosInstance.delete(`/${url}/chats/${id}`),
+  deleteAllChats: (params) => AxiosInstance.delete(`/${url}/chats`, { params }),
+  exportChats: (params) => AxiosInstance.get(`/${url}/chats/export`, { params, responseType: "blob" }),
 
   // Users (basic list for filters)
   getUsersBasic: (params) => AxiosInstance.get(`/${url}/users/basic`, { params }),

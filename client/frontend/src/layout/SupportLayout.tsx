@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, MessageCircle, Ticket, HelpCircle, FileText, Settings, LogOut, Menu, Bell, X, ListOrdered } from "lucide-react";
+import { LayoutDashboard, MessageCircle, Ticket, HelpCircle, Settings, LogOut, Menu, Bell, X, ListOrdered, ChevronDown, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,16 +8,20 @@ import { useNotifications } from "@/hooks/useNotifications";
 
 const navLinks = [
   { name: "Dashboard", path: "/support/dashboard", icon: LayoutDashboard },
-  { name: "Chats", path: "/support/chats", icon: MessageCircle },
   { name: "Tickets", path: "/support/tickets", icon: Ticket },
   { name: "Queue", path: "/support/queue", icon: ListOrdered },
   { name: "FAQ", path: "/support/faq", icon: HelpCircle },
-  { name: "Documents", path: "/support/documents", icon: FileText },
+];
+
+const chatSubLinks = [
+  { name: "Chat", path: "/support/chat", icon: MessageCircle },
+  { name: "Chat History", path: "/support/chat-history", icon: History },
 ];
 
 export default function SupportLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [chatMenuOpen, setChatMenuOpen] = useState(true);
   const location = useLocation();
   const { logout, orgSettings, user } = useAuth();
   const brandName = orgSettings?.chatbot_name || user?.organization_id?.name || "Support Portal";
@@ -88,6 +92,40 @@ export default function SupportLayout() {
               </Link>
             );
           })}
+
+          <div>
+            <button onClick={() => setChatMenuOpen(!chatMenuOpen)}
+              className={cn(
+                "flex items-center justify-between w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                chatMenuOpen ? "bg-primary/10 text-primary dark:bg-primary/15" : "text-muted-foreground hover:bg-muted dark:hover:bg-white/[0.04] hover:text-foreground"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <MessageCircle size={18} />
+                <span>Chats</span>
+              </div>
+              <ChevronDown size={16} className={cn("transition-transform", chatMenuOpen && "rotate-180")} />
+            </button>
+            {chatMenuOpen && (
+              <div className="ml-2 mt-1 space-y-0.5">
+                {chatSubLinks.map((sub) => {
+                  const SubIcon = sub.icon;
+                  const isSubActive = location.pathname.startsWith(sub.path);
+                  return (
+                    <Link key={sub.name} to={sub.path}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                        isSubActive ? "bg-primary/5 text-primary dark:bg-primary/10" : "text-muted-foreground hover:bg-muted dark:hover:bg-white/[0.04] hover:text-foreground"
+                      )}
+                      aria-current={isSubActive ? "page" : undefined}
+                    >
+                      <SubIcon size={16} /><span>{sub.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </nav>
         <div className="p-4 border-t dark:border-white/[0.06] space-y-1">
           <Link to="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-muted-foreground rounded-lg hover:bg-muted dark:hover:bg-white/[0.04] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">

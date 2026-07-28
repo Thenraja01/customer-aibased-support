@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Building2, Users, ScrollText,
   Sparkles, Search, MessageCircle, Settings2,
-  Settings, ArrowLeft, LogOut, Menu, Bell, X, Zap
+  Settings, ArrowLeft, LogOut, Menu, Bell, X, Zap, AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -17,6 +17,7 @@ const navLinks = [
   { name: "Users", path: "/superadmin/users", icon: Users },
   { name: "Audit Logs", path: "/superadmin/audit-logs", icon: ScrollText },
   { name: "AI Analytics", path: "/superadmin/ai-analytics", icon: Sparkles },
+  { name: "Knowledge Gaps", path: "/superadmin/knowledge-gaps", icon: AlertTriangle },
   { name: "Search", path: "/superadmin/search", icon: Search },
   { name: "Chat History", path: "/superadmin/chat-history", icon: MessageCircle },
   { name: "App Settings", path: "/superadmin/app-settings", icon: Settings2 },

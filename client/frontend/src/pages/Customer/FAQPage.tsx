@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { FAQAPI } from "@/api";
-import { HelpCircle, ChevronDown, ChevronUp, Search, AlertCircle } from "lucide-react";
+import { HelpCircle, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
 
 interface FAQ {
   _id: string;
@@ -14,21 +15,20 @@ interface FAQ {
 export default function FAQPage() {
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const toast = useToast();
 
   useEffect(() => {
     const loadFAQs = async () => {
       setLoading(true);
-      setError("");
       try {
         const res = await FAQAPI.getActive();
         if (res.data.success) {
           setFaqs(res.data.data);
         }
       } catch {
-        setError("Failed to load FAQs. Please try again.");
+        toast.error("Error", "Failed to load FAQs. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -86,13 +86,6 @@ export default function FAQPage() {
           aria-label="Search frequently asked questions"
         />
       </div>
-
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2" role="alert">
-          <AlertCircle size={14} />
-          {error}
-        </div>
-      )}
 
       {filteredFaqs.length === 0 ? (
         <div className="rounded-xl border bg-card dark:bg-card/50 p-8 sm:p-12 text-center">

@@ -5,7 +5,8 @@ const roleSchema = new mongoose.Schema({
     type: String,
     required: true,
     maxlength: 50,
-    trim: true
+    trim: true,
+    unique:true
   },
   organization_id: {
     type: mongoose.Schema.Types.ObjectId,

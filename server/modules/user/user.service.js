@@ -54,7 +54,7 @@ export const updateUser = async (id, userData) => {
 };
 
 export const updateUserStatus = async (id, status) => {
-  const allowed = ["active", "inactive", "blocked"];
+  const allowed = ["active", "inactive", "blocked", "pending", "approved"];
   if (!allowed.includes(status)) throw new Error("Invalid status value");
   const user = await User.findByIdAndUpdate(id, { status }, { new: true }).select(
     "-password"
@@ -108,3 +108,37 @@ export const changePassword = async (userId, currentPassword, newPassword) => {
   await user.save();
   return { message: "Password changed successfully" };
 };
+
+/**
+ * Save (or replace) the FCM device token for a user.
+ * The frontend should call POST /users/fcm-token after receiving a token
+ * from the FCM SDK. Overwrites any previously stored token for the user
+ * (single-device model). For multi-device support, switch fcm_token to
+ * an array field and use $addToSet here instead.
+ *
+ * @param {string} userId - MongoDB ObjectId string of the user
+ * @param {string} token  - FCM registration token from the client
+ */
+export const saveFcmToken = async (userId, token) => {
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { fcm_token: token },
+    { new: true }
+  ).select("_id fcm_token");
+  if (!user) throw new Error("User not found");
+  return user;
+};
+
+/**
+ * Clear the FCM token from the user document.
+ * Called in two situations:
+ *   1. Explicitly by the user (e.g. on logout via DELETE /users/fcm-token)
+ *   2. Automatically by firebase.js when FCM reports the token as stale
+ *
+ * @param {string} userId - MongoDB ObjectId string of the user
+ */
+export const clearFcmToken = async (userId) => {
+  await User.findByIdAndUpdate(userId, { $unset: { fcm_token: "" } });
+  return { message: "FCM token cleared" };
+};
+

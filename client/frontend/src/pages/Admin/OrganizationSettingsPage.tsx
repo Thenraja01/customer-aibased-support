@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Save, AlertCircle, CheckCircle2, Palette, Bot, Clock, Mail, Building2, Eye, Headphones, MessageCircle, FileText, BarChart3 } from "lucide-react";
+import { Save, Palette, Bot, Clock, Mail, Building2, Eye, Headphones, MessageCircle, FileText, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminAPI } from "@/api/admin.api";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ui/toast";
 import TicketTemplatesManager from "@/components/admin/TicketTemplatesManager";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
@@ -28,11 +29,11 @@ const tabs: { id: Tab; label: string; icon: any }[] = [
 ];
 
 export default function OrganizationSettingsPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const [form, setForm] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const { setOrgSettings } = useAuth();
 
@@ -88,7 +89,7 @@ export default function OrganizationSettingsPage() {
         });
       }
     } catch (err) {
-      setMessage({ type: "error", text: "Failed to load settings" });
+      toast.error("Error", "Failed to load settings");
     } finally {
       setLoading(false);
     }
@@ -96,16 +97,15 @@ export default function OrganizationSettingsPage() {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    setMessage(null);
     try {
       const res = await AdminAPI.updateOrgSettings(form);
       if (res.data.success) {
-        setMessage({ type: "success", text: "Settings saved successfully" });
+        toast.success("Success", "Settings saved successfully");
         localStorage.setItem("orgSettings", JSON.stringify(res.data.data));
         setOrgSettings(res.data.data);
       }
     } catch (err: any) {
-      setMessage({ type: "error", text: err?.response?.data?.message || "Failed to save settings" });
+      toast.error("Error", err?.response?.data?.message || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -145,19 +145,6 @@ export default function OrganizationSettingsPage() {
           {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
-
-      {message && (
-        <div
-          className={`flex items-center gap-2 px-4 py-3 rounded-lg border text-sm ${
-            message.type === "success"
-              ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
-              : "border-destructive/30 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-          {message.text}
-        </div>
-      )}
 
       <div className="flex gap-1 border-b dark:border-white/[0.06] overflow-x-auto">
         {tabs.map((tab) => (

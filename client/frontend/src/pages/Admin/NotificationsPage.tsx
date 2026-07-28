@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationAPI } from "@/api/notification.api.js";
 import { useAuth } from "@/hooks/useAuth";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type FilterTab = "all" | "unread";
 
@@ -49,6 +50,8 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<FilterTab>("all");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     loadNotifications();
@@ -84,17 +87,19 @@ export default function NotificationsPage() {
 
   const handleClearAll = async () => {
     if (!user?._id) return;
-    if (!window.confirm("Clear all notifications? This cannot be undone.")) return;
-    setClearing(true);
-    try {
-      await NotificationAPI.clearAll(user._id);
-      loadNotifications();
-      loadUnreadCount();
-    } catch {
-      // silent
-    } finally {
-      setClearing(false);
-    }
+    setConfirmAction(() => async () => {
+      setClearing(true);
+      try {
+        await NotificationAPI.clearAll(user._id);
+        loadNotifications();
+        loadUnreadCount();
+      } catch {
+        // silent
+      } finally {
+        setClearing(false);
+      }
+    });
+    setConfirmOpen(true);
   };
 
   return (
@@ -267,6 +272,14 @@ export default function NotificationsPage() {
           ))}
         </div>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Clear All Notifications"
+        message="Clear all notifications? This cannot be undone."
+        variant="danger"
+        onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
+        onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
     </div>
   );
 }

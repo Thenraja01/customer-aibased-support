@@ -3,9 +3,7 @@ import ChatMemory from "./memory.schema.js";
 import Message from "../message/message.schema.js";
 import Chat from "../chat/chat.schema.js";
 import { chunkHashMap, keywordIndexMap } from "../rag/hashmap.service.js";
-
-// ── Short-Term Memory (In-Memory HashMap) ────────────────────────────
-// Last N messages per chat, fast O(1) lookup by chat_id
+import { getEmbedding } from "../../services/embedding.service.js";
 
 const shortTermCache = new Map();
 const SHORT_TERM_TTL = 30 * 60 * 1000;
@@ -89,7 +87,7 @@ export const storeMemory = async ({
   confidence = 0.8,
   ttl_days = 90,
 }) => {
-  const embedding = computeMemoryEmbedding(content);
+  const embedding = await computeMemoryEmbedding(content);
 
   const memory = await ChatMemory.create({
     user_id,
@@ -156,7 +154,7 @@ export const searchMemoriesByKeyword = async (userId, keywords, limit = 10) => {
 
 // Get memories relevant to a query (similarity-based)
 export const getRelevantMemories = async (userId, query, limit = 5) => {
-  const queryEmbedding = computeMemoryEmbedding(query);
+  const queryEmbedding = await computeMemoryEmbedding(query);
 
   const memories = await ChatMemory.find({
     user_id: userId,
@@ -334,7 +332,13 @@ export const buildFullContext = async (userId, chatId, query, maxShortTerm = 10,
 
 // ── Utilities ────────────────────────────────────────────────────────
 
-function computeMemoryEmbedding(text) {
+async function computeMemoryEmbedding(text) {
+  try {
+    const emb = await getEmbedding(text);
+    if (emb) return emb;
+  } catch (err) {
+    console.error(`[Memory] Ollama embedding failed, using fallback:`, err.message);
+  }
   const words = text
     .toLowerCase()
     .replace(/[^\w\s]/g, "")

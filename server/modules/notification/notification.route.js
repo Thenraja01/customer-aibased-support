@@ -13,7 +13,6 @@ router.post("/broadcast", restrict("super admin", "tenant admin", "admin"), vali
 router.get("/user/:userId", selfOrAdminParam("userId"), notifController.getByUser);
 router.get("/user/:userId/unread", selfOrAdminParam("userId"), notifController.getUnread);
 router.get("/user/:userId/unread/count", selfOrAdminParam("userId"), notifController.getUnreadCount);
-router.get("/user/:userId/count", selfOrAdminParam("userId"), notifController.getUnreadCount);
 router.patch("/:id/read", notifController.read);
 router.patch("/user/:userId/read-all", selfOrAdminParam("userId"), notifController.readAll);
 router.delete("/:id", notifController.remove);

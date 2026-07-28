@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Save,
-  AlertCircle,
   CheckCircle2,
   Bot,
   Shield,
@@ -12,10 +11,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminAPI } from "@/api/admin.api";
 import AxiosInstance from "@/api/axiosInstance";
+import { useToast } from "@/components/ui/toast";
 
 type Tab = "prompt" | "settings" | "guardrails" | "playground";
 
@@ -34,15 +33,14 @@ const DEFAULT_GUARDRAILS = [
 ];
 
 export default function AIControlCenterPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("prompt");
-  const [orgSettings, setOrgSettings] = useState<any>(null);
   const [promptData, setPromptData] = useState<any>({ published: null, draft: null, customPrompt: "" });
   const [draftText, setDraftText] = useState("");
   const [versionHistory, setVersionHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // AI Settings form
   const [aiSettings, setAiSettings] = useState<any>({
@@ -81,12 +79,11 @@ export default function AIControlCenterPage() {
       }
       if (historyRes.data.success) setVersionHistory(historyRes.data.data);
       if (settingsRes.data.success) {
-        setOrgSettings(settingsRes.data.data);
         if (settingsRes.data.data.ai_settings) setAiSettings(settingsRes.data.data.ai_settings);
         if (settingsRes.data.data.guardrails?.length) setGuardrails(settingsRes.data.data.guardrails);
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to load AI configuration" });
+      toast.error("Error", "Failed to load AI configuration");
     } finally {
       setLoading(false);
     }
@@ -94,13 +91,12 @@ export default function AIControlCenterPage() {
 
   const saveDraft = async () => {
     setSaving(true);
-    setMessage(null);
     try {
       await AxiosInstance.post("/admin/v1/prompt/draft", { system_prompt: draftText });
-      setMessage({ type: "success", text: "Draft saved" });
+      toast.success("Success", "Draft saved");
       loadData();
     } catch {
-      setMessage({ type: "error", text: "Failed to save draft" });
+      toast.error("Error", "Failed to save draft");
     } finally {
       setSaving(false);
     }
@@ -108,13 +104,12 @@ export default function AIControlCenterPage() {
 
   const publishPrompt = async () => {
     setSaving(true);
-    setMessage(null);
     try {
       await AxiosInstance.post("/admin/v1/prompt/publish");
-      setMessage({ type: "success", text: "Prompt published successfully" });
+      toast.success("Success", "Prompt published successfully");
       loadData();
     } catch (err: any) {
-      setMessage({ type: "error", text: err?.response?.data?.message || "Failed to publish" });
+      toast.error("Error", err?.response?.data?.message || "Failed to publish");
     } finally {
       setSaving(false);
     }
@@ -125,10 +120,10 @@ export default function AIControlCenterPage() {
     setSaving(true);
     try {
       await AxiosInstance.post(`/admin/v1/prompt/rollback/${version}`);
-      setMessage({ type: "success", text: `Rolled back to version ${version}` });
+      toast.success("Success", `Rolled back to version ${version}`);
       loadData();
     } catch {
-      setMessage({ type: "error", text: "Failed to rollback" });
+      toast.error("Error", "Failed to rollback");
     } finally {
       setSaving(false);
     }
@@ -136,12 +131,11 @@ export default function AIControlCenterPage() {
 
   const saveAiSettings = async () => {
     setSaving(true);
-    setMessage(null);
     try {
       await AdminAPI.updateOrgSettings({ ai_settings: aiSettings });
-      setMessage({ type: "success", text: "AI settings saved" });
+      toast.success("Success", "AI settings saved");
     } catch {
-      setMessage({ type: "error", text: "Failed to save AI settings" });
+      toast.error("Error", "Failed to save AI settings");
     } finally {
       setSaving(false);
     }
@@ -149,12 +143,11 @@ export default function AIControlCenterPage() {
 
   const saveGuardrails = async () => {
     setSaving(true);
-    setMessage(null);
     try {
       await AdminAPI.updateOrgSettings({ guardrails });
-      setMessage({ type: "success", text: "Guardrails saved" });
+      toast.success("Success", "Guardrails saved");
     } catch {
-      setMessage({ type: "error", text: "Failed to save guardrails" });
+      toast.error("Error", "Failed to save guardrails");
     } finally {
       setSaving(false);
     }
@@ -207,19 +200,6 @@ export default function AIControlCenterPage() {
         </h1>
         <p className="text-muted-foreground">Manage prompts, AI behavior, guardrails, and test responses.</p>
       </div>
-
-      {message && (
-        <div
-          className={`flex items-center gap-2 px-4 py-3 rounded-lg border text-sm ${
-            message.type === "success"
-              ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
-              : "border-destructive/30 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-          {message.text}
-        </div>
-      )}
 
       <div className="flex gap-1 border-b dark:border-white/[0.06] overflow-x-auto">
         {tabs.map((tab) => (

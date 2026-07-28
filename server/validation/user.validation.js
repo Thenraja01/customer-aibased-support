@@ -42,3 +42,18 @@ export const userPasswordSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .max(128),
 });
+
+export const requestOtpSchema = z.object({
+  email: z.string().trim().email("Invalid email").max(100),
+});
+
+export const verifyOtpSchema = z.object({
+  email: z.string().trim().email("Invalid email").max(100),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+});
+
+export const resetPasswordWithOtpSchema = z.object({
+  email: z.string().trim().email("Invalid email").max(100),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters").max(128),
+});

@@ -29,11 +29,11 @@ import { faqRouter } from "./modules/faq/index.js";
 import { ragRouter } from "./modules/rag/index.js";
 import { memoryRouter } from "./modules/memory/index.js";
 import { adminRouter } from "./modules/admin/index.js";
-import { knowledgeGraphRouter } from "./modules/knowledge-graph/index.js";
 import { searchRouter } from "./modules/search/index.js";
 import { promptVersionRouter } from "./modules/prompt-version/index.js";
+import { knowledgeGapRouter } from "./modules/knowledge-gap/index.js";
 import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
-import { closeInactiveChats } from "./modules/chat/chat.service.js";
+import { initFirebase } from "./config/firebase.js";
 
 const app = express();
 
@@ -89,7 +89,7 @@ app.use("/audit-logs", auditLogRouter);
 app.use("/faqs", faqRouter);
 app.use("/rag", ragRouter);
 app.use("/memory", memoryRouter);
-app.use("/knowledge-graph", knowledgeGraphRouter);
+app.use("/knowledge-gaps", knowledgeGapRouter);
 app.use("/admin/v1", adminRouter);
 app.use("/search/v1", searchRouter);
 app.use("/admin/v1/prompt", promptVersionRouter);
@@ -115,6 +115,9 @@ const port = env.PORT;
 const startServer = async () => {
   try {
     await dbconnection();
+
+    // Initialize Firebase Admin SDK once after DB is ready
+    initFirebase();
 
     setInterval(() => {
       archiveExpiredMemories().catch((err) =>

@@ -72,6 +72,14 @@ export const searchChats = async (keyword) => {
   }).populate("user_id", "name email");
 };
 
+export const closeAllUserChats = async (userId) => {
+  const result = await Chat.updateMany(
+    { user_id: userId, status: "open" },
+    { status: "closed" }
+  );
+  return { closedCount: result.modifiedCount };
+};
+
 export const closeInactiveChats = async () => {
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
   const result = await Chat.updateMany(

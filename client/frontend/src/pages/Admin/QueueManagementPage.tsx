@@ -1,22 +1,23 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, AlertCircle, UserPlus, Zap, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, Zap, Clock, CheckCircle2 } from "lucide-react";
 import { TicketAPI } from "@/api";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast";
 
 export default function QueueManagementPage() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [data, setData] = useState<{ queue: any[]; workload: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [closing, setClosing] = useState<string | null>(null);
-  const [error, setError] = useState("");
 
   const loadQueue = () => {
     setLoading(true);
     TicketAPI.getQueue()
       .then((res) => { if (res.data.success) setData(res.data.data); })
-      .catch(() => setError("Failed to load queue"))
+      .catch(() => toast.error("Error", "Failed to load queue"))
       .finally(() => setLoading(false));
   };
 
@@ -28,7 +29,7 @@ export default function QueueManagementPage() {
       await TicketAPI.smartAssign(ticketId);
       loadQueue();
     } catch {
-      setError("Failed to assign");
+      toast.error("Error", "Failed to assign");
     } finally {
       setAssigning(null);
     }
@@ -40,7 +41,7 @@ export default function QueueManagementPage() {
       await TicketAPI.close(ticketId);
       loadQueue();
     } catch {
-      setError("Failed to close ticket");
+      toast.error("Error", "Failed to close ticket");
     } finally {
       setClosing(null);
     }
@@ -78,13 +79,6 @@ export default function QueueManagementPage() {
         <h1 className="text-2xl font-bold">Queue Management</h1>
         <p className="text-sm text-muted-foreground mt-1">Manage ticket queue and smart assignment</p>
       </div>
-
-      {error && (
-        <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertCircle size={16} /> {error}
-          <button onClick={() => setError("")} className="ml-auto text-xs">&times;</button>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {data?.workload?.map((agent: any) => (

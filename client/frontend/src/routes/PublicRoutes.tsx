@@ -9,7 +9,8 @@ import Contact from "@/pages/Marketing/Contact";
 import Privacy from "@/pages/Marketing/Privacy";
 import Login from "@/pages/AuthPage/Login";
 import Register from "@/pages/AuthPage/Register";
-
+import RegistrationPending from "@/pages/AuthPage/RegistrationPending";
+import OtpPage from "@/pages/AuthPage/optpage";
 export const publicRoutes = [
   <Route key="home" path="/" element={<Home />} />,
   <Route key="about" path="/about" element={<About />} />,
@@ -21,4 +22,6 @@ export const publicRoutes = [
   <Route key="privacy" path="/privacy" element={<Privacy />} />,
   <Route key="login" path="/login" element={<Login />} />,
   <Route key="register" path="/register" element={<Register />} />,
+  <Route key="registration-pending" path="/registration-pending" element={<RegistrationPending />} />,
+  <Route key="verify-otp" path="/verify-otp" element={<OtpPage />} />,
 ];

@@ -3,21 +3,16 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Building2, Image, Shield, HardDrive, Bot, MessageSquare, Clock, Mail,
   Key, CreditCard, Activity, LineChart as LineChartIcon, ArrowLeft, Save, Plus,
-  Trash2, RefreshCw, CheckCircle2, ShieldCheck, PieChart as PieChartIcon, Target,
-  Sparkles, Compass, Sliders, BarChart3, Layers
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AdminAPI } from "@/api/admin.api";
+import { useToast } from "@/components/ui/toast";
 import {
-  ResponsiveContainer, AreaChart, Area, LineChart, Line, PieChart, Pie, Cell,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, XAxis, YAxis, Tooltip, Legend
-} from "recharts";
-import {
-  ScatterPlotWidget, HistogramWidget, AreaChartWidget, BoxPlotWidget,
-  HeatmapWidget, BubbleChartWidget, WaterfallChartWidget
+  HistogramWidget, AreaChartWidget, WaterfallChartWidget
 } from "@/components/admin/AdvancedDashboardCharts";
 
 export default function OrganizationDetailsPage() {
@@ -40,12 +35,11 @@ export default function OrganizationDetailsPage() {
   >("general");
 
   const [orgData, setOrgData] = useState<any>(null);
-  const [metrics, setMetrics] = useState<any>(null);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const toast = useToast();
 
   // Form states
   const [generalForm, setGeneralForm] = useState<any>({});
@@ -68,7 +62,6 @@ export default function OrganizationDetailsPage() {
       if (fullRes.data?.success) {
         const org = fullRes.data.data.organization;
         setOrgData(org);
-        setMetrics(fullRes.data.data.metrics);
         setActivityLogs(fullRes.data.data.activityLogs || []);
 
         setGeneralForm({
@@ -110,7 +103,7 @@ export default function OrganizationDetailsPage() {
         setAnalytics(analyticsRes.data.data);
       }
     } catch (err: any) {
-      setFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to load organization details" });
+      toast.error("Error", err?.response?.data?.message || "Failed to load organization details");
     } finally {
       setLoading(false);
     }
@@ -126,11 +119,11 @@ export default function OrganizationDetailsPage() {
       setSaving(true);
       const res = await AdminAPI.updateOrganization(id, partialData);
       if (res.data?.success) {
-        setFeedback({ type: "success", msg: "Organization settings updated successfully." });
+        toast.success("Success", "Organization settings updated successfully.");
         loadData();
       }
     } catch (err: any) {
-      setFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to save settings" });
+      toast.error("Error", err?.response?.data?.message || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -142,12 +135,12 @@ export default function OrganizationDetailsPage() {
       setSaving(true);
       const res = await AdminAPI.createOrganization(id);
       if (res.data?.success) {
-        setFeedback({ type: "success", msg: "New API key generated successfully." });
+        toast.success("Success", "New API key generated successfully.");
         setNewKeyName("");
         loadData();
       }
     } catch (err: any) {
-      setFeedback({ type: "error", msg: "Failed to generate API key" });
+      toast.error("Error", "Failed to generate API key");
     } finally {
       setSaving(false);
     }
@@ -193,14 +186,6 @@ export default function OrganizationDetailsPage() {
         </div>
       </div>
 
-      {feedback && (
-        <div className={`p-4 rounded-xl border flex items-center justify-between ${
-          feedback.type === "success" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600" : "bg-rose-500/10 border-rose-500/30 text-rose-600"
-        }`}>
-          <span className="text-sm font-medium">{feedback.msg}</span>
-          <button onClick={() => setFeedback(null)} className="text-xs underline">Dismiss</button>
-        </div>
-      )}
 
       {/* Tabs Bar */}
       <div className="flex items-center gap-1 overflow-x-auto border-b pb-2 dark:border-white/[0.06]">

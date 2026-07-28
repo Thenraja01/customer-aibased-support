@@ -3,25 +3,23 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ShieldAlert, Activity, Building2, Users, Bot, Wifi, AlertTriangle,
   Power, Megaphone, PlusCircle, UserCheck, RefreshCw, Database,
-  ScrollText, Sparkles, CheckCircle2, XCircle, ArrowUpRight, Zap,
-  BarChart3, Layers, Compass, TrendingUp
+  ScrollText, Sparkles, ArrowUpRight, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminAPI } from "@/api/admin.api";
-import {
-  ScatterPlotWidget, HistogramWidget, AreaChartWidget, BoxPlotWidget,
-  HeatmapWidget, BubbleChartWidget, WaterfallChartWidget
-} from "@/components/admin/AdvancedDashboardCharts";
+import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+
 
 export default function CommandCenterPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [actionFeedback, setActionFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const toast = useToast();
 
   // Modals
   const [showNotificationModal, setShowNotificationModal] = useState(false);
@@ -35,6 +33,9 @@ export default function CommandCenterPage() {
 
   // Impersonate
   const [selectedOrgId, setSelectedOrgId] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+  const [confirmMessage, setConfirmMessage] = useState("");
 
   const fetchStatus = async () => {
     try {
@@ -44,7 +45,7 @@ export default function CommandCenterPage() {
         setData(res.data.data);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to load platform status" });
+      toast.error("Error", err?.response?.data?.message || "Failed to load platform status");
     } finally {
       setLoading(false);
     }
@@ -57,19 +58,22 @@ export default function CommandCenterPage() {
   const handleToggleMaintenance = async () => {
     if (!data) return;
     const nextState = !data.platformStatus?.maintenanceMode;
-    if (!confirm(`Are you sure you want to ${nextState ? "ENABLE" : "DISABLE"} Maintenance Mode?`)) return;
-    try {
-      setActionLoading("maintenance");
-      const res = await AdminAPI.toggleMaintenanceMode(nextState);
-      if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.data.message });
-        fetchStatus();
+    setConfirmMessage(`Are you sure you want to ${nextState ? "ENABLE" : "DISABLE"} Maintenance Mode?`);
+    setConfirmAction(() => async () => {
+      try {
+        setActionLoading("maintenance");
+        const res = await AdminAPI.toggleMaintenanceMode(nextState);
+        if (res.data?.success) {
+          toast.success("Success", res.data.data.message);
+          fetchStatus();
+        }
+      } catch (err: any) {
+        toast.error("Error", err?.response?.data?.message || "Failed to toggle maintenance mode");
+      } finally {
+        setActionLoading(null);
       }
-    } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to toggle maintenance mode" });
-    } finally {
-      setActionLoading(null);
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const handleSendNotification = async (e: React.FormEvent) => {
@@ -79,13 +83,13 @@ export default function CommandCenterPage() {
       setActionLoading("notif");
       const res = await AdminAPI.sendGlobalNotification({ title: notifTitle, message: notifMessage, type: notifType });
       if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.data.message });
+        toast.success("Success", res.data.data.message);
         setShowNotificationModal(false);
         setNotifTitle("");
         setNotifMessage("");
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to send notification" });
+      toast.error("Error", err?.response?.data?.message || "Failed to send notification");
     } finally {
       setActionLoading(null);
     }
@@ -99,7 +103,7 @@ export default function CommandCenterPage() {
         setShowImpersonateModal(true);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: "Failed to fetch organizations for impersonation" });
+      toast.error("Error", "Failed to fetch organizations for impersonation");
     }
   };
 
@@ -109,11 +113,11 @@ export default function CommandCenterPage() {
       setActionLoading("impersonate");
       const res = await AdminAPI.impersonateOrg(selectedOrgId);
       if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.data.message });
+        toast.success("Success", res.data.data.message);
         setShowImpersonateModal(false);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to impersonate" });
+      toast.error("Error", err?.response?.data?.message || "Failed to impersonate");
     } finally {
       setActionLoading(null);
     }
@@ -124,10 +128,10 @@ export default function CommandCenterPage() {
       setActionLoading("cache");
       const res = await AdminAPI.clearSystemCache();
       if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.message });
+        toast.success("Success", res.data.message);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to clear cache" });
+      toast.error("Error", err?.response?.data?.message || "Failed to clear cache");
     } finally {
       setActionLoading(null);
     }
@@ -138,10 +142,10 @@ export default function CommandCenterPage() {
       setActionLoading("jobs");
       const res = await AdminAPI.restartBackgroundJobs();
       if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.message });
+        toast.success("Success", res.data.message);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to restart background jobs" });
+      toast.error("Error", err?.response?.data?.message || "Failed to restart background jobs");
     } finally {
       setActionLoading(null);
     }
@@ -153,13 +157,10 @@ export default function CommandCenterPage() {
       const res = await AdminAPI.backupDatabase();
       if (res.data?.success) {
         const bkp = res.data.data;
-        setActionFeedback({
-          type: "success",
-          msg: `Database Snapshot Created: ${bkp.snapshotId} (${bkp.sizeEstimate}). Summary: ${bkp.summary.organizations} Orgs, ${bkp.summary.users} Users, ${bkp.summary.documents} Docs.`,
-        });
+        toast.success("Success", `Database Snapshot Created: ${bkp.snapshotId} (${bkp.sizeEstimate}). Summary: ${bkp.summary.organizations} Orgs, ${bkp.summary.users} Users, ${bkp.summary.documents} Docs.`);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to create database backup" });
+      toast.error("Error", err?.response?.data?.message || "Failed to create database backup");
     } finally {
       setActionLoading(null);
     }
@@ -217,20 +218,6 @@ export default function CommandCenterPage() {
         </div>
       </div>
 
-      {/* Action feedback message */}
-      {actionFeedback && (
-        <div className={`p-4 rounded-xl border flex items-center justify-between transition-all duration-300 ${
-          actionFeedback.type === "success"
-            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-            : "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
-        }`}>
-          <div className="flex items-center gap-2.5 text-sm font-medium">
-            {actionFeedback.type === "success" ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-            <span>{actionFeedback.msg}</span>
-          </div>
-          <button onClick={() => setActionFeedback(null)} className="text-xs underline opacity-80 hover:opacity-100">Dismiss</button>
-        </div>
-      )}
 
       {/* 6 Core Telemetry Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -704,6 +691,14 @@ export default function CommandCenterPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Toggle Maintenance Mode"
+        message={confirmMessage}
+        variant="warning"
+        onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
+        onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
     </div>
   );
 }

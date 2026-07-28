@@ -1,5 +1,6 @@
 import * as ragService from "../rag/rag.service.js";
 import * as memoryService from "../memory/memory.service.js";
+import * as knowledgeGapService from "../knowledge-gap/knowledgeGap.service.js";
 import Message from "../message/message.schema.js";
 import AISession from "../ai-session/aiSession.schema.js";
 import Document from "../document/document.schema.js";
@@ -166,6 +167,35 @@ export const processAIMessage = async ({ chatId, userId, userMessage, organizati
     sender: "Support Assistant",
     timestamp: new Date(),
   });
+
+  // Log low-scoring queries as knowledge gaps
+  if (ragResults?.document_results && ragResults.document_results.length > 0) {
+    const scores = ragResults.document_results.map((r) => r.score || 0);
+    const bestScore = Math.max(...scores);
+    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+    if (bestScore < MIN_RAG_SCORE) {
+      knowledgeGapService.logFailedQuery({
+        organizationId,
+        userId,
+        chatId,
+        query: userMessage,
+        bestScore,
+        avgScore,
+        matchedChunks: ragResults.document_results.length,
+      }).catch(() => {});
+    }
+  } else if (ragResults?.document_results?.length === 0 || !ragResults?.document_results) {
+    knowledgeGapService.logFailedQuery({
+      organizationId,
+      userId,
+      chatId,
+      query: userMessage,
+      bestScore: 0,
+      avgScore: 0,
+      matchedChunks: 0,
+    }).catch(() => {});
+  }
 
   return aiMessage;
 };

@@ -36,10 +36,26 @@ export default {
   RAG: {
     CHUNK_SIZE: Number(process.env.RAG_CHUNK_SIZE) || 500,
     CHUNK_OVERLAP: Number(process.env.RAG_CHUNK_OVERLAP) || 100,
-    EMBED_DIM: Number(process.env.RAG_EMBED_DIM) || 256,
+    EMBED_DIM: Number(process.env.EMBEDDING_DIM) || 256,
     BFS_MAX_DEPTH: Number(process.env.RAG_BFS_MAX_DEPTH) || 2,
     BFS_MAX_NODES: Number(process.env.RAG_BFS_MAX_NODES) || 30,
     TOP_K: Number(process.env.RAG_TOP_K) || 5,
     QUERY_CACHE_TTL_MS: Number(process.env.RAG_QUERY_CACHE_TTL_MS) || 600000,
   },
+
+  // Embedding Configuration
+  EMBEDDING_MODEL: process.env.EMBEDDING_MODEL || "nomic-embed-text",
+  EMBEDDING_DIM: Number(process.env.EMBEDDING_DIM) || 768,
+  OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
+
+  // SMTP Configuration
+  SMTP_HOST: process.env.SMTP_HOST || "smtp.gmail.com",
+  SMTP_PORT: Number(process.env.SMTP_PORT) || 587,
+  SMTP_USER: process.env.SMTP_USER || "",
+  SMTP_PASS: process.env.SMTP_PASS || "",
+  SMTP_FROM: process.env.SMTP_FROM || "SupportAI <noreply@supportai.com>",
+  OTP_EXPIRY_MINUTES: Number(process.env.OTP_EXPIRY_MINUTES) || 10,
+
+  // // Firebase Admin SDK — paste minified service-account JSON as a single-line string
+  // FIREBASE_SERVICE_ACCOUNT: process.env.FIREBASE_SERVICE_ACCOUNT || "",
 };

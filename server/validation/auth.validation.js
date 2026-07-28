@@ -16,6 +16,22 @@ export const registerSchema = z.object({
   dob: z.string().optional(),
 });
 
+export const registerWithApprovalSchema = z.object({
+  organization_id: z.string().trim().min(1, "Organization is required"),
+  role_id: z.string().trim().min(1, "Role is required"),
+  name: z.string().trim().min(1, "Name is required").max(100),
+  email: emailSchema,
+  phone: z.string().trim().max(20).optional(),
+  password: passwordSchema,
+  dob: z.string().optional(),
+  status: z.literal("pending").optional(),
+});
+
+export const approveRegistrationSchema = z.object({
+  action: z.enum(["approve", "reject"], { required_error: "Action is required" }),
+  rejection_reason: z.string().trim().max(500).optional(),
+});
+
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Password is required"),

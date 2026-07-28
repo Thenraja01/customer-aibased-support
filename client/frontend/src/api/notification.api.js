@@ -7,7 +7,7 @@ export const NotificationAPI = {
   getUnread: (userId) =>
     AxiosInstance.get(`/notifications/user/${userId}/unread`),
   getUnreadCount: (userId) =>
-    AxiosInstance.get(`/notifications/user/${userId}/count`),
+    AxiosInstance.get(`/notifications/user/${userId}/unread/count`),
   markRead: (id) => AxiosInstance.patch(`/notifications/${id}/read`),
   markAllRead: (userId) =>
     AxiosInstance.patch(`/notifications/user/${userId}/read-all`),

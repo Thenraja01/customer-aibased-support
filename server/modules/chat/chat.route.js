@@ -1,6 +1,6 @@
 import express from "express";
 import * as chatController from "./chat.controller.js";
-import { protect, restrict, selfOrAdmin, selfOrAdminParam } from "../../middleware/auth.middleware.js";
+import { protect, restrict, selfOrAdmin, selfOrAdminParam, selfOrAdminByChatOwner } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { createChatSchema, updateTopicSchema } from "../../validation/index.js";
 
@@ -17,8 +17,9 @@ router.get("/user/:userId", selfOrAdminParam("userId"), chatController.getChatsB
 router.get("/user/:userId/count", selfOrAdminParam("userId"), chatController.getUserChatCount);
 router.get("/:id", chatController.getChat);
 router.patch("/:id/topic", selfOrAdmin, validate(updateTopicSchema), chatController.updateTopic);
+router.patch("/close-all", chatController.closeAll);
 router.patch("/:id/close", selfOrAdmin, chatController.close);
 router.patch("/:id/reopen", selfOrAdmin, chatController.reopen);
-router.delete("/:id", selfOrAdmin, chatController.removeChat);
+router.delete("/:id", selfOrAdminByChatOwner("id"), chatController.removeChat);
 
 export default router;

@@ -7,6 +7,7 @@ import UserForm from "@/components/admin/UserForm";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
 import { useAdminOrganizations } from "@/hooks/useAdminOrganizations";
 import { useAdminRoles } from "@/hooks/useAdminRoles";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function UsersPage() {
   const {
@@ -27,6 +28,8 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     fetchUsers({ page, limit: 10, search, status: statusFilter });

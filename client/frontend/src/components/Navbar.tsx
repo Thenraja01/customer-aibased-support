@@ -33,7 +33,7 @@ const roleNavLinks: Record<string, { name: string; path: string }[]> = {
   ],
   support: [
     { name: "Dashboard", path: "/support/dashboard" },
-    { name: "Chats", path: "/support/chats" },
+    { name: "Chats", path: "/support/chat" },
     { name: "Tickets", path: "/support/tickets" },
     { name: "FAQ", path: "/support/faq" },
   ],

@@ -1,7 +1,7 @@
 import Notification from "./notification.schema.js";
 import User from "../user/user.schema.js";
 import { getIO } from "../../config/socket.js";
-import { sendPushNotification } from "../../config/firebase.js";
+import { sendPushNotification, sendMulticastNotification } from "../../config/firebase.js";
 
 export const createNotification = async (data) => {
   const notif = await Notification.create(data);
@@ -34,8 +34,11 @@ export const broadcastNotification = async (data, userIds) => {
     title: data.title,
     message: data.message,
     type: data.type || "info",
+    link: data.link,
   }));
   const created = await Notification.insertMany(notifications);
+
+  // Emit real-time Socket.io events
   try {
     const io = getIO();
     created.forEach((notif) => {
@@ -44,6 +47,25 @@ export const broadcastNotification = async (data, userIds) => {
   } catch {
     // socket not available
   }
+
+  // Send FCM multicast push notification to all users who have a device token
+  try {
+    const recipients = await User.find(
+      { _id: { $in: userIds }, fcm_token: { $ne: null } },
+      { fcm_token: 1 }
+    ).lean();
+    const tokens = recipients.map((u) => u.fcm_token).filter(Boolean);
+    if (tokens.length > 0) {
+      await sendMulticastNotification(tokens, {
+        title: data.title,
+        body: data.message,
+        data: { type: data.type || "info", link: data.link || "" },
+      });
+    }
+  } catch {
+    // push notification error — do not break the broadcast
+  }
+
   return created;
 };
 

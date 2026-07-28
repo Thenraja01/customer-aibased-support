@@ -6,6 +6,7 @@ import { Plus, Search, X } from "lucide-react";
 import OrganizationTable from "@/components/admin/OrganizationTable";
 import OrganizationForm from "@/components/admin/OrganizationForm";
 import { useAdminOrganizations } from "@/hooks/useAdminOrganizations";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function OrganizationsPage() {
   const navigate = useNavigate();
@@ -26,6 +27,10 @@ export default function OrganizationsPage() {
   const [editingOrg, setEditingOrg] = useState<any>(null);
   const [viewingOrgUsers, setViewingOrgUsers] = useState<any>(null);
   const [actionError, setActionError] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmAction, setDeleteConfirmAction] = useState<(() => void) | null>(null);
+  const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
+  const [toggleConfirmAction, setToggleConfirmAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     fetchOrganizations({ page, limit: 10, search });
@@ -47,27 +52,31 @@ export default function OrganizationsPage() {
   };
 
   const handleDelete = async (org: any) => {
-    if (!confirm(`Delete organization "${org.name}"?\nThis action cannot be undone.`)) return;
-    setActionError("");
-    try {
-      await deleteOrganization(org._id);
-      refresh();
-    } catch (err: any) {
-      setActionError(err?.response?.data?.message || err?.message || "Failed to delete organization");
-    }
+    setDeleteConfirmAction(() => async () => {
+      setActionError("");
+      try {
+        await deleteOrganization(org._id);
+        refresh();
+      } catch (err: any) {
+        setActionError(err?.response?.data?.message || err?.message || "Failed to delete organization");
+      }
+    });
+    setDeleteConfirmOpen(true);
   };
 
   const handleToggleStatus = async (org: any) => {
     const newStatus = org.status === "inactive" ? "active" : "inactive";
     const action = newStatus === "active" ? "activate" : "suspend";
-    if (!confirm(`Are you sure you want to ${action} "${org.name}"?`)) return;
-    setActionError("");
-    try {
-      await updateOrganization(org._id, { status: newStatus });
-      refresh();
-    } catch (err: any) {
-      setActionError(err?.response?.data?.message || err?.message || `Failed to ${action} organization`);
-    }
+    setToggleConfirmAction(() => async () => {
+      setActionError("");
+      try {
+        await updateOrganization(org._id, { status: newStatus });
+        refresh();
+      } catch (err: any) {
+        setActionError(err?.response?.data?.message || err?.message || `Failed to ${action} organization`);
+      }
+    });
+    setToggleConfirmOpen(true);
   };
 
   const handleViewUsers = async (org: any) => {
@@ -165,6 +174,22 @@ export default function OrganizationsPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete Organization"
+        message="Are you sure you want to delete this organization? This action cannot be undone."
+        variant="danger"
+        onConfirm={() => { deleteConfirmAction?.(); setDeleteConfirmOpen(false); }}
+        onCancel={() => { setDeleteConfirmOpen(false); setDeleteConfirmAction(null); }}
+      />
+      <ConfirmDialog
+        open={toggleConfirmOpen}
+        title="Change Organization Status"
+        message="Are you sure you want to change this organization's status?"
+        variant="warning"
+        onConfirm={() => { toggleConfirmAction?.(); setToggleConfirmOpen(false); }}
+        onCancel={() => { setToggleConfirmOpen(false); setToggleConfirmAction(null); }}
+      />
     </div>
   );
 }

@@ -98,3 +98,41 @@ export const patchUserStatus = async (req, res) => {
     res.status(status).json({ success: false, message: error.message });
   }
 };
+
+/**
+ * POST /users/fcm-token
+ * Save or update the FCM device registration token for the authenticated user.
+ * The frontend must call this endpoint after the FCM SDK returns a new token
+ * (on first load, after token refresh, or after permission is granted).
+ */
+export const updateFcmToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token || typeof token !== "string" || token.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "A valid FCM token string is required",
+      });
+    }
+    await userService.saveFcmToken(req.user.userId, token.trim());
+    res.status(200).json({ success: true, message: "FCM token saved" });
+  } catch (error) {
+    const status = error.message === "User not found" ? 404 : 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * DELETE /users/fcm-token
+ * Remove the FCM device token for the authenticated user.
+ * Call this on logout or when push notifications are disabled by the user.
+ */
+export const removeFcmToken = async (req, res) => {
+  try {
+    const result = await userService.clearFcmToken(req.user.userId);
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

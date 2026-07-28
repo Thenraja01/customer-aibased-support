@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, memo } from "react";
-import { X, Loader2, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { X, Loader2, AlertCircle, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,8 +35,6 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
   const [form, setForm] = useState({ subject: "", description: "", priority: "medium" });
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [success, setSuccess] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
@@ -45,8 +43,6 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
       setForm({ subject: "", description: "", priority: "medium" });
       setErrors({});
       setTouched({});
-      setSuccess(false);
-      setApiError(null);
       setSelectedTemplate(null);
     }
   }, [open]);
@@ -97,8 +93,7 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
     if (touched[field]) {
       setErrors((prev) => ({ ...prev, [field]: validateField(field, value) }));
     }
-    if (apiError) setApiError(null);
-  }, [touched, validateField, apiError]);
+  }, [touched, validateField]);
 
   const handleBlur = useCallback((field: string) => (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -130,12 +125,10 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
 
     try {
       await addTicket(payload).unwrap();
-      setSuccess(true);
       toast.success("Ticket Created", "We'll review your request shortly");
       setTimeout(() => onClose(), 1500);
     } catch (err: any) {
       const msg = typeof err === "string" ? err : err?.message || "Failed to create ticket";
-      setApiError(msg);
       toast.error("Error", msg);
     }
   }, [form, user, addTicket, onClose, validate, toast]);
@@ -157,22 +150,7 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
           </button>
         </div>
 
-        {success ? (
-          <div className="flex flex-col items-center py-10 px-5">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/15 to-secondary/10 flex items-center justify-center mb-3">
-              <CheckCircle2 size={20} className="text-primary" />
-            </div>
-            <p className="text-sm font-medium">Ticket Created</p>
-            <p className="text-xs text-muted-foreground mt-1">We'll review your request shortly</p>
-          </div>
-        ) : (
           <form onSubmit={handleSubmit} noValidate className="p-5 space-y-4">
-            {apiError && (
-              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive" role="alert">
-                <AlertCircle size={14} />
-                {apiError}
-              </div>
-            )}
 
             {templates.length > 0 && (
               <div className="space-y-1.5">
@@ -264,7 +242,6 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
               </Button>
             </div>
           </form>
-        )}
       </div>
     </div>
   );

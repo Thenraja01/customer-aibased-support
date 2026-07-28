@@ -12,6 +12,7 @@ import WelcomeScreen from "@/components/chat/WelcomeScreen";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
 import TypingIndicator from "@/components/chat/TypingIndigator";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function ChatPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -37,6 +38,8 @@ export default function ChatPage() {
   const { containerRef, handleScroll } = useChatScroll(messages);
   const [escalating, setEscalating] = useState(false);
   const [escalated, setEscalated] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     if (!user?._id) return;

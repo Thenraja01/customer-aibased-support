@@ -117,6 +117,16 @@ export const reopen = async (req, res) => {
   }
 };
 
+export const closeAll = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const result = await chatService.closeAllUserChats(userId);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 export const removeChat = async (req, res) => {
   try {
     const result = await chatService.deleteChat(req.params.id);

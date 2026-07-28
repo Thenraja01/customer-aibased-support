@@ -13,6 +13,7 @@ import GlobalSearchPage from "@/pages/Admin/GlobalSearchPage";
 import ChatHistoryManagementPage from "@/pages/Admin/ChatHistoryManagementPage";
 import ChatPage from "@/pages/Customer/ChatPage";
 import KnowledgeGraphPage from "@/pages/SuperAdmin/KnowledgeGraphPage";
+import KnowledgeGapPage from "@/pages/Admin/KnowledgeGapPage";
 
 export const superAdminRoutes = (
   <Route element={<ProtectedRoute allowedRoles={["super_admin"]} />}>
@@ -29,5 +30,6 @@ export const superAdminRoutes = (
     <Route path="/superadmin/chat-history" element={<ChatHistoryManagementPage />} />
     <Route path="/superadmin/chatbot" element={<ChatPage />} />
     <Route path="/superadmin/knowledge-graph" element={<KnowledgeGraphPage />} />
+    <Route path="/superadmin/knowledge-gaps" element={<KnowledgeGapPage />} />
   </Route>
 );

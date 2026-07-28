@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Trash2, Loader2, AlertCircle, Clock, CheckCircle2, RotateCcw, MessageSquare } from "lucide-react";
+import { ArrowLeft, Send, Trash2, Loader2, Clock, CheckCircle2, RotateCcw, MessageSquare } from "lucide-react";
 import { useAuthContext } from "@/context/AuthContext";
 import { TicketAPI } from "@/api";
+import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface TicketMessage {
   _id: string;
@@ -22,8 +24,10 @@ export default function TicketDetailPage() {
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [internalNote, setInternalNote] = useState(false);
-  const [error, setError] = useState("");
+  const toast = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -51,20 +55,23 @@ export default function TicketDetailPage() {
         setNewMessage("");
       }
     } catch {
-      setError("Failed to send message");
+      toast.error("Error", "Failed to send message");
     } finally {
       setSending(false);
     }
   };
 
-  const handleDeleteMessage = async (messageId: string) => {
-    if (!id || !confirm("Delete this message?")) return;
-    try {
-      await TicketAPI.deleteMessage(id, messageId);
-      setMessages((prev) => prev.filter((m) => m._id !== messageId));
-    } catch {
-      setError("Failed to delete message");
-    }
+  const handleDeleteMessage = (messageId: string) => {
+    if (!id) return;
+    setConfirmAction(() => async () => {
+      try {
+        await TicketAPI.deleteMessage(id, messageId);
+        setMessages((prev) => prev.filter((m) => m._id !== messageId));
+      } catch {
+        toast.error("Error", "Failed to delete message");
+      }
+    });
+    setConfirmOpen(true);
   };
 
   if (loading) {
@@ -98,7 +105,7 @@ export default function TicketDetailPage() {
       else if (status === "open") res = await TicketAPI.reopen(ticket._id);
       if (res?.data.success) setTicket(res.data.data);
     } catch {
-      setError("Failed to update status");
+      toast.error("Error", "Failed to update status");
     }
   };
 
@@ -167,12 +174,8 @@ export default function TicketDetailPage() {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive flex items-center gap-2 mb-4">
-          <AlertCircle size={14} />{error}
-          <button onClick={() => setError("")} className="ml-auto"><span className="text-xs">&times;</span></button>
-        </div>
-      )}
+
+
 
       <div className="flex-1 overflow-y-auto space-y-3 mb-4">
         {messages.length === 0 ? (
@@ -244,6 +247,14 @@ export default function TicketDetailPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Message"
+        message="Are you sure you want to delete this message? This action cannot be undone."
+        variant="danger"
+        onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
+        onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
     </div>
   );
 }

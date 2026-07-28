@@ -12,4 +12,9 @@ export const UsersAPI = {
 
   changePassword: (currentPassword, newPassword) =>
     AxiosInstance.put("/users/password", { currentPassword, newPassword }),
+
+  requestOtp: (email) => AxiosInstance.post("/users/otp/request", { email }),
+  verifyOtp: (email, otp) => AxiosInstance.post("/users/otp/verify", { email, otp }),
+  resetPasswordWithOtp: (email, otp, newPassword) =>
+    AxiosInstance.post("/users/otp/reset-password", { email, otp, newPassword }),
 };

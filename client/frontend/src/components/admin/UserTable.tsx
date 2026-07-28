@@ -67,9 +67,8 @@ export default function UserTable({
                 {user.organization_id?.name || "-"}
               </td>
               <td className="py-3 px-4">
-                <Badge variant="secondary">
+           
                   {user.role_id?.role_name || "-"}
-                </Badge>
               </td>
               <td className="py-3 px-4">
                 <span

@@ -263,15 +263,6 @@ export const getRAGStats = async (req, res) => {
   }
 };
 
-export const getKnowledgeGraphStats = async (req, res) => {
-  try {
-    const stats = await adminService.getKnowledgeGraphStats();
-    res.status(200).json({ success: true, data: stats });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
 export const getDocumentTypes = async (req, res) => {
   try {
     const { page, limit, search } = req.query;
@@ -427,6 +418,37 @@ export const deleteChat = async (req, res) => {
   } catch (error) {
     const status = error.message === "Chat not found" ? 404 : 500;
     res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteAllChats = async (req, res) => {
+  try {
+    const { search, status, from, to, userId } = req.query;
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const result = await adminService.deleteAllChats(
+      { search, status, from, to, userId },
+      isSuperAdmin ? null : req.user?.organizationId
+    );
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const exportChats = async (req, res) => {
+  try {
+    const { search, status, from, to, userId } = req.query;
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const result = await adminService.exportChats(
+      { search, status, from, to, userId },
+      isSuperAdmin ? null : req.user?.organizationId
+    );
+    const filename = `chat-history-export-${Date.now()}.csv`;
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(result);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

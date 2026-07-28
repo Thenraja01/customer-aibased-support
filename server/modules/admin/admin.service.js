@@ -14,7 +14,6 @@ import Notification from "../notification/notification.schema.js";
 import Ticket from "../ticket/ticket.schema.js";
 import GlobalSetting from "../global-setting/globalSetting.schema.js";
 import { getRAGStats as getRAGStatsFromService } from "../rag/rag.service.js";
-import { getGraphStats as getGraphStatsFromService } from "../knowledge-graph/knowledgeGraph.service.js";
 import { escapeRegex } from "../../utils/escapeRegex.js";
 
 let isMaintenanceMode = false;
@@ -281,10 +280,6 @@ export const getRAGStats = async () => {
   return await getRAGStatsFromService();
 };
 
-export const getKnowledgeGraphStats = async () => {
-  return await getGraphStatsFromService();
-};
-
 export const getDocumentTypesPaginated = async (page = 1, limit = 10, search = "") => {
   const query = search ? { name: { $regex: escapeRegex(search), $options: "i" } } : {};
   const total = await DocumentType.countDocuments(query);
@@ -532,6 +527,73 @@ export const deleteChat = async (chatId) => {
     ChatMemory.deleteMany({ chat_id: chatId }),
   ]);
   return { message: "Chat and related data deleted successfully" };
+};
+
+export const deleteAllChats = async (filters = {}, organizationId = null) => {
+  const query = {};
+  if (organizationId) query.organization_id = organizationId;
+  if (filters.status) query.status = filters.status;
+  if (filters.search) {
+    const safe = escapeRegex(filters.search);
+    query.$or = [{ topic: { $regex: safe, $options: "i" } }];
+  }
+  if (filters.from || filters.to) {
+    query.created_at = {};
+    if (filters.from) query.created_at.$gte = new Date(filters.from);
+    if (filters.to) query.created_at.$lte = new Date(filters.to);
+  }
+  if (filters.userId) query.user_id = filters.userId;
+
+  const chats = await Chat.find(query).select("_id").lean();
+  const chatIds = chats.map((c) => c._id);
+  const count = chatIds.length;
+
+  if (count === 0) return { message: "No chats matched the filters", deletedCount: 0 };
+
+  await Promise.all([
+    Message.deleteMany({ chat_id: { $in: chatIds } }),
+    AISession.deleteMany({ chat_id: { $in: chatIds } }),
+    ChatMemory.deleteMany({ chat_id: { $in: chatIds } }),
+    Chat.deleteMany({ _id: { $in: chatIds } }),
+  ]);
+
+  return { message: `${count} chat(s) and related data deleted successfully`, deletedCount: count };
+};
+
+export const exportChats = async (filters = {}, organizationId = null) => {
+  const query = {};
+  if (organizationId) query.organization_id = organizationId;
+  if (filters.status) query.status = filters.status;
+  if (filters.search) {
+    const safe = escapeRegex(filters.search);
+    query.$or = [{ topic: { $regex: safe, $options: "i" } }];
+  }
+  if (filters.from || filters.to) {
+    query.created_at = {};
+    if (filters.from) query.created_at.$gte = new Date(filters.from);
+    if (filters.to) query.created_at.$lte = new Date(filters.to);
+  }
+  if (filters.userId) query.user_id = filters.userId;
+
+  const chats = await Chat.find(query)
+    .populate("user_id", "name email")
+    .populate("organization_id", "name")
+    .sort({ updated_at: -1 })
+    .lean();
+
+  const headers = ["Topic", "User", "Email", "Organization", "Status", "Created At", "Updated At"];
+  const rows = chats.map((c) => [
+    `"${(c.topic || "Untitled").replace(/"/g, '""')}"`,
+    `"${(c.user_id?.name || "Unknown").replace(/"/g, '""')}"`,
+    `"${(c.user_id?.email || "").replace(/"/g, '""')}"`,
+    `"${(c.organization_id?.name || "").replace(/"/g, '""')}"`,
+    c.status,
+    c.created_at ? new Date(c.created_at).toISOString() : "",
+    c.updated_at ? new Date(c.updated_at).toISOString() : "",
+  ]);
+
+  const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  return csv;
 };
 
 export const getAllUsersBasic = async (organizationId = null) => {

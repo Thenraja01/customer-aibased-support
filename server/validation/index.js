@@ -1,5 +1,5 @@
-export { registerSchema, loginSchema, changePasswordSchema } from "./auth.validation.js";
-export { createUserSchema, updateUserSchema, updateUserStatusSchema, updateProfileSchema, userPasswordSchema } from "./user.validation.js";
+export { registerSchema, loginSchema, changePasswordSchema, registerWithApprovalSchema, approveRegistrationSchema } from "./auth.validation.js";
+export { createUserSchema, updateUserSchema, updateUserStatusSchema, updateProfileSchema, userPasswordSchema, requestOtpSchema, verifyOtpSchema, resetPasswordWithOtpSchema } from "./user.validation.js";
 export { createChatSchema, updateTopicSchema } from "./chat.validation.js";
 export { sendMessageSchema, updateMessageSchema } from "./message.validation.js";
 export { createTicketSchema, assignTicketSchema, updatePrioritySchema } from "./ticket.validation.js";

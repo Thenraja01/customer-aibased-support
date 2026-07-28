@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, FileText, Shield,
   FileType, Sparkles, HelpCircle, Settings, ArrowLeft, User,
-  LogOut, Menu, Bell, X, ListOrdered, MessageCircle, ChevronDown, CheckSquare
+  LogOut, Menu, Bell, X, ListOrdered, MessageCircle, ChevronDown, CheckSquare, AlertTriangle, Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -13,9 +13,11 @@ import { useNotifications } from "@/hooks/useNotifications";
 const navLinks = [
   { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Team", path: "/admin/team", icon: Users },
+  { name: "Pending Approvals", path: "/admin/pending-approvals", icon: Clock },
   { name: "Roles", path: "/admin/roles", icon: Shield },
   { name: "FAQ", path: "/admin/faq", icon: HelpCircle },
   { name: "AI Control", path: "/admin/ai", icon: Sparkles },
+  { name: "Knowledge Gaps", path: "/admin/knowledge-gaps", icon: AlertTriangle },
   { name: "Queue", path: "/admin/queue", icon: ListOrdered },
   { name: "Chat History", path: "/admin/chat-history", icon: MessageCircle },
   { name: "Notifications", path: "/admin/notifications", icon: Bell },
@@ -36,6 +38,7 @@ export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const location = useLocation();
   const { user, orgSettings, logout } = useAuth();
   const orgName = orgSettings?.name || user?.organization_id?.name || "SupportAI";
@@ -56,6 +59,15 @@ export default function AdminLayout() {
     loadNotifications();
     loadUnreadCount();
   }, [loadNotifications, loadUnreadCount]);
+
+  // Load pending approvals count for badge
+  useEffect(() => {
+    import("@/api/auth.api").then(({ AuthAPI }) => {
+      AuthAPI.getPendingRegistrations()
+        .then((res: any) => setPendingCount(res.data.data?.length || 0))
+        .catch(() => {/* silently fail */});
+    });
+  }, [location.pathname]);
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -106,9 +118,10 @@ export default function AdminLayout() {
 
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {/* Flat nav links before Documents group */}
-          {[navLinks[0], navLinks[1], navLinks[2]].map((link) => {
+          {[navLinks[0], navLinks[1], navLinks[2], navLinks[3]].map((link) => {
             const Icon = link.icon;
             const isActive = location.pathname === link.path || location.pathname.startsWith(link.path + "/");
+            const isPending = link.path === "/admin/pending-approvals";
             return (
               <Link key={link.name} to={link.path}
                 className={cn(
@@ -120,7 +133,12 @@ export default function AdminLayout() {
                 aria-current={isActive ? "page" : undefined}
               >
                 <Icon size={18} />
-                <span>{link.name}</span>
+                <span className="flex-1">{link.name}</span>
+                {isPending && pendingCount > 0 && (
+                  <span className="ml-auto text-[10px] font-bold bg-amber-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                    {pendingCount > 99 ? "99+" : pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}

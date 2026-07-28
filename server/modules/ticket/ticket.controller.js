@@ -4,9 +4,10 @@ import * as notifService from "../notification/notification.service.js";
 
 export const create = async (req, res) => {
   try {
-    const ticket = await ticketService.createTicket(req.body);
+    const orgId = req.user?.organizationId;
+    const ticket = await ticketService.createTicket(req.body, orgId);
 
-    const supportUserIds = await ticketService.getSupportUserIds(req.user?.organizationId);
+    const supportUserIds = await ticketService.getSupportUserIds(orgId);
     if (supportUserIds.length > 0) {
       await notifService.broadcastNotification({
         title: "New ticket created",
@@ -14,6 +15,16 @@ export const create = async (req, res) => {
         type: "info",
         link: `/support/tickets/${ticket._id}`,
       }, supportUserIds);
+    }
+
+    if (ticket.assigned_to) {
+      await notifService.createNotification({
+        user_id: ticket.assigned_to._id || ticket.assigned_to,
+        title: "Ticket assigned to you",
+        message: `You have been assigned "${ticket.subject}" via round-robin`,
+        type: "info",
+        link: `/support/tickets/${ticket._id}`,
+      });
     }
 
     res.status(201).json({ success: true, data: ticket });
@@ -220,13 +231,25 @@ export const deleteMessage = async (req, res) => {
 export const escalateFromChat = async (req, res) => {
   try {
     const { chatId, subject, description } = req.body;
+    const orgId = req.user.organizationId;
     const ticket = await ticketService.escalateFromChat({
       chatId,
       subject: subject || "Escalated from AI Chat",
       description,
       userId: req.user.userId,
-      organizationId: req.user.organizationId,
+      organizationId: orgId,
     });
+
+    if (ticket.assigned_to) {
+      await notifService.createNotification({
+        user_id: ticket.assigned_to._id || ticket.assigned_to,
+        title: "Ticket assigned to you",
+        message: `You have been assigned "${ticket.subject}" via round-robin`,
+        type: "info",
+        link: `/support/tickets/${ticket._id}`,
+      });
+    }
+
     res.status(201).json({ success: true, data: ticket });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

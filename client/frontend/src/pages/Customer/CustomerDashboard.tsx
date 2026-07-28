@@ -1,9 +1,10 @@
-import { useEffect, useState, memo } from "react";
+import { useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageSquare, Ticket, Clock, CheckCircle2, ArrowRight, Headphones, Loader2, AlertCircle } from "lucide-react";
+import { MessageSquare, Ticket, Clock, CheckCircle2, ArrowRight, Headphones, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTickets } from "@/hooks/useTickets";
 import { useChat } from "@/hooks/useChat";
+import { useToast } from "@/components/ui/toast";
 
 interface StatCardProps {
   icon: React.ComponentType<{ size?: number }>;
@@ -33,15 +34,15 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
   const { tickets, loadUserTickets, loading: ticketsLoading } = useTickets();
   const { chats, loadUserChats, loading: chatsLoading } = useChat();
-  const [error, setError] = useState("");
+  const toast = useToast();
 
   useEffect(() => {
     if (user?._id) {
       Promise.all([loadUserTickets(), loadUserChats()]).catch(() =>
-        setError("Failed to load dashboard data")
+        toast.error("Error", "Failed to load dashboard data")
       );
     }
-  }, [user, loadUserTickets, loadUserChats]);
+  }, [user, loadUserTickets, loadUserChats, toast]);
 
   const loading = ticketsLoading || chatsLoading;
 
@@ -58,13 +59,6 @@ export default function CustomerDashboard() {
         </h1>
         <p className="text-sm text-muted-foreground">Manage your support requests and get help.</p>
       </div>
-
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2" role="alert">
-          <AlertCircle size={14} />
-          {error}
-        </div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12" role="status">

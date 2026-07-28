@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Save, AlertCircle, CheckCircle2, Palette, Globe, LogIn, FileText, Plus, Trash2 } from "lucide-react";
+import { Save, Palette, Globe, LogIn, FileText, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminAPI } from "@/api/admin.api";
+import { useToast } from "@/components/ui/toast";
 
 type Tab = "marketing" | "branding" | "login" | "legal";
 
@@ -19,7 +20,7 @@ export default function AppSettingsPage() {
   const [form, setForm] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     loadSettings();
@@ -55,7 +56,7 @@ export default function AppSettingsPage() {
         });
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to load settings" });
+      toast.error("Error", "Failed to load settings");
     } finally {
       setLoading(false);
     }
@@ -63,14 +64,14 @@ export default function AppSettingsPage() {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    setMessage(null);
+    
     try {
       const res = await AdminAPI.updateGlobalSettings(form);
       if (res.data.success) {
-        setMessage({ type: "success", text: "Settings saved successfully" });
+        toast.success("Success", "Settings saved successfully");
       }
     } catch (err: any) {
-      setMessage({ type: "error", text: err?.response?.data?.message || "Failed to save settings" });
+      toast.error("Error", err?.response?.data?.message || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -127,18 +128,7 @@ export default function AppSettingsPage() {
         </Button>
       </div>
 
-      {message && (
-        <div
-          className={`flex items-center gap-2 px-4 py-3 rounded-lg border text-sm ${
-            message.type === "success"
-              ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
-              : "border-destructive/30 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-          {message.text}
-        </div>
-      )}
+
 
       <div className="flex gap-1 border-b dark:border-white/[0.06] overflow-x-auto">
         {tabs.map((tab) => (

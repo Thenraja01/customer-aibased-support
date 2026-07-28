@@ -1,5 +1,4 @@
 import * as ragService from "./rag.service.js";
-import * as kgService from "../knowledge-graph/knowledgeGraph.service.js";
 import * as chunkService from "../document/documentChunk.service.js";
 
 export const ingest = async (req, res) => {
@@ -39,24 +38,6 @@ export const getStats = async (req, res) => {
   try {
     const stats = await ragService.getRAGStats();
     res.status(200).json({ success: true, data: stats });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-export const getGlobalStats = async (req, res) => {
-  try {
-    const graphStats = await kgService.getGraphStats();
-    res.status(200).json({ success: true, data: graphStats });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-export const getDocumentGraph = async (req, res) => {
-  try {
-    const nodes = await kgService.findNodesByDocument(req.params.documentId);
-    res.status(200).json({ success: true, data: nodes });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -86,7 +86,7 @@ export default function SupportDashboard() {
           <Button variant="outline" size="sm" onClick={() => navigate("/support/tickets")}>
             <Ticket size={14} className="mr-1" /> All Tickets
           </Button>
-          <Button size="sm" onClick={() => navigate("/support/support-chats")}>
+          <Button size="sm" onClick={() => navigate("/support/chat")}>
             <MessageSquare size={14} className="mr-1" /> Chat
           </Button>
         </div>
@@ -119,7 +119,7 @@ export default function SupportDashboard() {
           </CardContent>
         </Card>
 
-        <Card size="sm" className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/support/support-chats")}>
+        <Card size="sm" className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/support/chat")}>
           <CardContent className="flex items-center gap-4 px-5 py-4">
             <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
               <Bell size={18} className="text-destructive" />
@@ -131,7 +131,7 @@ export default function SupportDashboard() {
           </CardContent>
         </Card>
 
-        <Card size="sm" className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/support/support-chats")}>
+        <Card size="sm" className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/support/chat")}>
           <CardContent className="flex items-center gap-4 px-5 py-4">
             <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center shrink-0">
               <Users size={18} className="text-green-600" />
@@ -305,7 +305,7 @@ export default function SupportDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <QuickAction icon={Ticket} label="Manage Tickets" desc="View, assign, and update tickets" onClick={() => navigate("/support/tickets")} />
-        <QuickAction icon={MessageSquare} label="Customer Chat" desc="Respond to live chat requests" onClick={() => navigate("/support/support-chats")} />
+        <QuickAction icon={MessageSquare} label="Customer Chat" desc="Respond to live chat requests" onClick={() => navigate("/support/chat")} />
         <QuickAction icon={FileText} label="FAQ Management" desc="Create and manage FAQs" onClick={() => navigate("/support/faq")} />
         <QuickAction icon={Users} label="Queue & Assign" desc="View queue and agent workload" onClick={() => navigate("/support/queue")} />
       </div>

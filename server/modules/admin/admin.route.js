@@ -41,7 +41,6 @@ router.patch("/document-verifications/:id/approve", restrict("super admin", "adm
 router.patch("/document-verifications/:id/reject", restrict("super admin", "admin"), adminController.rejectDocument);
 
 router.get("/rag-stats", restrict("super admin", "admin"), adminController.getRAGStats);
-router.get("/knowledge-graph-stats", restrict("super admin", "admin"), adminController.getKnowledgeGraphStats);
 
 router.get("/document-types", restrict("super admin"), adminController.getDocumentTypes);
 router.post("/document-types", restrict("super admin"), validate(createDocumentTypeSchema), adminController.createDocumentType);
@@ -60,12 +59,14 @@ router.get("/usage/stats", restrict("super admin"), adminController.getUsageStat
 router.post("/organizations/:id/api-keys", restrict("super admin"), adminController.createOrgApiKey);
 router.delete("/organizations/:id/api-keys/:keyId", restrict("super admin"), adminController.revokeOrgApiKey);
 
-router.get("/users/basic", restrict("super admin", "admin"), adminController.getUsersBasic);
+router.get("/users/basic", restrict("super admin", "tenant admin", "admin"), adminController.getUsersBasic);
 
-router.get("/chats", restrict("super admin", "admin"), adminController.getChats);
-router.get("/chats/:id", restrict("super admin", "admin"), adminController.getChatDetail);
-router.patch("/chats/:id/status", restrict("super admin", "admin"), adminController.updateChatStatus);
-router.delete("/chats/:id", restrict("super admin", "admin"), adminController.deleteChat);
+router.get("/chats", restrict("super admin", "tenant admin", "admin"), adminController.getChats);
+router.delete("/chats", restrict("super admin", "tenant admin", "admin"), adminController.deleteAllChats);
+router.get("/chats/export", restrict("super admin", "tenant admin", "admin"), adminController.exportChats);
+router.get("/chats/:id", restrict("super admin", "tenant admin", "admin"), adminController.getChatDetail);
+router.patch("/chats/:id/status", restrict("super admin", "tenant admin", "admin"), adminController.updateChatStatus);
+router.delete("/chats/:id", restrict("super admin", "tenant admin", "admin"), adminController.deleteChat);
 
 // Command Center (Super Admin Only)
 router.get("/command-center/status", restrict("super admin"), adminController.getCommandCenterStatus);

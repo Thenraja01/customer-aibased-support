@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, AlertCircle, X, Check, FileText, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Check, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TicketTemplateAPI } from "@/api";
+import { useToast } from "@/components/ui/toast";
 
 interface Template {
   _id: string;
@@ -24,7 +25,7 @@ export default function TicketTemplatesManager() {
   const [editing, setEditing] = useState<Template | null>(null);
   const [formData, setFormData] = useState({ name: "", category: "", default_priority: "medium", default_subject: "", default_description: "" });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const toast = useToast();
 
   useEffect(() => { loadTemplates(); }, []);
 
@@ -33,7 +34,7 @@ export default function TicketTemplatesManager() {
     try {
       const res = await TicketTemplateAPI.getAll();
       if (res.data.success) setTemplates(res.data.data || []);
-    } catch { setError("Failed to load templates"); }
+    } catch { toast.error("Error", "Failed to load templates"); }
     finally { setLoading(false); }
   };
 
@@ -41,7 +42,6 @@ export default function TicketTemplatesManager() {
     setFormData({ name: "", category: "", default_priority: "medium", default_subject: "", default_description: "" });
     setEditing(null);
     setShowForm(false);
-    setError("");
   };
 
   const openEdit = (t: Template) => {
@@ -52,7 +52,7 @@ export default function TicketTemplatesManager() {
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.category.trim() || !formData.default_subject.trim() || !formData.default_description.trim()) {
-      setError("All fields are required");
+      toast.warning("Warning", "All fields are required");
       return;
     }
     setSaving(true);
@@ -65,7 +65,7 @@ export default function TicketTemplatesManager() {
       resetForm();
       loadTemplates();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to save template");
+      toast.error("Error", err.response?.data?.message || "Failed to save template");
     } finally { setSaving(false); }
   };
 
@@ -74,14 +74,14 @@ export default function TicketTemplatesManager() {
     try {
       await TicketTemplateAPI.delete(t._id);
       loadTemplates();
-    } catch { setError("Failed to delete template"); }
+    } catch { toast.error("Error", "Failed to delete template"); }
   };
 
   const toggleActive = async (t: Template) => {
     try {
       await TicketTemplateAPI.update(t._id, { is_active: !t.is_active });
       loadTemplates();
-    } catch { setError("Failed to update template"); }
+    } catch { toast.error("Error", "Failed to update template"); }
   };
 
   const priorityColor = (p: string) => {
@@ -102,12 +102,8 @@ export default function TicketTemplatesManager() {
         </Button>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
-          <AlertCircle size={14} /> {error}
-          <button onClick={() => setError("")} className="ml-auto"><X size={14} /></button>
-        </div>
-      )}
+
+
 
       {showForm && (
         <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-4">

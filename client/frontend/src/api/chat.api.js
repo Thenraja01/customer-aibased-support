@@ -10,6 +10,7 @@ export const ChatAPI = {
   search: (params) => AxiosInstance.get("/chats/search", { params }),
   updateTopic: (id, data) => AxiosInstance.patch(`/chats/${id}/topic`, data),
   close: (id) => AxiosInstance.patch(`/chats/${id}/close`),
+  closeAll: () => AxiosInstance.patch("/chats/close-all"),
   reopen: (id) => AxiosInstance.patch(`/chats/${id}/reopen`),
   delete: (id) => AxiosInstance.delete(`/chats/${id}`),
   sendAI: (chatId, message) =>

@@ -15,3 +15,4 @@ export { MemoryAPI } from "./memory.api.js";
 export { AISessionAPI } from "./aiSession.api.js";
 export { SearchAPI } from "./search.api.js";
 export { TicketTemplateAPI } from "./ticketTemplate.api.js";
+export { KnowledgeGapAPI } from "./knowledgeGap.api.js";

@@ -3,7 +3,7 @@ import Role from "./role.schema.js";
 export const createRole = async (roleData) => {
   const { role_name, organization_id = null, permissions = [], status = 'active', description = '' } = roleData;
 
-  if (role_name.trim().toLowerCase() === "super admin") {
+  if (role_name.trim().toLowerCase() === "super admin" || role_name.trim().toLowerCase() === "super_admin" ) {
     throw new Error("Cannot create super admin role");
   }
 

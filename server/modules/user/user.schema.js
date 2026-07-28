@@ -29,11 +29,23 @@ const userSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "inactive", "blocked"],
+      // pending   = awaiting admin review
+      // approved  = admin approved, OTP not yet verified
+      // active    = fully verified, can login
+      // inactive  = disabled by admin
+      // blocked   = rejected / blocked
+      enum: ["pending", "approved", "active", "inactive", "blocked"],
       maxlength: 20,
       default: "active",
     },
+    // Admin approval tracking
+    approved_by: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    approved_at: { type: Date, default: null },
+    rejection_reason: { type: String, maxlength: 500, default: null },
+
     fcm_token: { type: String, default: null },
+    otp: { type: String, default: null },
+    otp_expiry: { type: Date, default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: false } }
 );

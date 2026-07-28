@@ -2,7 +2,6 @@ import Document from "./document.schema.js";
 import DocumentChunk from "./documentChunk.schema.js";
 import DocumentRoleAccess from "./documentRoleAccess.schema.js";
 import DocumentVerification from "../document-verification/documentVerification.schema.js";
-import { deleteNodesByDocument, deleteEdgesByDocument } from "../knowledge-graph/knowledgeGraph.service.js";
 import { ingestDocument } from "../rag/rag.service.js";
 import { extractTextFromBuffer } from "../../utils/extractText.utils.js";
 import { uploadFileToGridFS, getFileFromGridFS, deleteFileFromGridFS } from "../../services/gridfs.service.js";
@@ -186,8 +185,6 @@ export const deleteDocument = async (id) => {
   await Promise.all([
     DocumentChunk.deleteMany({ document_id: id }),
     DocumentRoleAccess.deleteMany({ document_id: id }),
-    deleteNodesByDocument(id),
-    deleteEdgesByDocument(id),
     doc.file_id ? deleteFileFromGridFS(doc.file_id) : Promise.resolve(),
   ]);
 

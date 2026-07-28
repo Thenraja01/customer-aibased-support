@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Loader2, AlertCircle, CheckCircle2, MessageSquare } from "lucide-react";
+import { ArrowLeft, Send, Loader2, CheckCircle2, MessageSquare } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { TicketAPI } from "@/api";
+import { useToast } from "@/components/ui/toast";
 
 interface TicketMessage {
   _id: string;
@@ -16,12 +17,12 @@ export default function TicketDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
   const [ticket, setTicket] = useState<any>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState("");
-  const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function TicketDetailPage() {
         setNewMessage("");
       }
     } catch {
-      setError("Failed to send message");
+      toast.error("Error", "Failed to send message");
     } finally {
       setSending(false);
     }
@@ -63,7 +64,7 @@ export default function TicketDetailPage() {
       const res = await TicketAPI.close(id);
       if (res.data.success) setTicket(res.data.data);
     } catch {
-      setError("Failed to close ticket");
+      toast.error("Error", "Failed to close ticket");
     }
   };
 
@@ -140,13 +141,6 @@ export default function TicketDetailPage() {
             <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Escalated from AI Chat</p>
           </div>
           <pre className="text-xs whitespace-pre-wrap text-muted-foreground leading-relaxed font-sans">{ticket.escalated_from_chat.conversation_preview}</pre>
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive flex items-center gap-2 mb-4">
-          <AlertCircle size={14} />{error}
-          <button onClick={() => setError("")} className="ml-auto"><span className="text-xs">&times;</span></button>
         </div>
       )}
 

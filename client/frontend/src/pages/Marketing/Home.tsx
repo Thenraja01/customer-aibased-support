@@ -97,53 +97,66 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-16 pb-16">
-      {/* Hero */}
-      <section className="relative overflow-hidden px-4 pt-16 pb-24 lg:pt-32 lg:pb-40">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background dark:from-primary/15 dark:via-background dark:to-background" />
+    
+      <section
+        className="relative overflow-hidden px-4 pt-16 pb-24 lg:pt-32 lg:pb-40 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/src/bg-aimodel.jpg')",
+        }}
+      >
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-background/75 dark:bg-background/80 -z-0" />
+
+        {/* Existing gradient */}
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background/30 to-background dark:from-primary/15 dark:via-background/40 dark:to-background" />
+
         <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/10 blur-3xl dark:bg-primary/5 animate-pulse-glow" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-secondary/10 blur-3xl dark:bg-secondary/5 animate-pulse-glow [animation-delay:1.5s]" />
-        <div className="container mx-auto max-w-5xl text-center">
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <Badge className="mb-6 dark:bg-primary/15 dark:text-primary dark:border-primary/20" variant="secondary">
-              {m.hero_title || "AI-Powered Customer Support"}
-            </Badge>
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl mb-6"
-          >
-            {appName}
-            <br />
-            <span className="text-primary bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text dark:text-transparent dark:bg-[length:200%_auto] dark:animate-gradient-x">
-              That Works 24/7
-            </span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mx-auto max-w-2xl text-lg text-muted-foreground mb-8 leading-relaxed"
-          >
-            {m.hero_subtitle || "Deliver instant, intelligent customer support across chat, email, and messaging platforms."}
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
-          >
-            <Button size="lg" variant="outline" className="dark:border-primary/30 dark:hover:bg-primary/10 dark:hover:border-primary/50 dark:shadow-lg dark:shadow-primary/10">
-              <Link to="/contact">{m.hero_cta_text || "Request a Demo"}</Link>
-            </Button>
-            <Button size="lg" variant="ghost" className="dark:hover:bg-primary/10">
-              <Link to="/contact">Start Free Trial</Link>
-            </Button>
-            <Button size="lg" variant="ghost" className="dark:hover:bg-primary/10">
-              <Link to="/contact">Contact Sales</Link>
-            </Button>
-          </motion.div>
+
+        <div className="container relative z-10 mx-auto max-w-5xl text-center">
+          <div className="container mx-auto max-w-5xl text-center">
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+              <Badge className="mb-6 dark:bg-primary/15 dark:text-primary dark:border-primary/20" variant="secondary">
+                {m.hero_title || "AI-Powered Customer Support"}
+              </Badge>
+            </motion.div>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl mb-6"
+            >
+              {appName}
+              <br />
+              <span className="text-primary bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text dark:text-transparent dark:bg-[length:200%_auto] dark:animate-gradient-x">
+                That Works 24/7
+              </span>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="mx-auto max-w-2xl text-lg text-muted-foreground mb-8 leading-relaxed"
+            >
+              {m.hero_subtitle || "Deliver instant, intelligent customer support across chat, email, and messaging platforms."}
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            >
+              <Button size="lg" variant="outline" className="dark:border-primary/30 dark:hover:bg-primary/10 dark:hover:border-primary/50 dark:shadow-lg dark:shadow-primary/10">
+                <Link to="/contact">{m.hero_cta_text || "Request a Demo"}</Link>
+              </Button>
+              <Button size="lg" variant="ghost" className="dark:hover:bg-primary/10">
+                <Link to="/contact">Start Free Trial</Link>
+              </Button>
+              <Button size="lg" variant="ghost" className="dark:hover:bg-primary/10">
+                <Link to="/contact">Contact Sales</Link>
+              </Button>
+            </motion.div>
+          </div>
         </div>
       </section>
 

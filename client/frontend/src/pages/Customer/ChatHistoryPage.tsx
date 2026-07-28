@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ChatAPI } from "@/api";
-import { MessageSquare, Clock, Trash2, Eye, Search, AlertCircle, Loader2 } from "lucide-react";
+import { MessageSquare, Clock, Trash2, Eye, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
@@ -20,7 +20,6 @@ export default function ChatHistoryPage() {
   const toast = useToast();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -32,14 +31,13 @@ export default function ChatHistoryPage() {
   const loadChats = async () => {
     if (!user?._id) return;
     setLoading(true);
-    setError("");
     try {
       const res = await ChatAPI.getByUser(user._id);
       if (res.data.success) {
         setChats(res.data.data);
       }
     } catch {
-      setError("Failed to load chat history. Please try again.");
+      toast.error("Error", "Failed to load chat history. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -94,13 +92,6 @@ export default function ChatHistoryPage() {
         </div>
         <Button onClick={() => navigate("/chat")} size="sm">Start New Chat</Button>
       </div>
-
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2" role="alert">
-          <AlertCircle size={14} />
-          {error}
-        </div>
-      )}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
