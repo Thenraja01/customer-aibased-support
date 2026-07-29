@@ -49,6 +49,8 @@ export default function AIControlCenterPage() {
     similarity_threshold: 0.75,
     max_tokens: 2048,
     response_style: "balanced",
+    system_prompt: "",
+    confidence_threshold: 0.7,
   });
 
   // Guardrails
@@ -390,6 +392,27 @@ export default function AIControlCenterPage() {
                 <option value="balanced">Balanced — Moderate detail</option>
                 <option value="detailed">Detailed — Comprehensive explanations</option>
               </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="confidence_threshold">Confidence Threshold ({aiSettings.confidence_threshold})</Label>
+              <input
+                id="confidence_threshold"
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={aiSettings.confidence_threshold ?? 0.7}
+                onChange={(e) => setAiSettings({ ...aiSettings, confidence_threshold: parseFloat(e.target.value) })}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Low (0)</span>
+                <span>High (1)</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Minimum confidence score required to answer. Below this, the AI escalates to a ticket.
+              </p>
             </div>
 
             <Button onClick={saveAiSettings} disabled={saving}>

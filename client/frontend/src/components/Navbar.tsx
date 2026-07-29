@@ -27,9 +27,15 @@ const roleNavLinks: Record<string, { name: string; path: string }[]> = {
   admin: [
     { name: "Dashboard", path: "/admin/dashboard" },
     { name: "Team", path: "/admin/team" },
+    { name: "Branches", path: "/admin/branches" },
     { name: "Documents", path: "/admin/documents" },
     { name: "FAQ", path: "/admin/faq" },
     { name: "Settings", path: "/admin/settings" },
+  ],
+  branch_admin: [
+    { name: "Dashboard", path: "/branch/dashboard" },
+    { name: "Documents", path: "/branch/documents" },
+    { name: "Branches", path: "/branch/branches" },
   ],
   support: [
     { name: "Dashboard", path: "/support/dashboard" },
@@ -80,6 +86,7 @@ export default function Navbar() {
     switch (role) {
       case "super_admin": return "/superadmin";
       case "admin": return "/admin/dashboard";
+      case "branch_admin": return "/branch/dashboard";
       case "support": return "/support/dashboard";
       default: return "/dashboard";
     }

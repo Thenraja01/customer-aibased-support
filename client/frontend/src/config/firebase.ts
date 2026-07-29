@@ -47,3 +47,11 @@ export const onMessageListener = () =>
       resolve(payload);
     });
   });
+
+export const onForegroundMessage = (callback: (payload: any) => void) => {
+  if (!messaging) return () => {};
+  const unsubscribe = onMessage(messaging, (payload) => {
+    callback(payload);
+  });
+  return unsubscribe;
+};

@@ -1,6 +1,6 @@
 import { memo, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Headphones, MessageCircle, Plus, XCircle, History, Loader2 } from "lucide-react";
+import { Headphones, MessageCircle, Plus, XCircle, History, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSocket } from "@/context/SocketContext";
@@ -12,9 +12,10 @@ import type { Chat } from "@/types/chat";
 interface ChatHeaderProps {
   activeChat: Chat | null;
   isSupportView?: boolean;
+  onBack?: () => void;
 }
 
-const ChatHeader = memo(function ChatHeader({ activeChat, isSupportView }: ChatHeaderProps) {
+const ChatHeader = memo(function ChatHeader({ activeChat, isSupportView, onBack }: ChatHeaderProps) {
   const navigate = useNavigate();
   const { user, orgSettings } = useAuthContext();
   const { typingUsers } = useSocket();
@@ -51,6 +52,16 @@ const ChatHeader = memo(function ChatHeader({ activeChat, isSupportView }: ChatH
     <>
       <div className="flex items-center justify-between border-b dark:border-white/[0.06] px-6 py-4 bg-background/50 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          )}
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-sm shadow-primary/20">
             {isNew ? (
               <MessageCircle size={15} className="text-primary-foreground" />
@@ -60,7 +71,7 @@ const ChatHeader = memo(function ChatHeader({ activeChat, isSupportView }: ChatH
           </div>
           <div>
             <h2 className="text-sm font-semibold">
-              {isNew ? "New Chat" : isSupportView ? `Chat with ${activeChat?.user_id?.name || "Customer"}` : (orgSettings?.chatbot_name || "Support Chat")}
+              {isNew ? "New Chat" : isSupportView ? `Chat with ${(activeChat?.user_id as any)?.name || "Customer"}` : (orgSettings?.chatbot_name || "Support Chat")}
             </h2>
             {!isNew && (
               <div className="flex items-center gap-1.5">

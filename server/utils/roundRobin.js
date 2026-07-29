@@ -8,7 +8,3 @@ export const getNextIndex = (organizationId, length) => {
   counters.set(key, current + 1);
   return index;
 };
-
-export const resetCounter = (organizationId) => {
-  counters.delete(organizationId.toString());
-};

@@ -1,12 +1,10 @@
 import Faq from "./faq.schema.js";
-import { escapeRegex } from "../../utils/escapeRegex.js";
-
-const ADMIN_ROLES = ["super admin", "tenant admin", "admin"];
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 export const createFaq = async (data, user) => {
   const payload = { ...data, created_by: user.userId };
 
-  if (ADMIN_ROLES.includes(user.roleName?.toLowerCase())) {
+  if (isNormalizedAdminRole(normalizeRoleName(user.roleName))) {
     payload.status = "approved";
     payload.approved_by = user.userId;
     payload.approved_at = new Date();

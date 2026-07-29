@@ -31,8 +31,8 @@ function extractTenantId(): string | null {
   return subdomain;
 }
 
-export async function fetchTenantSettings(): Promise<TenantOrg | null> {
-  const tenantId = extractTenantId();
+export async function fetchTenantSettings(tenantIdOrOrgId?: string): Promise<TenantOrg | null> {
+  const tenantId = tenantIdOrOrgId || extractTenantId();
   if (!tenantId) return null;
 
   try {

@@ -4,6 +4,7 @@ import chatReducer from "./chatSlice";
 import ticketReducer from "./ticketSlice";
 import notificationReducer from "./notificationSlice";
 import adminReducer from "./adminSlice";
+import navigationReducer from "./navigationSlice";
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     ticket: ticketReducer,
     notification: notificationReducer,
     admin: adminReducer,
+    navigation: navigationReducer,
   },
 });
 

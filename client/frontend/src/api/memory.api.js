@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 export const MemoryAPI = {
   store: (data) => AxiosInstance.post("/memory/store", data),

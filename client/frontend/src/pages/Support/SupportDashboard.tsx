@@ -7,7 +7,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TicketAPI, FAQAPI, NotificationAPI, UsersAPI } from "@/api";
+import { TicketAPI, FAQAPI, UsersAPI } from "@/api";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/store";

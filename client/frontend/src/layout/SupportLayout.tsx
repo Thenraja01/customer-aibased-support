@@ -3,19 +3,22 @@ import { Outlet, Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, MessageCircle, Ticket, HelpCircle, Settings, LogOut, Menu, Bell, X, ListOrdered, ChevronDown, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
+import FontSizeToggle from "@/components/FontSizeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
+import { getSessionMeta } from "@/utils/localStorage";
 
 const navLinks = [
-  { name: "Dashboard", path: "/support/dashboard", icon: LayoutDashboard },
-  { name: "Tickets", path: "/support/tickets", icon: Ticket },
-  { name: "Queue", path: "/support/queue", icon: ListOrdered },
-  { name: "FAQ", path: "/support/faq", icon: HelpCircle },
+  { name: "Dashboard", path: "/support/dashboard", icon: LayoutDashboard, permission: "ticket.assign" },
+  { name: "Tickets", path: "/support/tickets", icon: Ticket, permission: "ticket.assign" },
+  { name: "Queue", path: "/support/queue", icon: ListOrdered, permission: "ticket.assign" },
+  { name: "FAQ", path: "/support/faq", icon: HelpCircle, permission: "knowledge.view" },
+  { name: "Notifications", path: "/support/notifications", icon: Bell, permission: "notification.view" },
 ];
 
 const chatSubLinks = [
-  { name: "Chat", path: "/support/chat", icon: MessageCircle },
-  { name: "Chat History", path: "/support/chat-history", icon: History },
+  { name: "Chat", path: "/support/chat", icon: MessageCircle, permission: "chat.view" },
+  { name: "Chat History", path: "/support/chat-history", icon: History, permission: "chat.view_history" },
 ];
 
 export default function SupportLayout() {
@@ -23,13 +26,19 @@ export default function SupportLayout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [chatMenuOpen, setChatMenuOpen] = useState(true);
   const location = useLocation();
-  const { logout, orgSettings, user } = useAuth();
+  const { logout, orgSettings, user, can } = useAuth();
   const brandName = orgSettings?.chatbot_name || user?.organization_id?.name || "Support Portal";
   const brandLogo = orgSettings?.logo?.url || null;
   const { notifications, unreadCount, loadNotifications, loadUnreadCount, markRead } = useNotifications();
   const notifRef = useRef<HTMLDivElement>(null);
 
+  const visibleNavLinks = navLinks.filter((link) => !link.permission || can(link.permission));
+  const visibleChatSubLinks = chatSubLinks.filter((link) => !link.permission || can(link.permission));
+
   useEffect(() => {
+    const sessionMeta = getSessionMeta();
+    if (!sessionMeta.token || !sessionMeta.user) return;
+    
     loadNotifications();
     loadUnreadCount();
   }, [loadNotifications, loadUnreadCount]);
@@ -77,7 +86,7 @@ export default function SupportLayout() {
           <button className="lg:hidden p-1.5 rounded-lg hover:bg-muted text-muted-foreground" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar"><X size={18} /></button>
         </div>
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {navLinks.map((link) => {
+          {visibleNavLinks.map((link) => {
             const Icon = link.icon;
             const isActive = location.pathname === link.path;
             return (
@@ -108,7 +117,7 @@ export default function SupportLayout() {
             </button>
             {chatMenuOpen && (
               <div className="ml-2 mt-1 space-y-0.5">
-                {chatSubLinks.map((sub) => {
+                {visibleChatSubLinks.map((sub) => {
                   const SubIcon = sub.icon;
                   const isSubActive = location.pathname.startsWith(sub.path);
                   return (
@@ -183,6 +192,7 @@ export default function SupportLayout() {
                 </div>
               )}
             </div>
+            <FontSizeToggle />
             <ThemeToggle />
           </div>
         </header>

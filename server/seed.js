@@ -115,7 +115,6 @@ async function createUser(roleName, orgId) {
   });
   console.log(`User created: ${email} / ${password}`);
 }
-
 async function main() {
   try {
     await mongoose.connect(MONGODB_URI);
@@ -130,25 +129,39 @@ async function main() {
     const command = args[0];
 
     if (command === 'role') {
-      const roleNames = args.slice(1);
+      const roleNames =
+        args.length > 1
+          ? args.slice(1)
+          : ['admin', 'support', 'branchadmin', 'customer'];
+
       for (const name of roleNames) {
         await createRole(name);
       }
     } else if (command === 'user') {
-      const roleNames = args.slice(1);
-      const org = await Organization.findOne({ organization_id: DEFAULT_ORG.organization_id });
+      const roleNames =
+        args.length > 1
+          ? args.slice(1)
+          : ['admin', 'support', 'branchadmin', 'customer'];
+
+      const org = await Organization.findOne({
+        organization_id: DEFAULT_ORG.organization_id,
+      });
+
       if (!org) {
         console.error('Default organization not found. Run seed first.');
         process.exit(1);
       }
+
       for (const name of roleNames) {
         await createUser(name, org._id);
       }
     } else {
       console.log('Usage:');
       console.log('  node seed.js                          - Seed super admin + default org');
-      console.log('  node seed.js role <name1> <name2>...  - Create roles');
-      console.log('  node seed.js user <role1> <role2>... - Create users for roles');
+      console.log('  node seed.js role                     - Create default roles');
+      console.log('  node seed.js role admin support       - Create specific roles');
+      console.log('  node seed.js user                     - Create default users');
+      console.log('  node seed.js user admin support       - Create users for specific roles');
       process.exit(1);
     }
 

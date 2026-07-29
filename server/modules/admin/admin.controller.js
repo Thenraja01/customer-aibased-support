@@ -5,7 +5,7 @@ import * as roleService from "../role/role.service.js";
 
 export const dashboardStats = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const orgId = isSuperAdmin ? null : req.user?.organizationId;
     const stats = await adminService.getDashboardStats(orgId);
     res.status(200).json({ success: true, data: stats });
@@ -17,7 +17,13 @@ export const dashboardStats = async (req, res) => {
 export const getOrganizations = async (req, res) => {
   try {
     const { page, limit, search } = req.query;
-    const result = await adminService.getAllOrgsPaginated(Number(page) || 1, Number(limit) || 10, search || "");
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
+    const result = await adminService.getAllOrgsPaginated(
+      Number(page) || 1,
+      Number(limit) || 10,
+      search || "",
+      isSuperAdmin ? null : req.user?.organizationId
+    );
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -66,7 +72,7 @@ export const getOrganizationUsers = async (req, res) => {
 export const getUsers = async (req, res) => {
   try {
     const { page, limit, search, status } = req.query;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const result = await adminService.getAllUsersPaginated(
       Number(page) || 1,
       Number(limit) || 10,
@@ -122,7 +128,7 @@ export const removeUser = async (req, res) => {
 export const getRoles = async (req, res) => {
   try {
     const { page, limit } = req.query;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const orgId = isSuperAdmin ? null : req.user?.organizationId;
     const result = await adminService.getAllRolesPaginated(Number(page) || 1, Number(limit) || 10, orgId);
     res.status(200).json({ success: true, ...result });
@@ -133,7 +139,7 @@ export const getRoles = async (req, res) => {
 
 export const addRole = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const roleData = { ...req.body };
     if (!isSuperAdmin) {
       roleData.organization_id = req.user?.organizationId;
@@ -178,7 +184,7 @@ export const getAuditLogs = async (req, res) => {
 export const getDocuments = async (req, res) => {
   try {
     const { page, limit, status, assigned_role, search } = req.query;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const result = await adminService.getDocumentsPaginated(
       Number(page) || 1,
       Number(limit) || 10,
@@ -377,7 +383,7 @@ export const updateOrgSettings = async (req, res) => {
 export const getChats = async (req, res) => {
   try {
     const { page, limit, search, status, from, to, userId, stats } = req.query;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const result = await adminService.getAllChatsPaginated(
       Number(page) || 1,
       Number(limit) || 10,
@@ -424,7 +430,7 @@ export const deleteChat = async (req, res) => {
 export const deleteAllChats = async (req, res) => {
   try {
     const { search, status, from, to, userId } = req.query;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const result = await adminService.deleteAllChats(
       { search, status, from, to, userId },
       isSuperAdmin ? null : req.user?.organizationId
@@ -438,7 +444,7 @@ export const deleteAllChats = async (req, res) => {
 export const exportChats = async (req, res) => {
   try {
     const { search, status, from, to, userId } = req.query;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const result = await adminService.exportChats(
       { search, status, from, to, userId },
       isSuperAdmin ? null : req.user?.organizationId
@@ -454,7 +460,7 @@ export const exportChats = async (req, res) => {
 
 export const getUsersBasic = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const users = await adminService.getAllUsersBasic(isSuperAdmin ? null : req.user?.organizationId);
     res.status(200).json({ success: true, data: users });
   } catch (error) {

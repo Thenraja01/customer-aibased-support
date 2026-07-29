@@ -3,6 +3,8 @@ import { io, Socket } from "socket.io-client";
 import { useDispatch } from "react-redux";
 import { addNotification } from "@/store/notificationSlice";
 import { useAuthContext } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/toast";
+import { onForegroundMessage } from "@/config/firebase";
 
 interface SocketContextValue {
   socket: Socket | null;
@@ -21,6 +23,7 @@ export function useSocket() {
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch();
   const { user, token } = useAuthContext();
+  const toast = useToast();
   const socketRef = useRef<Socket | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
 
@@ -53,9 +56,19 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       });
     });
 
+    const unsubscribeFcm = onForegroundMessage((payload: any) => {
+      if (payload?.notification) {
+        toast.info(
+          payload.notification.title || "New Notification",
+          payload.notification.body || ""
+        );
+      }
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      if (unsubscribeFcm) unsubscribeFcm();
     };
   }, [user?._id, token, dispatch]);
 

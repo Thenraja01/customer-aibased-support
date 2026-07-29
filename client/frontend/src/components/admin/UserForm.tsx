@@ -71,7 +71,7 @@ export default function UserForm({ user, organizations, roles, onSubmit, onClose
         return /^[\d\s+\-()]{7,20}$/.test(value) ? "" : "Invalid phone number";
       case "password":
         if (!value) return user ? "" : "Password is required";
-        if (value.length < 6) return "Password must be at least 6 characters";
+        if (value.length < 8) return "Password must be at least 8 characters";
         return "";
       case "organization_id":
         return value ? "" : "Organization is required";
@@ -179,7 +179,7 @@ export default function UserForm({ user, organizations, roles, onSubmit, onClose
             <Input
               id="user-password" name="password" type="password" value={form.password}
               onChange={handleChange} onBlur={handleBlur}
-              placeholder={user ? "Leave blank to keep current" : "Min 6 characters"}
+              placeholder={user ? "Leave blank to keep current" : "Min 8 characters"}
               className={errors.password && touched.password ? "border-destructive" : ""}
               aria-invalid={!!errors.password}
             />

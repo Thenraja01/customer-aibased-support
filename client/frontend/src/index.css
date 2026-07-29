@@ -4,14 +4,44 @@
 @import "@fontsource-variable/ibm-plex-sans";
 @import "@fontsource-variable/source-sans-3";
 @import "@fontsource/merriweather";
+@import "@fontsource/jetbrains-mono";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/otf/OpenDyslexic-Regular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/otf/OpenDyslexic-Bold.otf") format("opentype");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OpenDyslexicAlta";
+  src: url("https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/otf/OpenDyslexicAlta-Regular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     --radius: 0.375rem;
+
+    --font-size-scale: 1;
+    --font-family-custom: "Inter Variable", "IBM Plex Sans Variable", "Source Sans 3 Variable", sans-serif;
+    --line-height-custom: 1.6;
+    --letter-spacing-custom: 0px;
 
     --background: 0 0% 100%;
     --foreground: 0 0% 10%;
@@ -96,11 +126,14 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: var(--font-family-custom);
+    line-height: var(--line-height-custom);
+    letter-spacing: var(--letter-spacing-custom);
   }
 
   html {
     scroll-behavior: smooth;
-    @apply font-sans;
+    font-size: calc(100% * var(--font-size-scale));
   }
 }
 

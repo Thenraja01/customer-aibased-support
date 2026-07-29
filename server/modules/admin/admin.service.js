@@ -18,6 +18,28 @@ import { escapeRegex } from "../../utils/escapeRegex.js";
 
 let isMaintenanceMode = false;
 
+/**
+ * Collect an organization's ID plus all of its descendant org IDs (BFS over
+ * the parent_org_id tree). Used to scope hierarchy-aware queries so an
+ * Organization Admin can see their own org and all child/branch orgs.
+ */
+export const getOrgAndDescendants = async (organizationId) => {
+  if (!organizationId) return [];
+  const ids = [organizationId];
+  const queue = [organizationId];
+  while (queue.length) {
+    const parent = queue.shift();
+    const children = await Organization.find({ parent_org_id: parent })
+      .select("_id")
+      .lean();
+    for (const child of children) {
+      ids.push(child._id.toString());
+      queue.push(child._id.toString());
+    }
+  }
+  return [...new Set(ids)];
+};
+
 export const getDashboardStats = async (organizationId = null) => {
   const userFilter = organizationId ? { organization_id: organizationId } : {};
 
@@ -70,8 +92,12 @@ export const getDashboardStats = async (organizationId = null) => {
   };
 };
 
-export const getAllOrgsPaginated = async (page = 1, limit = 10, search = "") => {
+export const getAllOrgsPaginated = async (page = 1, limit = 10, search = "", organizationId = null) => {
   const query = search ? { name: { $regex: escapeRegex(search), $options: "i" } } : {};
+  if (organizationId) {
+    const orgIds = await getOrgAndDescendants(organizationId);
+    query._id = { $in: orgIds };
+  }
   const total = await Organization.countDocuments(query);
   const orgs = await Organization.find(query)
     .sort({ created_at: -1 })
@@ -103,7 +129,10 @@ export const getOrgUsers = async (orgId, page = 1, limit = 10) => {
 
 export const getAllUsersPaginated = async (page = 1, limit = 10, search = "", status = "", organizationId = null) => {
   const query = {};
-  if (organizationId) query.organization_id = organizationId;
+  if (organizationId) {
+    const orgIds = await getOrgAndDescendants(organizationId);
+    query.organization_id = { $in: orgIds };
+  }
   if (search) {
     const safe = escapeRegex(search);
     query.$or = [
@@ -126,11 +155,18 @@ export const getAllUsersPaginated = async (page = 1, limit = 10, search = "", st
     pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
   };
 };
-
 export const getAllRolesPaginated = async (page = 1, limit = 10, organizationId = null) => {
-  const filter = organizationId
-    ? { $or: [{ organization_id: organizationId }, { organization_id: null }] }
-    : {};
+  const filter = {};
+  
+  if (organizationId) {
+    filter.$or = [{ organization_id: organizationId }, { organization_id: null }];
+  }
+  
+  // Exclude super_admin and its variations (case-insensitive)
+  filter.role_name = { 
+    $not: { $regex: /^super[\s_-]?admin$/i } 
+  };
+  
   const total = await Role.countDocuments(filter);
   const roles = await Role.find(filter)
     .populate("organization_id", "name")
@@ -138,6 +174,7 @@ export const getAllRolesPaginated = async (page = 1, limit = 10, organizationId 
     .skip((page - 1) * limit)
     .limit(limit)
     .lean();
+    
   return {
     data: roles,
     pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },

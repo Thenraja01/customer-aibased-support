@@ -26,6 +26,7 @@ export const updateOrganizationSettingsSchema = z.object({
     })
     .optional(),
   show_charts: z.boolean().optional(),
+  ai_session_logging: z.boolean().optional(),
   default_language: z.string().trim().max(10).optional(),
   greeting_message: z.string().max(500).optional(),
   logo: z

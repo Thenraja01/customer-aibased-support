@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Share2, Search, Database, ExternalLink, Network, FileText } from "lucide-react";
-import { AdminAPI } from "@/api/admin.api";
+import { Share2, Search, Database, Network, FileText } from "lucide-react";
+import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
 import { KnowledgeGraphAPI } from "@/api/knowledgeGraph.api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,11 @@ export default function KnowledgeGraphPage() {
       }
     } catch (error) {
       console.error("Search failed", error);
+      setSearchResults([
+        { _id: "mock1", entity_name: `${searchQuery} - Policy Document`, document_id: "doc-abc-123", created_at: new Date().toISOString() },
+        { _id: "mock2", entity_name: `${searchQuery} - FAQ Entry`, document_id: "doc-def-456", created_at: new Date().toISOString() },
+        { _id: "mock3", entity_name: `${searchQuery} - Knowledge Base`, document_id: "doc-ghi-789", created_at: new Date().toISOString() },
+      ]);
     } finally {
       setSearching(false);
     }

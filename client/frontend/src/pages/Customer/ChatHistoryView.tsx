@@ -11,7 +11,7 @@ import { ChatAPI } from "@/api";
 import ChatHeader from "@/components/chat/ChatHeader";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
-import TypingIndicator from "@/components/chat/TypingIndigator";
+import TypingIndicator from "@/components/chat/TypingIndicator";
 
 export default function ChatHistoryView() {
   const { id } = useParams();

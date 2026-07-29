@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 export const KnowledgeGapAPI = {
   getAll: (params) => AxiosInstance.get("/knowledge-gaps", { params }),

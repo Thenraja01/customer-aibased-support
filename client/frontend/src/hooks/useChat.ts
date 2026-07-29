@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchChats,
@@ -18,6 +18,16 @@ export function useChat() {
   const { chats, activeChat, messages, loading, messagesLoading, sending, aiThinking, error } =
     useSelector((state: RootState) => state.chat);
   const { user } = useSelector((state: RootState) => state.user);
+
+  const sortedMessages = useMemo(() => {
+    return [...messages].sort(
+      (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }, [messages]);
+
+  const pendingMessages = useMemo(() => {
+    return messages.filter((m: any) => m.status === "pending" || m.status === "sending");
+  }, [messages]);
 
   const loadUserChats = useCallback(() => {
     if (user?._id) {
@@ -82,6 +92,8 @@ export function useChat() {
     chats,
     activeChat,
     messages,
+    sortedMessages,
+    pendingMessages,
     loading,
     messagesLoading,
     sending,

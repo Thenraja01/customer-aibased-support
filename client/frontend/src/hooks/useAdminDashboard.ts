@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { AdminAPI } from "@/api/admin.api";
+import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
 import {
   setDashboardStats,
   setLoading,

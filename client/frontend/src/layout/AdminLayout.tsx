@@ -1,36 +1,43 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, Users, FileText, Shield,
+  LayoutDashboard, Users, FileText,
   FileType, Sparkles, HelpCircle, Settings, ArrowLeft, User,
-  LogOut, Menu, Bell, X, ListOrdered, MessageCircle, ChevronDown, CheckSquare, AlertTriangle, Clock
+  LogOut, Menu, Bell, X, ListOrdered, MessageCircle, ChevronDown, CheckSquare, AlertTriangle, Clock, Send,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
+import FontSizeToggle from "@/components/FontSizeToggle";
+import { getSessionMeta } from "@/utils/localStorage";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 
 const navLinks = [
-  { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
-  { name: "Team", path: "/admin/team", icon: Users },
-  { name: "Pending Approvals", path: "/admin/pending-approvals", icon: Clock },
-  { name: "Roles", path: "/admin/roles", icon: Shield },
-  { name: "FAQ", path: "/admin/faq", icon: HelpCircle },
-  { name: "AI Control", path: "/admin/ai", icon: Sparkles },
-  { name: "Knowledge Gaps", path: "/admin/knowledge-gaps", icon: AlertTriangle },
-  { name: "Queue", path: "/admin/queue", icon: ListOrdered },
-  { name: "Chat History", path: "/admin/chat-history", icon: MessageCircle },
-  { name: "Notifications", path: "/admin/notifications", icon: Bell },
-  { name: "Settings", path: "/admin/settings", icon: Settings },
+  { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard, permission: "report.view_dashboard" },
+  { name: "Users", path: "/admin/users", icon: Users, permission: "user.view" },
+  { name: "Team & Roles", path: "/admin/team", icon: Users, permission: "user.view" },
+  { name: "Role Management", path: "/admin/roles", icon: Users, permission: "role.view" },
+  { name: "Branches", path: "/admin/branches", icon: Building2, permission: "branch.view" },
+  { name: "Pending Approvals", path: "/admin/pending-approvals", icon: Clock, permission: "registration.approve" },
+  { name: "FAQ", path: "/admin/faq", icon: HelpCircle, permission: "knowledge.create" },
+  { name: "AI Control", path: "/admin/ai", icon: Sparkles, permission: "ai.train_kb" },
+  { name: "Knowledge Gaps", path: "/admin/knowledge-gaps", icon: AlertTriangle, permission: "ai.train_kb" },
+  { name: "Queue", path: "/admin/queue", icon: ListOrdered, permission: "ticket.assign" },
+  { name: "Chat History", path: "/admin/chat-history", icon: MessageCircle, permission: "chat.view_history" },
+  { name: "Notifications", path: "/admin/notifications", icon: Bell, permission: "notification.view" },
+  { name: "Send Notification", path: "/admin/notifications/send", icon: Send, permission: "notification.create" },
+  { name: "Settings", path: "/admin/settings", icon: Settings, permission: "org.manage" },
 ];
 
 const documentGroup = {
   name: "Documents",
   icon: FileText,
+  permission: "document.view_all",
   children: [
-    { name: "All Documents", path: "/admin/documents", icon: FileText },
-    { name: "Document Verification", path: "/admin/verifications", icon: CheckSquare },
-    { name: "Document Types", path: "/admin/document-types", icon: FileType },
+    { name: "All Documents", path: "/admin/documents", icon: FileText, permission: "document.view_all" },
+    { name: "Document Verification", path: "/admin/verifications", icon: CheckSquare, permission: "document.view_all" },
+    { name: "Document Types", path: "/admin/document-types", icon: FileType, permission: "*" },
   ],
 };
 
@@ -40,14 +47,19 @@ export default function AdminLayout() {
   const [docsOpen, setDocsOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const location = useLocation();
-  const { user, orgSettings, logout } = useAuth();
+  const { user, orgSettings, logout, can } = useAuth();
   const orgName = orgSettings?.name || user?.organization_id?.name || "SupportAI";
   const orgLogo = orgSettings?.logo?.url || null;
   const { notifications, unreadCount, loadNotifications, loadUnreadCount, markRead, markAllRead } = useNotifications();
   const notifRef = useRef<HTMLDivElement>(null);
 
+  // Filter nav links based on user permissions
+  const visibleNavLinks = navLinks.filter((link) => !link.permission || can(link.permission));
+  const visibleDocChildren = documentGroup.children.filter((child) => !child.permission || can(child.permission));
+  const docsVisible = !documentGroup.permission || can(documentGroup.permission);
+
   // Auto-expand docs group when on a docs sub-route
-  const isOnDocRoute = documentGroup.children.some(
+  const isOnDocRoute = visibleDocChildren.some(
     (c) => location.pathname === c.path || location.pathname.startsWith(c.path + "/")
   );
 
@@ -56,12 +68,18 @@ export default function AdminLayout() {
   }, [isOnDocRoute]);
 
   useEffect(() => {
+    const sessionMeta = getSessionMeta();
+    if (!sessionMeta.token || !sessionMeta.user) return;
+    
     loadNotifications();
     loadUnreadCount();
   }, [loadNotifications, loadUnreadCount]);
 
   // Load pending approvals count for badge
   useEffect(() => {
+    const sessionMeta = getSessionMeta();
+    if (!sessionMeta.token || !sessionMeta.user) return;
+
     import("@/api/auth.api").then(({ AuthAPI }) => {
       AuthAPI.getPendingRegistrations()
         .then((res: any) => setPendingCount(res.data.data?.length || 0))
@@ -118,7 +136,7 @@ export default function AdminLayout() {
 
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {/* Flat nav links before Documents group */}
-          {[navLinks[0], navLinks[1], navLinks[2], navLinks[3]].map((link) => {
+          {visibleNavLinks.slice(0, 4).map((link) => {
             const Icon = link.icon;
             const isActive = location.pathname === link.path || location.pathname.startsWith(link.path + "/");
             const isPending = link.path === "/admin/pending-approvals";
@@ -144,8 +162,9 @@ export default function AdminLayout() {
           })}
 
           {/* Documents dropdown group */}
-          <div>
-            <button
+          {docsVisible && (
+            <div>
+              <button
               onClick={() => setDocsOpen((prev) => !prev)}
               className={cn(
                 "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
@@ -173,7 +192,7 @@ export default function AdminLayout() {
               )}
             >
               <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-primary/20 pl-3">
-                {documentGroup.children.map((child) => {
+                {visibleDocChildren.map((child) => {
                   const ChildIcon = child.icon;
                   const isActive = location.pathname === child.path || location.pathname.startsWith(child.path + "/");
                   return (
@@ -194,9 +213,10 @@ export default function AdminLayout() {
               </div>
             </div>
           </div>
+        )}
 
-          {/* Remaining flat nav links */}
-          {navLinks.slice(3).map((link) => {
+        {/* Remaining flat nav links */}
+          {visibleNavLinks.slice(4).map((link) => {
             const Icon = link.icon;
             const isActive = location.pathname === link.path || location.pathname.startsWith(link.path + "/");
             const isBell = link.icon === Bell;
@@ -303,6 +323,7 @@ export default function AdminLayout() {
                 </div>
               )}
             </div>
+            <FontSizeToggle />
             <ThemeToggle />
           </div>
         </header>

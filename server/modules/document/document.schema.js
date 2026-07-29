@@ -14,6 +14,12 @@ const documentSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
+      index: true,
+    },
     document_type_id: {
       type: Schema.Types.ObjectId,
       ref: "DocumentType",

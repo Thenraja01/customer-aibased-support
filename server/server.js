@@ -2,7 +2,6 @@ import express from "express";
 import { createServer } from "http";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import mongoose from "mongoose";
 import path from "path";
 
@@ -22,6 +21,7 @@ import { documentRouter } from "./modules/document/index.js";
 import { documentVerificationRouter } from "./modules/document-verification/index.js";
 import { organizationRouter } from "./modules/organization/index.js";
 import { roleRouter } from "./modules/role/index.js";
+import { branchRouter } from "./modules/branch/index.js";
 import { documentTypeRouter } from "./modules/document-type/index.js";
 import { aiSessionRouter } from "./modules/ai-session/index.js";
 import { auditLogRouter } from "./modules/audit-log/index.js";
@@ -32,6 +32,12 @@ import { adminRouter } from "./modules/admin/index.js";
 import { searchRouter } from "./modules/search/index.js";
 import { promptVersionRouter } from "./modules/prompt-version/index.js";
 import { knowledgeGapRouter } from "./modules/knowledge-gap/index.js";
+import { aiRouter } from "./modules/ai/index.js";
+import { communicationRouter } from "./modules/communication/index.js";
+import { feedbackRouter } from "./modules/feedback/index.js";
+import { permissionRouter } from "./modules/permission/index.js";
+import { superAdminRouter } from "./modules/super-admin/index.js";
+import { userRoleRouter } from "./modules/user-role/index.js";
 import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
 import { initFirebase } from "./config/firebase.js";
 
@@ -41,38 +47,17 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", process.env.CLIENT_URL].filter(Boolean),
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:64788", process.env.CLIENT_URL].filter(Boolean),
     credentials: true,
   })
 );
 
 app.use("/uploads", express.static(path.resolve("uploads")));
 
-const globalLimiter = rateLimit({
-  windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.NODE_ENV === "development" ? 500 : env.RATE_LIMIT_MAX_REQUESTS,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many requests, please try again later.",
-  },
-});
-app.use(globalLimiter);
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: env.NODE_ENV === "development" ? 200 : 20,
-  message: {
-    success: false,
-    message: "Too many authentication attempts, please try again in 15 minutes.",
-  },
-});
-
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-app.use("/auth", authLimiter, authRouter);
+app.use("/auth", authRouter);
 app.use("/users", userRouter);
 app.use("/chats", chatRouter);
 app.use("/messages", messageRouter);
@@ -82,6 +67,7 @@ app.use("/notifications", notificationRouter);
 app.use("/documents", documentRouter);
 app.use("/document-verifications", documentVerificationRouter);
 app.use("/organizations", organizationRouter);
+app.use("/branches", branchRouter);
 app.use("/roles", roleRouter);
 app.use("/document-types", documentTypeRouter);
 app.use("/ai-sessions", aiSessionRouter);
@@ -93,6 +79,12 @@ app.use("/knowledge-gaps", knowledgeGapRouter);
 app.use("/admin/v1", adminRouter);
 app.use("/search/v1", searchRouter);
 app.use("/admin/v1/prompt", promptVersionRouter);
+app.use("/ai", aiRouter);
+app.use("/communication", communicationRouter);
+app.use("/feedback", feedbackRouter);
+app.use("/permissions", permissionRouter);
+app.use("/super-admin", superAdminRouter);
+app.use("/user-roles", userRoleRouter);
 
 app.get("/api/health/v1", (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;

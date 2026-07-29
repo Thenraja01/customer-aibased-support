@@ -12,6 +12,7 @@ import {
   getRelevantMemories,
 } from "../memory/memory.service.js";
 import { getEmbedding, getEmbeddingDim } from "../../services/embedding.service.js";
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 const FALLBACK_DIM = 256;
 
@@ -107,8 +108,8 @@ export const getAuthorizedDocumentIds = async (organizationId, roleId) => {
 
 export const getRoleFilter = (roleName) => {
   if (!roleName) return null;
-  const normalizedRole = roleName.toLowerCase().trim();
-  if (["super admin", "tenant admin", "admin"].includes(normalizedRole)) {
+  const normalizedRole = normalizeRoleName(roleName);
+  if (isNormalizedAdminRole(normalizedRole)) {
     return null;
   }
   return { $in: [normalizedRole, "all"] };
@@ -225,8 +226,8 @@ export const ingestDocument = async (documentId, organizationId, assignedRole, t
 };
 
 export const getRoleAccessibleDocumentIds = async (organizationId, roleId, roleName) => {
-  const normalizedRole = (roleName || "").toLowerCase().trim();
-  if (["super admin", "tenant admin", "admin"].includes(normalizedRole)) {
+  const normalizedRole = normalizeRoleName(roleName);
+  if (isNormalizedAdminRole(normalizedRole)) {
     return null;
   }
 

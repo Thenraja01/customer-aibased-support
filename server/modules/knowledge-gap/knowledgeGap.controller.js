@@ -1,9 +1,10 @@
 import * as knowledgeGapService from "./knowledgeGap.service.js";
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 export const getKnowledgeGaps = async (req, res) => {
   try {
     const { page, limit, status, topic, search, sortBy, sortOrder } = req.query;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = isNormalizedAdminRole(normalizeRoleName(req.user?.roleName));
     const orgId = isSuperAdmin ? (req.query.organizationId || req.user?.organizationId) : req.user?.organizationId;
     const result = await knowledgeGapService.getKnowledgeGaps(orgId, {
       page: Number(page) || 1,
@@ -22,7 +23,7 @@ export const getKnowledgeGaps = async (req, res) => {
 
 export const getGapStats = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const orgId = isSuperAdmin ? (req.query.organizationId || req.user?.organizationId) : req.user?.organizationId;
     const stats = await knowledgeGapService.getGapStats(orgId);
     res.status(200).json({ success: true, data: stats });
@@ -77,7 +78,7 @@ export const deleteGap = async (req, res) => {
 
 export const getSuggestedTopics = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const orgId = isSuperAdmin ? (req.query.organizationId || req.user?.organizationId) : req.user?.organizationId;
     const topics = await knowledgeGapService.getSuggestedTopics(orgId);
     res.status(200).json({ success: true, data: topics });

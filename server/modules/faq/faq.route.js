@@ -1,6 +1,6 @@
 import express from "express";
 import * as faqController from "./faq.controller.js";
-import { protect, restrict } from "../../middleware/auth.middleware.js";
+import { protect, access } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { createFaqSchema, updateFaqSchema } from "../../validation/index.js";
 
@@ -8,15 +8,15 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("super admin", "tenant admin", "admin", "support"), validate(createFaqSchema), faqController.create);
+router.post("/", access("knowledge.create"), validate(createFaqSchema), faqController.create);
 router.get("/active", faqController.getActive);
-router.get("/my", restrict("super admin", "tenant admin", "admin", "support"), faqController.getMyFaqs);
-router.get("/status/:status", restrict("super admin", "tenant admin", "admin", "support"), faqController.getByStatus);
-router.get("/", restrict("super admin", "tenant admin", "admin", "support"), faqController.getAll);
-router.get("/:id", restrict("super admin", "tenant admin", "admin", "support"), faqController.getById);
-router.put("/:id", restrict("super admin", "tenant admin", "admin", "support"), validate(updateFaqSchema), faqController.update);
-router.patch("/:id/approve", restrict("super admin", "tenant admin", "admin"), faqController.approve);
-router.patch("/:id/reject", restrict("super admin", "tenant admin", "admin"), faqController.reject);
-router.delete("/:id", restrict("super admin", "tenant admin", "admin"), faqController.remove);
+router.get("/my", access("knowledge.view"), faqController.getMyFaqs);
+router.get("/status/:status", access("knowledge.create"), faqController.getByStatus);
+router.get("/", access("knowledge.view"), faqController.getAll);
+router.get("/:id", access("knowledge.view"), faqController.getById);
+router.put("/:id", access("knowledge.edit"), validate(updateFaqSchema), faqController.update);
+router.patch("/:id/approve", access("knowledge.create"), faqController.approve);
+router.patch("/:id/reject", access("knowledge.create"), faqController.reject);
+router.delete("/:id", access("knowledge.delete"), faqController.remove);
 
 export default router;

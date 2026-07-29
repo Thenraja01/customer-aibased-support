@@ -36,7 +36,7 @@ export const create = async (req, res) => {
 export const getAll = async (req, res) => {
   try {
     const orgId = req.user?.organizationId;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const tickets = await ticketService.getAllTickets(isSuperAdmin ? null : orgId);
     res.status(200).json({ success: true, data: tickets });
   } catch (error) {
@@ -47,7 +47,7 @@ export const getAll = async (req, res) => {
 export const getStats = async (req, res) => {
   try {
     const orgId = req.user?.organizationId;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
     const stats = await ticketService.getTicketStats(isSuperAdmin ? null : orgId);
     res.status(200).json({ success: true, data: stats });
   } catch (error) {
@@ -98,6 +98,27 @@ export const getByStatus = async (req, res) => {
 export const assign = async (req, res) => {
   try {
     const ticket = await ticketService.assignTicket(req.params.id, req.body.supportId);
+
+    // Notify the assigned agent
+    await notifService.createNotification({
+      user_id: req.body.supportId,
+      title: "Ticket assigned to you",
+      message: `Ticket "${ticket.subject}" has been assigned to you`,
+      type: "info",
+      link: `/support/tickets/${req.params.id}`,
+    });
+
+    // Notify the ticket creator
+    if (ticket.user_id && ticket.user_id.toString() !== req.body.supportId) {
+      await notifService.createNotification({
+        user_id: ticket.user_id,
+        title: "Your ticket has been assigned",
+        message: `Your ticket "${ticket.subject}" has been assigned to a support agent`,
+        type: "info",
+        link: `/tickets/${req.params.id}`,
+      });
+    }
+
     res.status(200).json({ success: true, data: ticket });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -116,6 +137,18 @@ export const changePriority = async (req, res) => {
 export const resolve = async (req, res) => {
   try {
     const ticket = await ticketService.resolveTicket(req.params.id, req.user.userId);
+
+    // Notify the ticket creator
+    if (ticket.user_id) {
+      await notifService.createNotification({
+        user_id: ticket.user_id,
+        title: "Ticket resolved",
+        message: `Your ticket "${ticket.subject}" has been resolved`,
+        type: "success",
+        link: `/tickets/${req.params.id}`,
+      });
+    }
+
     res.status(200).json({ success: true, data: ticket });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -125,6 +158,18 @@ export const resolve = async (req, res) => {
 export const close = async (req, res) => {
   try {
     const ticket = await ticketService.closeTicket(req.params.id, req.user.userId);
+
+    // Notify the ticket creator
+    if (ticket.user_id) {
+      await notifService.createNotification({
+        user_id: ticket.user_id,
+        title: "Ticket closed",
+        message: `Your ticket "${ticket.subject}" has been closed`,
+        type: "info",
+        link: `/tickets/${req.params.id}`,
+      });
+    }
+
     res.status(200).json({ success: true, data: ticket });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -153,6 +198,18 @@ export const setPending = async (req, res) => {
 export const reopen = async (req, res) => {
   try {
     const ticket = await ticketService.reopenTicket(req.params.id);
+
+    // Notify assigned agent if any
+    if (ticket.assigned_to) {
+      await notifService.createNotification({
+        user_id: ticket.assigned_to,
+        title: "Ticket reopened",
+        message: `Ticket "${ticket.subject}" has been reopened`,
+        type: "warning",
+        link: `/support/tickets/${req.params.id}`,
+      });
+    }
+
     res.status(200).json({ success: true, data: ticket });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -172,7 +229,7 @@ export const remove = async (req, res) => {
 export const getMessages = async (req, res) => {
   try {
     const roleName = req.user?.roleName?.toLowerCase();
-    const includeInternal = ["super admin", "tenant admin", "admin", "support"].includes(roleName);
+    const includeInternal = ["super_admin", "admin", "support"].includes(roleName);
     const messages = await ticketMessageService.getMessagesByTicket(req.params.ticketId, includeInternal);
     res.status(200).json({ success: true, data: messages });
   } catch (error) {

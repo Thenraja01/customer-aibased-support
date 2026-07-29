@@ -1,7 +1,7 @@
 import * as notifService from "./notification.service.js";
 
 const isStaffRole = (roleName) =>
-  ["super admin", "tenant admin", "admin", "support"].includes(roleName?.toLowerCase());
+  ["super_admin", "admin", "support"].includes(roleName?.toLowerCase());
 
 export const create = async (req, res) => {
   try {
@@ -107,5 +107,40 @@ export const clear = async (req, res) => {
     res.status(200).json({ success: true, message: result.message });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const broadcastToOrg = async (req, res) => {
+  try {
+    const orgId = req.user.organizationId;
+    if (!orgId) {
+      return res.status(400).json({ success: false, message: "No organization associated with your account" });
+    }
+    const notifs = await notifService.broadcastToOrganization(req.body, orgId);
+    res.status(201).json({ success: true, data: notifs, count: notifs.length });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const broadcastToAll = async (req, res) => {
+  try {
+    const notifs = await notifService.broadcastToAll(req.body);
+    res.status(201).json({ success: true, data: notifs, count: notifs.length });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const broadcastToOrgById = async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    if (!orgId) {
+      return res.status(400).json({ success: false, message: "Organization ID is required" });
+    }
+    const notifs = await notifService.broadcastToOrganization(req.body, orgId);
+    res.status(201).json({ success: true, data: notifs, count: notifs.length });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
   }
 };

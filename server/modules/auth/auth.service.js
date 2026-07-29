@@ -1,14 +1,18 @@
 import bcrypt from "bcrypt";
 import User from "../user/user.schema.js";
-import Role from "../role/role.schema.js";
-import jwt from "jsonwebtoken";
+import Organization from "../organization/organization.schema.js";
 import env from "../../config/env.js";
-
-// Roles that cannot be assigned during self-registration
-const RESTRICTED_ROLES = ["tenant admin", "super admin"];
+import { REQUESTABLE_ROLE_KEYS, RESTRICTED_ROLE_KEYS, ROLE_KEYS } from "../../utils/constants.js";
+import {
+  signAccessToken,
+  issueRefreshSession,
+  revokeRefreshSession,
+  revokeAllUserSessions,
+  findValidSession,
+} from "./token.service.js";
 
 export const register = async (userData) => {
-  const { organization_id, role_id, name, email, phone, password, dob } =
+  const { organization_id, role, name, email, phone, password, dob } =
     userData;
 
   // Check if user already exists
@@ -16,16 +20,16 @@ export const register = async (userData) => {
   if (existingUser) throw new Error("Email already registered");
 
   // Validate that the role is not restricted
-  if (role_id) {
-    const role = await Role.findById(role_id);
-
-    if (!role) {
+  if (role) {
+    // Validate role against allowed roles
+    const validRoles = Object.values(ROLE_KEYS);
+    if (!validRoles.includes(role)) {
       throw new Error("Invalid role selected");
     }
 
     // Check if the role is restricted
-    if (RESTRICTED_ROLES.some(restricted =>
-      role.role_name.toLowerCase() === restricted.toLowerCase()
+    if (RESTRICTED_ROLE_KEYS.some(restricted =>
+      role.toLowerCase() === restricted.toLowerCase()
     )) {
       throw new Error("Cannot register with admin or super admin roles");
     }
@@ -34,7 +38,7 @@ export const register = async (userData) => {
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = await User.create({
     organization_id,
-    role_id,
+    role,
     name,
     email,
     phone,
@@ -49,7 +53,7 @@ export const register = async (userData) => {
     user: {
       id: user._id,
       organization_id: user.organization_id,
-      role_id: user.role_id,
+      role: user.role,
       name: user.name,
       email: user.email,
       phone: user.phone,
@@ -62,7 +66,7 @@ export const register = async (userData) => {
  * Register a new user with status "pending" — requires admin approval.
  */
 export const registerWithApproval = async (userData) => {
-  const { organization_id, role_id, name, email, phone, password, dob } =
+  const { organization_id, role, name, email, phone, password, dob } =
     userData;
 
   // Check if user already exists
@@ -75,11 +79,13 @@ export const registerWithApproval = async (userData) => {
   }
 
   // Validate that the role is not restricted
-  const role = await Role.findById(role_id);
-  if (!role) throw new Error("Invalid role selected");
+  const validRoles = Object.values(ROLE_KEYS);
+  if (!validRoles.includes(role)) {
+    throw new Error("Invalid role selected");
+  }
 
-  if (RESTRICTED_ROLES.some(restricted =>
-    role.role_name.toLowerCase() === restricted.toLowerCase()
+  if (RESTRICTED_ROLE_KEYS.some(restricted =>
+    role.toLowerCase() === restricted.toLowerCase()
   )) {
     throw new Error("Cannot register with admin or super admin roles");
   }
@@ -87,7 +93,7 @@ export const registerWithApproval = async (userData) => {
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = await User.create({
     organization_id,
-    role_id,
+    role,
     name,
     email,
     phone,
@@ -119,7 +125,7 @@ export const getPendingRegistrations = async (organizationId = null) => {
 
   const users = await User.find(filter)
     .populate("organization_id", "name")
-    .populate("role_id", "role_name description")
+    .populate("role", "role_name description")
     .select("-password -otp -otp_expiry -fcm_token")
     .sort({ created_at: -1 });
 
@@ -176,7 +182,7 @@ export const checkUserStatus = async (email) => {
   };
 };
 
-export const login = async ({ email, password, organization_id }) => {
+export const login = async ({ email, password, organization_id }, ctx = {}) => {
   const query = { email };
   if (organization_id) {
     query.organization_id = organization_id;
@@ -184,7 +190,7 @@ export const login = async ({ email, password, organization_id }) => {
   console.log("[Login] Query:", JSON.stringify(query));
   const user = await User.findOne(query)
     .populate("organization_id")
-    .populate("role_id");
+    .populate("role");
 
   if (!user) {
     console.log("[Login] User not found for query");
@@ -211,35 +217,18 @@ export const login = async ({ email, password, organization_id }) => {
     throw new Error("Invalid email, password, or organization");
   }
 
-  if (!user.organization_id || !user.role_id) {
+  if (!user.organization_id || !user.role) {
     console.log("[Login] User has invalid organization or role reference");
     throw new Error("Invalid email, password, or organization");
   }
 
-  const token = jwt.sign(
-    {
-      userId: user._id,
-      organizationId: user.organization_id._id,
-      roleId: user.role_id._id,
-      roleName: user.role_id.role_name,
-      email: user.email,
-    },
-    env.JWT_SECRET,
-    { expiresIn: "1d" }
-  );
+  const auth = await buildAuthTokens(user, ctx);
 
   return {
     message: "Login successful",
-    token,
-    user: {
-      id: user._id,
-      organization_id: user.organization_id,
-      role_id: user.role_id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      status: user.status,
-    },
+    token: auth.accessToken,
+    refreshToken: auth.refreshToken,
+    user: auth.user,
   };
 };
 
@@ -264,4 +253,177 @@ export const changePassword = async (email, currentPassword, newPassword) => {
   await user.save();
 
   return { message: "Password changed successfully" };
+};
+
+/**
+ * Resolve the org + role references for a user doc. Handles both populated
+ * (object) and unpopulated (id) references.
+ */
+const resolveOrgAndRole = async (user) => {
+  const org =
+    typeof user.organization_id === "object"
+      ? user.organization_id
+      : await Organization.findById(user.organization_id).lean();
+  // Role is now a string, no need to look up in DB
+  const role = user.role;
+  return { org, role };
+};
+
+/**
+ * Sign a short-lived access token and persist a refresh-token session.
+ * Returns the access token, the (one-time) refresh token, and a sanitized
+ * user payload the client can persist.
+ */
+export const buildAuthTokens = async (user, ctx = {}) => {
+  const { org, role } = await resolveOrgAndRole(user);
+
+  const organizationId = org?._id || user.organization_id?._id || user.organization_id;
+  const roleName = role?.role_name || user.role || "customer";
+  // Use roleName as roleId since we're using string-based roles
+  const roleId = roleName;
+
+  const accessToken = signAccessToken({
+    userId: user._id,
+    organizationId,
+    roles: [roleName],
+    roleId,
+    roleName,
+    email: user.email,
+  });
+
+  const { token: refreshToken } = await issueRefreshSession({
+    userId: user._id,
+    organizationId,
+    userAgent: ctx.userAgent || "",
+    ip: ctx.ip || "",
+  });
+
+  const orgName = org?.name || user.organization_id?.name;
+  const sanitizedUser = {
+    id: user._id,
+    _id: user._id,
+    userId: user._id,
+    organization_id:
+      typeof user.organization_id === "object"
+        ? { _id: organizationId, name: orgName }
+        : organizationId,
+    role:
+      typeof user.role === "object"
+        ? { _id: roleId, role_name: roleName }
+        : user.role,
+    roleName,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    status: user.status,
+  };
+
+  return { accessToken, refreshToken, user: sanitizedUser };
+};
+
+/**
+ * Build a JWT + refresh token + sanitized user payload for an existing active
+ * user. Used by the OAuth and standard login flows.
+ */
+export const buildAuthResponse = async (user, ctx = {}) => {
+  const auth = await buildAuthTokens(user, ctx);
+  return {
+    message: "Login successful",
+    token: auth.accessToken,
+    refreshToken: auth.refreshToken,
+    user: auth.user,
+  };
+};
+
+/**
+ * Rotate a refresh token: validate the stored session, sign a fresh access
+ * token, revoke the used refresh session and issue a new one.
+ */
+export const refreshTokens = async (refreshToken, ctx = {}) => {
+  if (!refreshToken) throw new Error("Refresh token is required");
+
+  const session = await findValidSession(refreshToken);
+  if (!session) throw new Error("Invalid or expired refresh token. Please sign in again.");
+
+  const user = await User.findById(session.user_id)
+    .populate("organization_id")
+    .populate("role");
+
+  if (!user) {
+    await revokeRefreshSession(refreshToken);
+    throw new Error("User not found. Please sign in again.");
+  }
+
+  if (user.status !== "active") {
+    await revokeRefreshSession(refreshToken);
+    throw new Error("Your account is not active.");
+  }
+
+  // Rotate: the used refresh token is single-use.
+  await revokeRefreshSession(refreshToken);
+  const auth = await buildAuthTokens(user, ctx);
+
+  return {
+    message: "Token refreshed",
+    accessToken: auth.accessToken,
+    refreshToken: auth.refreshToken,
+    user: auth.user,
+  };
+};
+
+/**
+ * Log out. Revokes the given refresh session (single device) when a token is
+ * supplied; otherwise revokes every active session for the user.
+ */
+export const logout = async ({ refreshToken, userId } = {}) => {
+  if (refreshToken) {
+    await revokeRefreshSession(refreshToken);
+  } else if (userId) {
+    await revokeAllUserSessions(userId);
+  }
+  return { message: "Logged out successfully" };
+};
+
+/**
+ * Resolve an organization by MongoDB _id or the alternate organization_id field.
+ */
+export const resolveOrganization = async (organization_id) => {
+  if (!organization_id) {
+    throw new Error("Organization ID is required");
+  }
+
+  let org = await Organization.findById(organization_id).lean();
+  if (!org) {
+    org = await Organization.findOne({ organization_id }).lean();
+  }
+  if (!org) {
+    throw new Error("Organization not found");
+  }
+  return org;
+};
+
+/**
+ * Resolve a role that is eligible for self/registration selection.
+ * Accepts a role_name string.
+ * Rejects restricted roles (super_admin, admin, branch_admin).
+ */
+export const resolveRequestableRole = async (organizationId, requestedRole) => {
+  if (!requestedRole) {
+    throw new Error("Role selection is required");
+  }
+
+  // Validate role against allowed roles
+  const validRoles = Object.values(ROLE_KEYS);
+  if (!validRoles.includes(requestedRole)) {
+    throw new Error("Selected role not found");
+  }
+
+  // Enforce that the role is requestable (not a restricted admin role)
+  const normalized = requestedRole.toLowerCase().replace(/[\s_]+/g, "");
+  const restricted = RESTRICTED_ROLE_KEYS;
+  if (restricted.includes(normalized) || normalized.includes("superadmin")) {
+    throw new Error("The selected role cannot be self-assigned");
+  }
+
+  return requestedRole;
 };

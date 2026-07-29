@@ -1,4 +1,5 @@
 import * as faqService from "./faq.service.js";
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 export const create = async (req, res) => {
   try {
@@ -21,7 +22,7 @@ export const getActive = async (req, res) => {
 
 export const getAll = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = isNormalizedAdminRole(normalizeRoleName(req.user?.roleName));
     const orgId = isSuperAdmin ? null : req.user?.organizationId;
     const faqs = await faqService.getAllFaqs(orgId);
     res.status(200).json({ success: true, data: faqs });
@@ -32,7 +33,7 @@ export const getAll = async (req, res) => {
 
 export const getByStatus = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = isNormalizedAdminRole(normalizeRoleName(req.user?.roleName));
     const orgId = isSuperAdmin ? null : req.user?.organizationId;
     const faqs = await faqService.getFaqsByStatus(req.params.status, orgId);
     res.status(200).json({ success: true, data: faqs });

@@ -15,7 +15,6 @@ export const generateOtp = async (email) => {
 
   const otp = crypto.randomInt(100000, 999999).toString();
   const expiry = new Date(Date.now() + env.OTP_EXPIRY_MINUTES * 60 * 1000);
-
   user.otp = await bcrypt.hash(otp, 10);
   user.otp_expiry = expiry;
   await user.save();
@@ -38,7 +37,7 @@ export const generateOtp = async (email) => {
     html,
   });
 
-  return { message: `OTP sent to ${user.email}`, email: user.email };
+  return { message: `OTP sent to ${user.email}`, email: user.email};
 };
 
 export const verifyOtp = async (email, otp) => {
@@ -183,5 +182,34 @@ export const verifyApprovalOtp = async (email, otp) => {
   return {
     message: "Account verified successfully! You can now login.",
     email: user.email,
+  };
+};
+
+/**
+ * Return the current OTP guard state for an email. Drives the client-side
+ * resend countdown / lockout UI (see useOtpGuard). Attempts/lockout are not
+ * tracked yet, so those fields report a neutral (unlocked) state.
+ */
+export const getOtpStatus = async (email) => {
+  const user = await User.findOne({ email: email.toLowerCase() })
+    .select("otp otp_expiry status")
+    .lean();
+
+  if (!user) throw new Error("No account found with this email");
+
+  const now = Date.now();
+  const hasActiveOtp = Boolean(
+    user.otp && user.otp_expiry && new Date(user.otp_expiry) > now
+  );
+
+  return {
+    has_active_otp: hasActiveOtp,
+    otp_expires_in_seconds: hasActiveOtp
+      ? Math.max(0, Math.floor((new Date(user.otp_expiry) - now) / 1000))
+      : 0,
+    resend_after_seconds: 0,
+    locked: false,
+    locked_seconds: 0,
+    attempts_remaining: null,
   };
 };

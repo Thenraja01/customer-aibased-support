@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 const BASE_URL = "/auth/v1";
 
@@ -16,6 +16,31 @@ export const AuthAPI = {
   login: async (data) => {
     try {
       const response = await AxiosInstance.post(`${BASE_URL}/login`, data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Rotate a refresh token into a fresh access token.
+   * Returns: { accessToken, refreshToken, user }
+   */
+  refresh: async (refreshToken) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/refresh`, { refreshToken });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Revoke a refresh session server-side (fires before local cleanup).
+   */
+  logout: async (refreshToken) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/logout`, { refreshToken });
       return response;
     } catch (error) {
       throw error;
@@ -148,6 +173,142 @@ export const AuthAPI = {
   verifyApprovalOTP: async (email, otp) => {
     try {
       const response = await AxiosInstance.post(`${BASE_URL}/otp/verify-approval`, { email, otp });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Shorthand — verify OTP during activation flow.
+   */
+  verifyOtp: async (email, otp) => {
+    return AuthAPI.verifyApprovalOTP(email, otp);
+  },
+
+  /**
+   * Shorthand — resend activation OTP.
+   */
+  resendOtp: async (email) => {
+    return AuthAPI.requestApprovalOTP(email);
+  },
+
+  /**
+   * Get the current OTP guard state for an email (resend countdown, lockout,
+   * active OTP expiry). Used by the forgot/reset-password pages.
+   */
+  getOtpStatus: async (email) => {
+    try {
+      const response = await AxiosInstance.get(`${BASE_URL}/otp-status/${encodeURIComponent(email)}`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Shorthand — check registration status by email.
+   */
+  checkStatus: async (email) => {
+    return AuthAPI.checkUserStatus(email);
+  },
+
+  // ── OAuth Methods ──────────────────────────────────────────────
+  
+  getOAuthProviders: async () => {
+    try {
+      const response = await AxiosInstance.get(`${BASE_URL}/oauth/providers`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getGoogleAuthUrl: async (params) => {
+    try {
+      const response = await AxiosInstance.get(`${BASE_URL}/oauth/google/url`, { params });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getFacebookAuthUrl: async (params) => {
+    try {
+      const response = await AxiosInstance.get(`${BASE_URL}/oauth/facebook/url`, { params });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  googleCallback: async (data) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/oauth/google/callback`, data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+   facebookCallback: async (data) => {
+     try {
+       const response = await AxiosInstance.post(`${BASE_URL}/oauth/facebook/callback`, data);
+       return response;
+     } catch (error) {
+       throw error;
+     }
+   },
+
+   /**
+    * Get roles requestable for a specific organization (for OAuth registration completion).
+    * Falls back to all roles if the org-scoped endpoint is unavailable.
+    */
+   getRequestableRoles: async (orgId) => {
+     try {
+       const response = await AxiosInstance.get(`${BASE_URL}/roles/requestable/${orgId}`);
+       return response;
+     } catch (error) {
+       throw error;
+     }
+   },
+
+   /**
+    * Complete OAuth registration by selecting org + role.
+    * Body: { oauthToken, organization_id, requested_role }
+    */
+   completeOAuthRegistration: async (data) => {
+     try {
+       const response = await AxiosInstance.post(`${BASE_URL}/oauth/complete`, data);
+       return response;
+     } catch (error) {
+       throw error;
+     }
+   },
+
+  // ── Password Reset Methods ──────────────────────────────────────
+  
+  forgotPassword: async (email) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/forgot-password`, { email });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  verifyResetOtp: async (email, otp) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/verify-reset-otp`, { email, otp });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  resetPassword: async (email, otp, newPassword) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/reset-password`, { email, otp, newPassword });
       return response;
     } catch (error) {
       throw error;

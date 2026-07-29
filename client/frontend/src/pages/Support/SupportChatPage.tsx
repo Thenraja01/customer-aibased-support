@@ -10,7 +10,7 @@ import ChatHeader from "@/components/chat/ChatHeader";
 import WelcomeScreen from "@/components/chat/WelcomeScreen";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
-import TypingIndicator from "@/components/chat/TypingIndigator";
+import TypingIndicator from "@/components/chat/TypingIndicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ChatAPI } from "@/api";
 
@@ -29,7 +29,6 @@ export default function SupportChatPage() {
     error,
     loadUserChats,
     startNewChat,
-    loadMessages,
     sendWithAI,
     resetMessages,
   } = useChat();

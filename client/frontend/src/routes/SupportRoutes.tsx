@@ -1,5 +1,5 @@
 import { Route } from "react-router-dom";
-import ProtectedRoute from "@/components/ProdectedRoute";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import SupportDashboard from "@/pages/Support/SupportDashboard";
 import SupportChatPage from "@/pages/Support/SupportChatPage";
 import SupportChatHistoryPage from "@/pages/Support/SupportChatHistoryPage";
@@ -9,6 +9,7 @@ import TicketDetailPage from "@/pages/Support/TicketDetailPage";
 import SupportFAQPage from "@/pages/Support/SupportFAQPage";
 import SupportDocumentsPage from "@/pages/Support/SupportDocumentsPage";
 import QueueManagementPage from "@/pages/Admin/QueueManagementPage";
+import NotificationsPage from "@/pages/Admin/NotificationsPage";
 
 export const supportRoutes = (
   <Route path="/support/*" element={<ProtectedRoute allowedRoles={["support"]} />}>
@@ -21,5 +22,6 @@ export const supportRoutes = (
     <Route path="queue" element={<QueueManagementPage />} />
     <Route path="faq" element={<SupportFAQPage />} />
     <Route path="documents" element={<SupportDocumentsPage />} />
+    <Route path="notifications" element={<NotificationsPage />} />
   </Route>
 );

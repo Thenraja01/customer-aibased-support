@@ -2,12 +2,23 @@ import mongoose, { Schema } from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    organization_id: {
+     organization_id: {
       type: Schema.Types.ObjectId,
       ref: "Organization",
       required: true,
     },
-    role_id: { type: Schema.Types.ObjectId, ref: "Role", required: true },
+    branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
+      index: true,
+    },
+    role: { 
+      type: String, 
+      enum: ["super_admin", "admin", "branch_admin", "support", "customer"], 
+      default: "customer",
+      required: true 
+    },
     name: { type: String, required: true, maxlength: 100 },
     email: {
       type: String,

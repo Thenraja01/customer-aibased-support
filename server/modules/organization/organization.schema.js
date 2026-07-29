@@ -51,6 +51,7 @@ const organizationSchema = new mongoose.Schema(
       background: { type: String, default: "#ffffff" },
     },
     show_charts: { type: Boolean, default: true },
+    ai_session_logging: { type: Boolean, default: true },
 
     // Chatbot
     chatbot_name: { type: String, default: "Support AI" },
@@ -63,6 +64,11 @@ const organizationSchema = new mongoose.Schema(
       top_k: { type: Number, default: 40 },
       similarity_threshold: { type: Number, default: 0.75, min: 0, max: 1 },
       max_tokens: { type: Number, default: 2048 },
+      system_prompt: { type: String, default: "You are a helpful AI customer support assistant. Always be polite and try to resolve the customer's issue." },
+      confidence_threshold: {
+        high: { type: Number, default: 0.9, min: 0, max: 1, description: "Above this: auto-respond" },
+        medium: { type: Number, default: 0.6, min: 0, max: 1, description: "Between medium-high: suggest + offer human" },
+      },
       response_style: {
         type: String,
         enum: ["concise", "balanced", "detailed"],

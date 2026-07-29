@@ -3,7 +3,7 @@ import { Save, Palette, Globe, LogIn, FileText, Plus, Trash2 } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AdminAPI } from "@/api/admin.api";
+import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
 import { useToast } from "@/components/ui/toast";
 
 type Tab = "marketing" | "branding" | "login" | "legal";

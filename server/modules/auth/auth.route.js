@@ -7,8 +7,20 @@ import {
   getPendingRegistrations,
   approveRegistration,
   checkUserStatus,
+  buildAuthResponse,
+  refreshTokens,
+  logout,
 } from "./auth.service.js";
-import { protect, restrict } from "../../middleware/auth.middleware.js";
+import { getAuthUrl as getGoogleAuthUrl, verifyAuthorizationCode as verifyGoogleCode } from "./google.service.js";
+import { getAuthUrl as getFacebookAuthUrl, verifyAuthorizationCode as verifyFacebookCode } from "./facebook.service.js";
+import {
+  handleOAuthIdentity,
+  completeOAuthRegistration,
+  issueOAuthState,
+  consumeOAuthState,
+} from "./oauth.service.js";
+import env from "../../config/env.js";
+import { protect, access } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import {
   registerSchema,
@@ -16,13 +28,21 @@ import {
   changePasswordSchema,
   registerWithApprovalSchema,
   approveRegistrationSchema,
+  requestOtpSchema,
+  verifyOtpSchema,
+  resetPasswordWithOtpSchema,
 } from "../../validation/index.js";
 import Organization from "../organization/organization.schema.js";
 import Role from "../role/role.schema.js";
+import User from "../user/user.schema.js";
 import GlobalSetting from "../global-setting/globalSetting.schema.js";
 import {
+  generateOtp,
+  verifyOtp,
+  resetPasswordWithOtp,
   generateApprovalOtp,
   verifyApprovalOtp,
+  getOtpStatus,
 } from "../user/otp.service.js";
 
 const router = express.Router();
@@ -40,10 +60,13 @@ router.post("/v1/register", validate(registerSchema), async (req, res) => {
   }
 });
 
-router.post("/v1/login", validate(loginSchema), async (req, res) => {
+router.post("/v1/login", async (req, res) => {
   try {
-    const result = await login(req.body);
-    res.status(200).json({ success: true, message: result.message, token: result.token, data: result.user });
+    const result = await login(req.body, {
+      ip: req.ip,
+      userAgent: req.get("User-Agent") || "",
+    });
+    res.status(200).json({ success: true, message: result.message, token: result.token, refreshToken: result.refreshToken, data: result.user });
   } catch (error) {
     // Parse structured error codes from the login service
     const message = error.message;
@@ -61,12 +84,48 @@ router.post("/v1/login", validate(loginSchema), async (req, res) => {
       userMessage = message.replace("ACCOUNT_REJECTED: ", "");
     }
 
-    res.status(400).json({ success: false, message: userMessage, code });
+    console.error("Login error:", error);
+    res.status(400).json({ success: false, message: userMessage, code, status: code });
   }
 });
 
-router.post("/v1/logout", protect, async (_req, res) => {
-  res.status(200).json({ success: true, message: "Logged out successfully" });
+/**
+ * POST /v1/refresh
+ * Rotate a refresh token → new access token + rotated refresh token.
+ * Body: { refreshToken }
+ */
+router.post("/v1/refresh", async (req, res) => {
+  try {
+    const { refreshToken } = req.body || {};
+    if (!refreshToken) throw new Error("Refresh token is required");
+    const result = await refreshTokens(refreshToken, {
+      ip: req.ip,
+      userAgent: req.get("User-Agent") || "",
+    });
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      user: result.user,
+    });
+  } catch (error) {
+    res.status(401).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /v1/logout
+ * Revoke the refresh session(s). Body: { refreshToken } or { userId }.
+ */
+router.post("/v1/logout", async (req, res) => {
+  try {
+    const { refreshToken, userId } = req.body || {};
+    const result = await logout({ refreshToken, userId });
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
 });
 
 router.put("/v1/change-password", protect, validate(changePasswordSchema), async (req, res) => {
@@ -127,14 +186,90 @@ router.post("/v1/otp/request-approval", async (req, res) => {
 
 /**
  * POST /v1/otp/verify-approval
- * Verifies OTP and sets user status to "active", enabling login.
+ * Verifies OTP and sets user status to "active". On success the user is
+ * signed in immediately (access + refresh tokens are returned).
  */
 router.post("/v1/otp/verify-approval", async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ success: false, message: "Email and OTP are required" });
-    const result = await verifyApprovalOtp(email, otp);
-    res.status(200).json({ success: true, message: result.message, data: { email: result.email } });
+    await verifyApprovalOtp(email, otp);
+    const user = await User.findOne({ email: email.toLowerCase().trim() })
+      .populate("organization_id")
+      .populate("role");
+    if (!user) return res.status(404).json({ success: false, message: "Account not found" });
+    const auth = await buildAuthResponse(user, {
+      ip: req.ip,
+      userAgent: req.get("User-Agent") || "",
+    });
+    res.status(200).json({
+      success: true,
+      message: auth.message,
+      token: auth.token,
+      refreshToken: auth.refreshToken,
+      data: auth.user,
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /v1/otp-status/:email
+ * Returns the current OTP guard state for an email so the client can show
+ * resend countdowns / lockouts and survive refreshes.
+ */
+router.get("/v1/otp-status/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    if (!email) return res.status(400).json({ success: false, message: "Email is required" });
+    const result = await getOtpStatus(decodeURIComponent(email));
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(404).json({ success: false, message: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// Password Reset — Public endpoints
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * POST /v1/forgot-password
+ * Sends a password-reset OTP to the user's email. Body: { email }
+ */
+router.post("/v1/forgot-password", validate(requestOtpSchema), async (req, res) => {
+  try {
+    const result = await generateOtp(req.body.email);
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /v1/verify-reset-otp
+ * Verifies a password-reset OTP. Body: { email, otp }
+ */
+router.post("/v1/verify-reset-otp", validate(verifyOtpSchema), async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    await verifyOtp(email, otp);
+    res.status(200).json({ success: true, message: "OTP verified. You may now set a new password." });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /v1/reset-password
+ * Resets the password using a verified OTP. Body: { email, otp, newPassword }
+ */
+router.post("/v1/reset-password", validate(resetPasswordWithOtpSchema), async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    await resetPasswordWithOtp(email, otp, newPassword);
+    res.status(200).json({ success: true, message: "Password reset successfully. You can now sign in." });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
@@ -151,7 +286,7 @@ router.post("/v1/otp/verify-approval", async (req, res) => {
 router.get(
   "/v1/pending-registrations",
   protect,
-  restrict("super admin", "tenant admin", "admin"),
+  access("registration.approve"),
   async (req, res) => {
     try {
       // Org admins only see their own org's pending registrations
@@ -172,7 +307,7 @@ router.get(
 router.post(
   "/v1/approve-registration/:id",
   protect,
-  restrict("super admin", "tenant admin", "admin"),
+  access("registration.approve"),
   validate(approveRegistrationSchema),
   async (req, res) => {
     try {
@@ -231,7 +366,9 @@ router.get("/v1/organizations/by-domain", async (req, res) => {
     if (!domain) {
       return res.status(400).json({ success: false, message: "Domain query parameter is required" });
     }
-    const org = await Organization.findOne({ domain: domain.toLowerCase().trim() }).lean();
+    const org = await Organization.findOne({ domain: domain.toLowerCase().trim() })
+      .select("name domain address phone email logo brand_colors chart_colors show_charts chatbot_name default_language greeting_message organization_id")
+      .lean();
     if (!org) {
       return res.status(404).json({ success: false, message: "Organization not found for this domain" });
     }
@@ -257,6 +394,155 @@ router.get("/v1/roles", async (_req, res) => {
   try {
     const roles = await Role.find().sort({ role_name: 1 }).select("role_name description");
     res.status(200).json({ success: true, data: roles });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// OAuth Configuration Check
+// ──────────────────────────────────────────────────────────────
+
+router.get("/v1/oauth/providers", async (_req, res) => {
+  try {
+    const providers = {
+      google: !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET,
+      facebook: !!env.FACEBOOK_CLIENT_ID && !!env.FACEBOOK_CLIENT_SECRET,
+    };
+    res.status(200).json({ success: true, data: providers });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// OAuth Callback Routes
+// ──────────────────────────────────────────────────────────────
+
+router.get("/v1/oauth/google/url", async (req, res) => {
+  try {
+    const { redirect_uri, code_challenge } = req.query;
+    const state = await issueOAuthState("google");
+    const authUrl = getGoogleAuthUrl({
+      state,
+      codeChallenge: code_challenge,
+      redirectUri: redirect_uri || env.GOOGLE_CALLBACK_URL,
+    });
+    res.status(200).json({ success: true, data: { url: authUrl, state } });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/v1/oauth/google/callback", async (req, res) => {
+  try {
+    const { code, state, code_verifier, redirect_uri } = req.body;
+
+    const stateValid = await consumeOAuthState("google", state);
+    if (!stateValid) {
+      throw new Error("Invalid or expired OAuth state. Please try signing in again.");
+    }
+
+    const identity = await verifyGoogleCode({
+      code,
+      codeVerifier: code_verifier,
+      redirectUri: redirect_uri || env.GOOGLE_CALLBACK_URL,
+    });
+
+    const result = await handleOAuthIdentity(identity, {
+      ip: req.ip,
+      userAgent: req.get("User-Agent") || "",
+    });
+
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.get("/v1/oauth/facebook/url", async (req, res) => {
+  try {
+    const { redirect_uri } = req.query;
+    const state = await issueOAuthState("facebook");
+    const authUrl = getFacebookAuthUrl({
+      state,
+      redirectUri: redirect_uri || env.FACEBOOK_CALLBACK_URL,
+    });
+    res.status(200).json({ success: true, data: { url: authUrl, state } });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/v1/oauth/facebook/callback", async (req, res) => {
+  try {
+    const { code, state, redirect_uri } = req.body;
+
+    const stateValid = await consumeOAuthState("facebook", state);
+    if (!stateValid) {
+      throw new Error("Invalid or expired OAuth state. Please try signing in again.");
+    }
+
+    const identity = await verifyFacebookCode({
+      code,
+      redirectUri: redirect_uri || env.FACEBOOK_CALLBACK_URL,
+    });
+
+    const result = await handleOAuthIdentity(identity, {
+      ip: req.ip,
+      userAgent: req.get("User-Agent") || "",
+    });
+
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// OAuth Registration Completion
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * POST /v1/oauth/complete
+ * Finish a new-user OAuth registration by selecting an org + requested role.
+ * Body: { oauthToken, organization_id, requested_role }
+ */
+router.post("/v1/oauth/complete", async (req, res) => {
+  try {
+    const { oauthToken, organization_id, requested_role } = req.body;
+    if (!oauthToken) {
+      throw new Error("OAuth token is required");
+    }
+    const result = await completeOAuthRegistration({
+      oauthToken,
+      organization_id,
+      requested_role,
+    });
+    res.status(201).json({ success: true, message: result.message, data: result.data });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /v1/roles/requestable/:orgId
+ * Return roles that a new user may self-select for the given organization.
+ * Excludes restricted roles (super_admin, admin, branch_admin).
+ */
+router.get("/v1/roles/requestable/:orgId", async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const roles = await Role.find({
+      $or: [{ organization_id: orgId }, { organization_id: null }],
+    }).sort({ role_name: 1 }).select("role_name description");
+
+    const requestable = roles.filter((r) => {
+      const normalized = r.role_name.toLowerCase().replace(/[\s_]+/g, "");
+      return !["superadmin", "tenantadmin", "admin"].includes(normalized);
+    });
+
+    res.status(200).json({ success: true, data: requestable });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

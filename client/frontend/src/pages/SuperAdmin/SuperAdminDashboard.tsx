@@ -4,7 +4,7 @@ import StatsCard from "@/components/admin/StatsCard";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AdminAPI } from "@/api/admin.api";
+import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
 import {
   HeatmapWidget, HistogramWidget, AreaChartWidget
 } from "@/components/admin/AdvancedDashboardCharts";
@@ -15,7 +15,7 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     AdminAPI.getCommandCenterStatus()
-      .then((res) => {
+      .then((res: any) => {
         if (res.data?.success) {
           setTelemetry(res.data.data?.charts);
         }

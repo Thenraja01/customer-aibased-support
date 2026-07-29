@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 export const KnowledgeGraphAPI = {
   getNodesByDocument: (documentId) => AxiosInstance.get(`/knowledge-graph/document/${documentId}`),

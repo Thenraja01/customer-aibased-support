@@ -3,11 +3,11 @@ import Role from '../modules/role/role.schema.js';
 import env from '../config/env.js';
 
 const defaultRoles = [
-  { role_name: "super admin", permissions: ["*"], status: "active", description: "Super administrator with full system access" },
-  { role_name: "tenant admin", permissions: ["manage_documents", "manage_users", "manage_document_types", "view_analytics", "manage_organizations"], status: "active", description: "Tenant administrator with limited system access" },
-  { role_name: "admin", permissions: ["manage_documents", "manage_users", "manage_faq", "view_analytics"], status: "active", description: "Organization admin with management permissions" },
-  { role_name: "support", permissions: ["view_tickets", "manage_tickets", "view_documents", "view_faq", "view_chats"], status: "active", description: "Support agent with ticket and chat access" },
-  { role_name: "user", permissions: ["view_documents", "upload_documents", "view_own_profile"], status: "active", description: "Regular user with basic access" }
+  { role_name: "super_admin", level: 0, status: "active", description: "Platform owner. Creates and manages organizations and all admins." },
+  { role_name: "admin", level: 1, status: "active", description: "Organization administrator. Creates branches, branch admins, support users, and customers." },
+  { role_name: "branch_admin", level: 2, status: "active", description: "Manages a single branch, its support staff, and customers." },
+  { role_name: "support", level: 3, status: "active", description: "Assists customers within their assigned branch." },
+  { role_name: "customer", level: 4, status: "active", description: "End user with access only to their own account." },
 ];
 
 async function initRoles() {
@@ -19,7 +19,7 @@ async function initRoles() {
       const exists = await Role.findOne({ role_name: roleData.role_name });
       if (!exists) {
         await Role.create(roleData);
-        console.log(`Created role: ${roleData.role_name}`);
+        console.log(`Created role: ${roleData.role_name} (level ${roleData.level})`);
       } else {
         console.log(`Role already exists: ${roleData.role_name}`);
       }

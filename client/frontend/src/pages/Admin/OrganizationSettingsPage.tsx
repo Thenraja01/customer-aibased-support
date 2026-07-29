@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Save, Palette, Bot, Clock, Mail, Building2, Eye, Headphones, MessageCircle, FileText, BarChart3 } from "lucide-react";
+import { Save, Palette, Bot, Clock, Mail, Building2, Eye, Headphones, MessageCircle, FileText, BarChart3, Shield, Info, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminAPI } from "@/api/admin.api";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/toast";
+import { Switch } from "@/components/ui/switch";
 import TicketTemplatesManager from "@/components/admin/TicketTemplatesManager";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
@@ -18,10 +19,11 @@ const DEFAULT_GUARDRAILS = [
   "Escalate to a ticket if confidence is low",
 ];
 
-type Tab = "general" | "hours" | "email" | "ticket-templates" | "charts";
+type Tab = "general" | "security" | "hours" | "email" | "ticket-templates" | "charts";
 
 const tabs: { id: Tab; label: string; icon: any }[] = [
   { id: "general", label: "General", icon: Building2 },
+  { id: "security", label: "Security", icon: Shield },
   { id: "hours", label: "Working Hours", icon: Clock },
   { id: "email", label: "Email Templates", icon: Mail },
   { id: "ticket-templates", label: "Ticket Templates", icon: FileText },
@@ -82,6 +84,7 @@ export default function OrganizationSettingsPage() {
             timezone: "UTC",
             ...Object.fromEntries(DAYS.map((d) => [d, { open: "09:00", close: "17:00", enabled: d === "saturday" || d === "sunday" ? false : true }])),
           },
+          ai_session_logging: data.ai_session_logging !== undefined ? data.ai_session_logging : true,
           email_templates: data.email_templates || {
             ticket_assigned: { subject: "", body: "" },
             ticket_resolved: { subject: "", body: "" },
@@ -292,6 +295,93 @@ export default function OrganizationSettingsPage() {
                   className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y font-mono dark:border-white/[0.06]"
                 />
                 <p className="text-xs text-muted-foreground">Use {'{ORGANIZATION_NAME}'} as a placeholder for the org name.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "security" && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Shield size={18} className="text-primary" />
+                Security
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage security and compliance settings for your organization.
+              </p>
+            </div>
+
+            <div className="rounded-xl border dark:border-white/[0.06] p-5 space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Database size={16} className="text-primary" />
+                    <p className="text-sm font-semibold">AI Session Logging</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Record AI conversations, prompts, responses, and usage
+                    for auditing, analytics, and troubleshooting.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.ai_session_logging}
+                  onCheckedChange={(checked) => updateField("ai_session_logging", checked)}
+                  aria-label="Toggle AI session logging"
+                />
+              </div>
+
+              {form.ai_session_logging ? (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+                    <Info size={14} />
+                    When Enabled
+                  </div>
+                  <p className="text-xs text-muted-foreground">Log information such as:</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+                    {[
+                      "User ID", "Organization ID", "Session ID", "Prompt",
+                      "AI response", "Timestamp", "Model used", "Response time",
+                      "Token usage", "Feedback", "Errors",
+                    ].map((label) => (
+                      <div key={label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="w-1 h-1 rounded-full bg-primary/40" />
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  <pre className="rounded-lg bg-background dark:bg-black/20 p-3 text-[11px] font-mono text-muted-foreground overflow-x-auto border dark:border-white/[0.06]">
+{`{
+  "userId": "123",
+  "organizationId": "456",
+  "sessionId": "abc123",
+  "prompt": "How do I reset my password?",
+  "response": "You can reset your password by...",
+  "model": "gpt-5.5",
+  "tokens": 842,
+  "responseTime": 1250,
+  "createdAt": "2026-07-29T09:15:00Z"
+}`}
+                  </pre>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-400/20 bg-amber-500/5 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    <Info size={14} />
+                    When Disabled
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Prompts and responses will not be saved. Minimal operational data
+                    such as request ID, timestamp, success/failure, and response time
+                    may still be logged for monitoring.
+                  </p>
+                </div>
+              )}
+
+              <div className="rounded-lg bg-muted/40 dark:bg-white/[0.03] p-3 border dark:border-white/[0.06]">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground">⚠️ Compliance notice:</span> When enabled, prompts and AI responses are securely stored and visible to administrators with the appropriate permissions. Disable this if your organization does not want conversation content retained.
+                </p>
               </div>
             </div>
           </div>

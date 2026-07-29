@@ -1,25 +1,42 @@
-import admin from "firebase-admin";
+import admin, { cert } from "firebase-admin";
+import { readFileSync, existsSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let firebaseInitialized = false;
 
-/**
- * Initialize Firebase Admin SDK.
- * Call this ONCE at server startup (from server.js).
- * Subsequent calls are no-ops due to the guard flag.
- */
 export const initFirebase = () => {
   if (firebaseInitialized) return;
   try {
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!serviceAccountJson) {
+    let serviceAccount;
+
+    const envJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (envJson) {
+      serviceAccount = JSON.parse(envJson);
+    }
+
+    // Fallback: try loading from device-management.json
+    if (!serviceAccount) {
+      const filePath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
+        resolve(__dirname, "device-management.json");
+      if (existsSync(filePath)) {
+        const raw = readFileSync(filePath, "utf-8");
+        serviceAccount = JSON.parse(raw);
+      }
+    }
+
+    if (!serviceAccount) {
       console.warn(
-        "[Firebase] FIREBASE_SERVICE_ACCOUNT env var not set — push notifications disabled."
+        "[Firebase] No service account found — push notifications disabled. " +
+        "Set FIREBASE_SERVICE_ACCOUNT env var or ensure device-management.json exists."
       );
       return;
     }
-    const serviceAccount = JSON.parse(serviceAccountJson);
+
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: cert(serviceAccount),
     });
     firebaseInitialized = true;
     console.log("[Firebase] Admin SDK initialized successfully.");
@@ -28,17 +45,6 @@ export const initFirebase = () => {
   }
 };
 
-/**
- * Build the recommended FCM message payload.
- * Converts all custom data values to strings (FCM requirement).
- * Sets high-priority headers for Android, APNS, and Web Push.
- *
- * @param {string} token - Single device FCM registration token
- * @param {string} title - Notification title
- * @param {string} body  - Notification body
- * @param {Object} data  - Optional custom key/value data (values coerced to string)
- * @returns {Object} FCM message object
- */
 const buildMessage = (token, { title, body, data = {} }) => ({
   token,
   notification: { title, body },
@@ -49,15 +55,6 @@ const buildMessage = (token, { title, body, data = {} }) => ({
   apns: { headers: { "apns-priority": "10" } },
   webpush: { headers: { Urgency: "high" } },
 });
-
-/**
- * Send a push notification to a single device.
- * Automatically clears the stale token from the User document if FCM
- * reports it as no longer registered.
- *
- * @param {string} fcmToken - Target device FCM token
- * @param {{ title: string, body: string, data?: Object }} payload
- */
 export const sendPushNotification = async (fcmToken, { title, body, data = {} }) => {
   if (!fcmToken) return;
   if (!firebaseInitialized) {
@@ -91,14 +88,6 @@ export const sendPushNotification = async (fcmToken, { title, body, data = {} })
   }
 };
 
-/**
- * Send a push notification to multiple devices (multicast).
- * Uses sendEachForMulticast which is the FCM HTTP v1 recommended approach
- * for targeting multiple tokens in a single call.
- *
- * @param {string[]} tokens - Array of FCM registration tokens
- * @param {{ title: string, body: string, data?: Object }} payload
- */
 export const sendMulticastNotification = async (tokens, { title, body, data = {} }) => {
   if (!tokens || tokens.length === 0) return;
   if (!firebaseInitialized) {

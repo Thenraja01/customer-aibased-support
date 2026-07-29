@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, Ban, CheckCircle } from "lucide-react";
 import type { IUser } from "@/types";

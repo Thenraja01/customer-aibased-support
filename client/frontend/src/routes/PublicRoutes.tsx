@@ -11,6 +11,10 @@ import Login from "@/pages/AuthPage/Login";
 import Register from "@/pages/AuthPage/Register";
 import RegistrationPending from "@/pages/AuthPage/RegistrationPending";
 import OtpPage from "@/pages/AuthPage/optpage";
+import Forgotpassword from "@/pages/AuthPage/Forgotpassword";
+import ResetPassword from "@/pages/AuthPage/ResetPassword";
+import OAuthCallback from "@/pages/AuthPage/OAuthCallback";
+import OAuthCompletion from "@/pages/AuthPage/OAuthCompletion";
 export const publicRoutes = [
   <Route key="home" path="/" element={<Home />} />,
   <Route key="about" path="/about" element={<About />} />,
@@ -23,5 +27,10 @@ export const publicRoutes = [
   <Route key="login" path="/login" element={<Login />} />,
   <Route key="register" path="/register" element={<Register />} />,
   <Route key="registration-pending" path="/registration-pending" element={<RegistrationPending />} />,
+  <Route key="registration-status" path="/registration-status" element={<RegistrationPending />} />,
   <Route key="verify-otp" path="/verify-otp" element={<OtpPage />} />,
+  <Route key="forgot-password" path="/forgot-password" element={<Forgotpassword />} />,
+  <Route key="reset-password" path="/reset-password" element={<ResetPassword />} />,
+  <Route key="oauth-callback" path="/oauth/:provider/callback" element={<OAuthCallback />} />,
+  <Route key="oauth-complete" path="/oauth/complete" element={<OAuthCompletion />} />,
 ];

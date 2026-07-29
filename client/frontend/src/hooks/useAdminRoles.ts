@@ -32,12 +32,12 @@ export const useAdminRoles = () => {
     [dispatch]
   );
 
-  const createRole = useCallback(async (data: { role_name: string }) => {
+  const createRole = useCallback(async (data: any) => {
     const res = await AdminAPI.createRole(data);
     return res.data;
   }, []);
 
-  const updateRole = useCallback(async (id: string, data: { role_name: string }) => {
+  const updateRole = useCallback(async (id: string, data: any) => {
     const res = await AdminAPI.updateRole(id, data);
     return res.data;
   }, []);

@@ -6,7 +6,7 @@ export default {
   NODE_ENV: process.env.NODE_ENV || "development",
 
   RATE_LIMIT_WINDOW_MS: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 min
-  RATE_LIMIT_MAX_REQUESTS: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  RATE_LIMIT_MAX_REQUESTS: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // Increased for development
 
   MONGODB_URI: process.env.MONGODB_URI,
 
@@ -55,6 +55,41 @@ export default {
   SMTP_PASS: process.env.SMTP_PASS || "",
   SMTP_FROM: process.env.SMTP_FROM || "SupportAI <noreply@supportai.com>",
   OTP_EXPIRY_MINUTES: Number(process.env.OTP_EXPIRY_MINUTES) || 10,
+
+  // JWT Configuration
+  JWT_ISSUER: process.env.JWT_ISSUER || "supportai",
+  JWT_AUDIENCE: process.env.JWT_AUDIENCE || "supportai-clients",
+  ACCESS_TOKEN_TTL: process.env.ACCESS_TOKEN_TTL || "15m",
+  REFRESH_TOKEN_TTL_DAYS: Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 7,
+
+  // OAuth Grant (for OAuth registration completion)
+  OAUTH_GRANT_TTL_MINUTES: Number(process.env.OAUTH_GRANT_TTL_MINUTES) || 15,
+  EMAIL_VERIFY_TTL_MINUTES: Number(process.env.EMAIL_VERIFY_TTL_MINUTES) || 30,
+
+  // Redis
+  REDIS_URL: process.env.REDIS_URL || "",
+
+  // OAuth — Google
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+  GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:5173/oauth/google/callback",
+
+  // OAuth — Facebook
+  FACEBOOK_CLIENT_ID: process.env.FACEBOOK_CLIENT_ID || "",
+  FACEBOOK_CLIENT_SECRET: process.env.FACEBOOK_CLIENT_SECRET || "",
+  FACEBOOK_CALLBACK_URL: process.env.FACEBOOK_CALLBACK_URL || "http://localhost:5173/oauth/facebook/callback",
+  FACEBOOK_GRAPH_VERSION: process.env.FACEBOOK_GRAPH_VERSION || "v18.0",
+
+  // Super Admin
+  SUPER_ADMIN_EMAIL: process.env.SUPER_ADMIN_EMAIL || "superadmin@supportai.com",
+  SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD || "Super@123",
+  SUPER_ADMIN_NAME: process.env.SUPER_ADMIN_NAME || "Super Admin",
+  SUPER_ADMIN_ROLE: process.env.SUPER_ADMIN_ROLE || "super_admin",
+  SUPER_ADMIN_ORG_ID: process.env.SUPER_ADMIN_ORG_ID || "",
+
+  // Client / Frontend URLs
+  CLIENT_URL: process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173",
+  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",
 
   // // Firebase Admin SDK — paste minified service-account JSON as a single-line string
   // FIREBASE_SERVICE_ACCOUNT: process.env.FIREBASE_SERVICE_ACCOUNT || "",

@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 export const UsersAPI = {
   getAll: (params) => AxiosInstance.get("/users", { params }),

@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 export const TicketTemplateAPI = {
   create: (data) => AxiosInstance.post("/ticket-templates", data),

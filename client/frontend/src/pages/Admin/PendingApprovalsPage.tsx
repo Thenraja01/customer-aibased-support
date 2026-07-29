@@ -17,7 +17,6 @@ import {
   AlertCircle,
   Shield,
   User,
-  ChevronDown,
   Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,13 +37,6 @@ interface PendingUser {
   role_id: { _id: string; role_name: string; description?: string };
   status: "pending" | "approved" | "blocked" | "active";
 }
-
-const statusColors: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-400/10 dark:text-amber-400 dark:border-amber-400/20",
-  approved: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-400/10 dark:text-blue-400 dark:border-blue-400/20",
-  active: "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-400/10 dark:text-emerald-400 dark:border-emerald-400/20",
-  blocked: "bg-red-100 text-red-700 border-red-300 dark:bg-red-400/10 dark:text-red-400 dark:border-red-400/20",
-};
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/context/SocketContext";
 import { useAuthContext } from "@/context/AuthContext";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface ChatInputProps {
   onSend: (text: string, file?: File) => void;
@@ -19,8 +20,15 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { socket } = useSocket();
+
+  const typingValue = useDebounce(message, 300);
+  const typingEmittedRef = useRef(false);
+
+  const emitTyping = useCallback((isTyping: boolean) => {
+    if (!socket || !chatId) return;
+    socket.emit(isTyping ? "typing:start" : "typing:stop", { chatId });
+  }, [socket, chatId]);
 
   useEffect(() => {
     if (initialValue !== undefined) {
@@ -32,26 +40,27 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
     }
   }, [initialValue]);
 
-  const emitTyping = useCallback((isTyping: boolean) => {
-    if (!socket || !chatId) return;
-    socket.emit(isTyping ? "typing:start" : "typing:stop", { chatId });
-  }, [socket, chatId]);
-
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+    const val = e.target.value;
+    setMessage(val);
 
-    if (chatId && socket) {
-      if (typingTimerRef.current) {
-        clearTimeout(typingTimerRef.current);
-      } else {
+    if (chatId && socket && val.trim()) {
+      if (!typingEmittedRef.current) {
         emitTyping(true);
+        typingEmittedRef.current = true;
       }
-      typingTimerRef.current = setTimeout(() => {
-        emitTyping(false);
-        typingTimerRef.current = null;
-      }, 2000);
     }
   }, [chatId, socket, emitTyping]);
+
+  useEffect(() => {
+    if (typingValue === message && message.trim() && typingEmittedRef.current) {
+      return;
+    }
+    if (!message.trim() && typingEmittedRef.current) {
+      emitTyping(false);
+      typingEmittedRef.current = false;
+    }
+  }, [typingValue, message, emitTyping]);
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
@@ -60,10 +69,7 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
       if (!trimmed && !selectedFile) return;
       if (disabled) return;
       emitTyping(false);
-      if (typingTimerRef.current) {
-        clearTimeout(typingTimerRef.current);
-        typingTimerRef.current = null;
-      }
+      typingEmittedRef.current = false;
       onSend(trimmed, selectedFile || undefined);
       setMessage("");
       setSelectedFile(null);

@@ -3,7 +3,7 @@ export { createUserSchema, updateUserSchema, updateUserStatusSchema, updateProfi
 export { createChatSchema, updateTopicSchema } from "./chat.validation.js";
 export { sendMessageSchema, updateMessageSchema } from "./message.validation.js";
 export { createTicketSchema, assignTicketSchema, updatePrioritySchema } from "./ticket.validation.js";
-export { createNotificationSchema, broadcastNotificationSchema } from "./notification.validation.js";
+export { createNotificationSchema, broadcastNotificationSchema, broadcastToOrgSchema } from "./notification.validation.js";
 export { createDocumentSchema, updateDocumentStatusSchema } from "./document.validation.js";
 export { createFaqSchema, updateFaqSchema } from "./faq.validation.js";
 export { createOrganizationSchema, updateOrganizationSchema } from "./organization.validation.js";
@@ -12,3 +12,4 @@ export { ingestSchema, querySchema } from "./rag.validation.js";
 export { createDocumentTypeSchema, updateDocumentTypeSchema } from "./documentType.validation.js";
 export { createVerificationSchema, rejectVerificationSchema } from "./documentVerification.validation.js";
 export { storeMemorySchema, updateMemorySchema } from "./memory.validation.js";
+export { submitFeedbackSchema } from "./feedback.validation.js";

@@ -1,11 +1,10 @@
 import * as docService from "./document.service.js";
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 export const upload = async (req, res) => {
   try {
     const userRole = req.user?.roleName || req.user?.role_id?.role_name;
-    const isAdmin = ["super admin", "tenant admin", "admin"].includes(
-      userRole?.toLowerCase()
-    );
+    const isAdmin = isNormalizedAdminRole(normalizeRoleName(userRole));
 
     const docData = {
       user_id: req.user.userId,
@@ -32,8 +31,12 @@ export const upload = async (req, res) => {
 export const getAll = async (req, res) => {
   try {
     const organizationId = req.user?.organizationId;
-    const docs = await docService.getAllDocuments(organizationId);
-    res.status(200).json({ success: true, data: docs });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const status = req.query.status || "";
+    const search = req.query.search || "";
+    const result = await docService.getAllDocuments(organizationId, page, limit, status, search);
+    res.status(200).json({ success: true, data: result.data, pagination: result.pagination });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

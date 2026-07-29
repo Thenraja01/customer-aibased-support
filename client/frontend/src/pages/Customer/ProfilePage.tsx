@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -22,15 +22,18 @@ import {
   UserCircle,
   Activity,
   Fingerprint,
+  Type,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { UsersAPI } from "@/api/user.api";
+import FontSettingsPanel from "@/components/FontSettingsPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
+import { Switch } from "@/components/ui/switch";
 
-type Tab = "profile" | "security";
+type Tab = "profile" | "security" | "appearance";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -80,6 +83,40 @@ export default function ProfilePage() {
   const [otpMessage, setOtpMessage] = useState("");
   const [otpError, setOtpError] = useState("");
   const [otpPwStrength, setOtpPwStrength] = useState(0);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.two_factor_enabled ?? true);
+  const [aiLoggingEnabled, setAiLoggingEnabled] = useState(user?.ai_session_logging ?? true);
+  const [togglingTwoFactor, setTogglingTwoFactor] = useState(false);
+  const [togglingAiLogging, setTogglingAiLogging] = useState(false);
+
+  const handleToggleTwoFactor = useCallback(async (checked: boolean) => {
+    const previous = twoFactorEnabled;
+    setTwoFactorEnabled(checked);
+    setTogglingTwoFactor(true);
+    try {
+      await UsersAPI.updateProfile({ two_factor_enabled: checked });
+      toast.success("Success", "Two-factor authentication updated");
+    } catch {
+      setTwoFactorEnabled(previous);
+      toast.error("Error", "Failed to update two-factor authentication");
+    } finally {
+      setTogglingTwoFactor(false);
+    }
+  }, [twoFactorEnabled, toast]);
+
+  const handleToggleAiLogging = useCallback(async (checked: boolean) => {
+    const previous = aiLoggingEnabled;
+    setAiLoggingEnabled(checked);
+    setTogglingAiLogging(true);
+    try {
+      await UsersAPI.updateProfile({ ai_session_logging: checked });
+      toast.success("Success", "AI session logging updated");
+    } catch {
+      setAiLoggingEnabled(previous);
+      toast.error("Error", "Failed to update AI session logging");
+    } finally {
+      setTogglingAiLogging(false);
+    }
+  }, [aiLoggingEnabled, toast]);
 
   // Sync form if user loads after mount
   useEffect(() => {
@@ -234,7 +271,9 @@ export default function ProfilePage() {
   };
 
   const goBack = () => {
-    if (roleName === "super_admin" || roleName === "admin") {
+    if (roleName === "super_admin") {
+      navigate("/superadmin/dashboard");
+    } else if (roleName === "admin") {
       navigate("/admin/dashboard");
     } else if (roleName === "support") {
       navigate("/support/dashboard");
@@ -400,6 +439,7 @@ export default function ProfilePage() {
         {([
           { id: "profile", label: "Profile", icon: User },
           { id: "security", label: "Security", icon: Lock },
+          { id: "appearance", label: "Appearance", icon: Type },
         ] as const).map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -872,30 +912,52 @@ export default function ProfilePage() {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
-                    <Smartphone size={15} className="text-muted-foreground" />
-                    Two-factor authentication
+                    <Smartphone size={15} className="text-muted-foreground shrink-0" />
+                    <span>Two-factor authentication</span>
                   </div>
-                  <span className="inline-flex items-center rounded-full border border-green-500/25 bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-600 dark:text-green-400">
-                    Enabled
-                  </span>
+                  <Switch
+                    checked={twoFactorEnabled}
+                    onCheckedChange={handleToggleTwoFactor}
+                    loading={togglingTwoFactor}
+                    disabled={togglingTwoFactor}
+                    aria-label="Toggle two-factor authentication"
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
-                    <Clock size={15} className="text-muted-foreground" />
-                    Session timeout
+                    <Clock size={15} className="text-muted-foreground shrink-0" />
+                    <span>Session timeout</span>
                   </div>
                   <span className="text-xs text-muted-foreground">30 minutes</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
-                    <Bot size={15} className="text-muted-foreground" />
-                    AI session logging
+                    <Bot size={15} className="text-muted-foreground shrink-0" />
+                    <span>AI session logging</span>
                   </div>
-                  <span className="inline-flex items-center rounded-full border bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
-                    Active
-                  </span>
+                  <Switch
+                    checked={aiLoggingEnabled}
+                    onCheckedChange={handleToggleAiLogging}
+                    loading={togglingAiLogging}
+                    disabled={togglingAiLogging}
+                    aria-label="Toggle AI session logging"
+                  />
                 </div>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === "appearance" && (
+          <motion.div
+            key="appearance"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
+          >
+            <div className="rounded-2xl border bg-card p-6">
+              <FontSettingsPanel />
             </div>
           </motion.div>
         )}

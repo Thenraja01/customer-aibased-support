@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 export const ChatAPI = {
   create: (data) => AxiosInstance.post("/chats", data),

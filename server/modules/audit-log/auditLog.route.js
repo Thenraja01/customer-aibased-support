@@ -1,18 +1,18 @@
 import express from "express";
 import * as auditController from "./auditLog.controller.js";
-import { protect, restrict } from "../../middleware/auth.middleware.js";
+import { protect, access } from "../../middleware/auth.middleware.js";
 
 const router = express.Router();
 
 router.use(protect);
 
-router.post("/", restrict("super admin", "tenant admin", "admin"), auditController.create);
-router.get("/", restrict("super admin", "tenant admin", "admin"), auditController.getAll);
-router.get("/user/:userId", restrict("super admin", "tenant admin", "admin"), auditController.getByUser);
-router.get("/table/:tableName", restrict("super admin", "tenant admin", "admin"), auditController.getByTable);
-router.get("/record/:tableName/:recordId", restrict("super admin", "tenant admin", "admin"), auditController.getByRecord);
-router.get("/action/:action", restrict("super admin", "tenant admin", "admin"), auditController.getByAction);
-router.get("/range", restrict("super admin", "tenant admin", "admin"), auditController.getByDateRange);
-router.delete("/cleanup", restrict("super admin", "tenant admin", "admin"), auditController.cleanup);
+router.post("/", access("report.view"), auditController.create);
+router.get("/", access("report.view"), auditController.getAll);
+router.get("/user/:userId", access("report.view"), auditController.getByUser);
+router.get("/table/:tableName", access("report.view"), auditController.getByTable);
+router.get("/record/:tableName/:recordId", access("report.view"), auditController.getByRecord);
+router.get("/action/:action", access("report.view"), auditController.getByAction);
+router.get("/range", access("report.view"), auditController.getByDateRange);
+router.delete("/cleanup", access("report.view"), auditController.cleanup);
 
 export default router;

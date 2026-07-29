@@ -3,6 +3,7 @@ import Organization from "../organization/organization.schema.js";
 import Role from "../role/role.schema.js";
 import bcrypt from "bcrypt";
 import { escapeRegex } from "../../utils/escapeRegex.js";
+import { resolveAssignableRole } from "../user-role/userRole.service.js";
 
 export const getAllUsers = async (organizationId = null) => {
   const filter = {};
@@ -32,6 +33,9 @@ export const createUser = async (userData) => {
   const role = await Role.findById(userData.role_id);
   if (!role) throw new Error("Role not found");
 
+  // Prevent tenant admins from assigning super-admin or cross-org roles.
+  await resolveAssignableRole(userData.role_id, organization._id);
+
   const hashedPassword = await bcrypt.hash(userData.password, 10);
   const user = await User.create({ ...userData, password: hashedPassword });
 
@@ -40,9 +44,13 @@ export const createUser = async (userData) => {
 };
 
 export const updateUser = async (id, userData) => {
-  delete userData.password;
-  delete userData.role_id;
-  const user = await User.findByIdAndUpdate(id, userData, {
+  const allowed = { name: 1, email: 1, phone: 1, status: 1, role_id: 1 };
+  const filtered = {};
+  for (const key of Object.keys(userData)) {
+    if (allowed[key]) filtered[key] = userData[key];
+  }
+  delete filtered.password;
+  const user = await User.findByIdAndUpdate(id, filtered, {
     new: true,
     runValidators: true,
   })

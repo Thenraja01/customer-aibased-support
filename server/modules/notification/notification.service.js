@@ -117,3 +117,91 @@ export const clearNotifications = async (userId) => {
   await Notification.deleteMany({ user_id: userId });
   return { message: "All notifications cleared" };
 };
+
+export const broadcastToOrganization = async (data, organizationId) => {
+  const users = await User.find(
+    { organization_id: organizationId, status: "active" },
+    { _id: 1, fcm_token: 1 }
+  ).lean();
+
+  const userIds = users.map((u) => u._id);
+  if (userIds.length === 0) return [];
+
+  const notifications = userIds.map((userId) => ({
+    user_id: userId,
+    organization_id: organizationId,
+    title: data.title,
+    message: data.message,
+    type: data.type || "info",
+    link: data.link,
+  }));
+  const created = await Notification.insertMany(notifications);
+
+  try {
+    const io = getIO();
+    created.forEach((notif) => {
+      io.to(`user:${notif.user_id}`).emit("notification", notif);
+    });
+  } catch {
+    // socket not available
+  }
+
+  try {
+    const tokens = users.map((u) => u.fcm_token).filter(Boolean);
+    if (tokens.length > 0) {
+      await sendMulticastNotification(tokens, {
+        title: data.title,
+        body: data.message,
+        data: { type: data.type || "info", link: data.link || "" },
+      });
+    }
+  } catch {
+    // push notification error
+  }
+
+  return created;
+};
+
+export const broadcastToAll = async (data) => {
+  const users = await User.find(
+    { status: "active" },
+    { _id: 1, fcm_token: 1, organization_id: 1 }
+  ).lean();
+
+  const userIds = users.map((u) => u._id);
+  if (userIds.length === 0) return [];
+
+  const notifications = userIds.map((userId, idx) => ({
+    user_id: userId,
+    organization_id: users[idx].organization_id,
+    title: data.title,
+    message: data.message,
+    type: data.type || "info",
+    link: data.link,
+  }));
+  const created = await Notification.insertMany(notifications);
+
+  try {
+    const io = getIO();
+    created.forEach((notif) => {
+      io.to(`user:${notif.user_id}`).emit("notification", notif);
+    });
+  } catch {
+    // socket not available
+  }
+
+  try {
+    const tokens = users.map((u) => u.fcm_token).filter(Boolean);
+    if (tokens.length > 0) {
+      await sendMulticastNotification(tokens, {
+        title: data.title,
+        body: data.message,
+        data: { type: data.type || "info", link: data.link || "" },
+      });
+    }
+  } catch {
+    // push notification error
+  }
+
+  return created;
+};

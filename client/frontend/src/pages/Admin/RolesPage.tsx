@@ -2,33 +2,32 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit2, Trash2, Shield, AlertCircle, X, Check, Building2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Shield, AlertCircle, X, Building2 } from "lucide-react";
 import { AdminAPI } from "@/api/admin.api";
+import { ROLE_KEYS, SYSTEM_ROLE_NAMES, normalizeRoleName } from "@/lib/roles";
+import { useAuth } from "@/hooks/useAuth";
+import { canManageRoles } from "@/lib/roles";
 
 interface Role {
   _id: string;
   role_name: string;
+  level?: number;
   description?: string;
-  permissions: string[];
   status: string;
   organization_id?: { _id: string; name: string } | string | null;
 }
 
-const availablePermissions = [
-  "manage_users",
-  "manage_documents",
-  "manage_document_types",
-  "manage_roles",
-  "manage_faq",
-  "view_analytics",
-  "view_documents",
-  "upload_documents",
-  "view_own_profile",
-  "manage_tickets",
-  "manage_chats",
+const LEVEL_OPTIONS = [
+  { level: 1, label: "Admin", description: "Organization administrator" },
+  { level: 2, label: "Branch Admin", description: "Branch-level management" },
+  { level: 3, label: "Support", description: "Assists customers" },
+  { level: 4, label: "Customer", description: "End user access" },
 ];
 
 export default function RolesPage() {
+  const { user } = useAuth();
+  const canManage = canManageRoles(user);
+
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -37,7 +36,7 @@ export default function RolesPage() {
   const [formData, setFormData] = useState({
     role_name: "",
     description: "",
-    permissions: [] as string[],
+    level: 3,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -58,22 +57,22 @@ export default function RolesPage() {
   useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
   const resetForm = () => {
-    setFormData({ role_name: "", description: "", permissions: [] });
+    setFormData({ role_name: "", description: "", level: 3 });
     setFormErrors({});
     setEditingRole(null);
     setShowForm(false);
   };
 
   const openEdit = (role: Role) => {
-    if (role.role_name.toLowerCase() === "super admin") {
-      setError("Cannot edit super_admin role");
+    if (SYSTEM_ROLE_NAMES.includes(normalizeRoleName(role.role_name))) {
+      setError(`Cannot edit system role "${role.role_name}"`);
       return;
     }
     setEditingRole(role);
     setFormData({
       role_name: role.role_name,
       description: role.description || "",
-      permissions: role.permissions || [],
+      level: typeof role.level === "number" ? role.level : 3,
     });
     setFormErrors({});
     setShowForm(true);
@@ -82,6 +81,9 @@ export default function RolesPage() {
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!formData.role_name.trim()) errs.role_name = "Role name is required";
+    if (SYSTEM_ROLE_NAMES.includes(normalizeRoleName(formData.role_name))) {
+      errs.role_name = "Role name conflicts with a system role";
+    }
     if (formData.role_name.length > 50) errs.role_name = "Max 50 characters";
     if (formData.description && formData.description.length > 200) errs.description = "Max 200 characters";
     setFormErrors(errs);
@@ -116,13 +118,9 @@ export default function RolesPage() {
     }
   };
 
-  const togglePermission = (perm: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: prev.permissions.includes(perm)
-        ? prev.permissions.filter((p) => p !== perm)
-        : [...prev.permissions, perm],
-    }));
+  const levelLabel = (level: number | undefined) => {
+    const opt = LEVEL_OPTIONS.find((o) => o.level === level);
+    return opt?.label ?? `Level ${level}`;
   };
 
   return (
@@ -130,12 +128,16 @@ export default function RolesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Role Management</h1>
-          <p className="text-muted-foreground text-sm">Create and manage roles for your organization.</p>
+          <p className="text-muted-foreground text-sm">
+            Create and manage roles for your organization. Access is granted by hierarchy level.
+          </p>
         </div>
-        <Button onClick={() => { setEditingRole(null); setShowForm(true); }}>
-          <Plus size={16} className="mr-1" />
-          New Role
-        </Button>
+        {canManage && (
+          <Button onClick={() => { setEditingRole(null); setShowForm(true); }}>
+            <Plus size={16} className="mr-1" />
+            New Role
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -143,6 +145,13 @@ export default function RolesPage() {
           <AlertCircle size={14} />
           {error}
           <button onClick={() => setError("")} className="ml-auto"><X size={14} /></button>
+        </div>
+      )}
+
+      {!canManage && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+          <AlertCircle size={14} />
+          You don't have permission to manage roles.
         </div>
       )}
 
@@ -162,7 +171,7 @@ export default function RolesPage() {
                   id="role_name"
                   value={formData.role_name}
                   onChange={(e) => setFormData((p) => ({ ...p, role_name: e.target.value }))}
-                  placeholder="e.g. Support Agent"
+                  placeholder="e.g. Regional Manager"
                   className={formErrors.role_name ? "border-destructive" : ""}
                   aria-invalid={!!formErrors.role_name}
                 />
@@ -190,29 +199,32 @@ export default function RolesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Permissions</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-lg p-3">
-                  {availablePermissions.map((perm) => (
+                <Label>Access Level</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {LEVEL_OPTIONS.map((opt) => (
                     <label
-                      key={perm}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
-                        formData.permissions.includes(perm)
-                          ? "bg-primary/10 text-primary border border-primary/20"
-                          : "hover:bg-muted border border-transparent"
+                      key={opt.level}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors border ${
+                        formData.level === opt.level
+                          ? "bg-primary/10 text-primary border-primary/20"
+                          : "hover:bg-muted border-transparent"
                       }`}
                     >
                       <input
-                        type="checkbox"
-                        checked={formData.permissions.includes(perm)}
-                        onChange={() => togglePermission(perm)}
+                        type="radio"
+                        name="level"
+                        value={opt.level}
+                        checked={formData.level === opt.level}
+                        onChange={() => setFormData((p) => ({ ...p, level: opt.level }))}
                         className="sr-only"
                       />
-                      {formData.permissions.includes(perm) ? (
-                        <Check size={14} className="shrink-0" />
-                      ) : (
-                        <div className="w-3.5 h-3.5 rounded border border-muted-foreground/30 shrink-0" />
-                      )}
-                      <span className="capitalize">{perm.replace(/_/g, " ")}</span>
+                      <span className="w-4 h-4 rounded-full border border-muted-foreground/30 flex items-center justify-center shrink-0">
+                        {formData.level === opt.level && <span className="w-2 h-2 rounded-full bg-primary" />}
+                      </span>
+                      <span className="flex-1">
+                        <span className="block font-medium">{opt.label}</span>
+                        <span className="block text-xs text-muted-foreground">{opt.description}</span>
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -246,51 +258,63 @@ export default function RolesPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {roles
-            .filter((r) => r.role_name.toLowerCase() !== "super admin")
-            .map((role) => (
-              <div key={role._id} className="rounded-xl border bg-card p-4 sm:p-5 space-y-3 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold truncate">{role.role_name}</h3>
-                    {role.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{role.description}</p>
-                    )}
-                    {!role.organization_id && (
-                      <span className="text-[10px] text-muted-foreground/60 mt-1 inline-flex items-center gap-1">
-                        <Building2 size={10} /> Global role
-                      </span>
-                    )}
+            .filter((r) => normalizeRoleName(r.role_name) !== ROLE_KEYS.SUPER_ADMIN)
+            .map((role) => {
+              const isSystem = SYSTEM_ROLE_NAMES.includes(normalizeRoleName(role.role_name));
+              return (
+                <div key={role._id} className="rounded-xl border bg-card p-4 sm:p-5 space-y-3 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold truncate">{role.role_name}</h3>
+                      {role.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{role.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                          {levelLabel(role.level)}
+                        </span>
+                        {!role.organization_id && (
+                          <span className="text-[10px] text-muted-foreground/60 inline-flex items-center gap-1">
+                            <Building2 size={10} /> Global role
+                          </span>
+                        )}
+                        {isSystem && (
+                          <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1.5 py-0.5 rounded-full">
+                            System
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                      role.status === "active" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {role.status}
+                    </span>
                   </div>
-                  <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                    role.status === "active" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                  }`}>
-                    {role.status}
-                  </span>
-                </div>
 
-                {role.permissions && role.permissions.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {role.permissions.slice(0, 4).map((p) => (
-                      <span key={p} className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground truncate max-w-[100px]">
-                        {p.replace(/_/g, " ")}
-                      </span>
-                    ))}
-                    {role.permissions.length > 4 && (
-                      <span className="text-[10px] text-muted-foreground">+{role.permissions.length - 4}</span>
-                    )}
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEdit(role)}
+                      disabled={isSystem || !canManage}
+                      className="flex-1"
+                    >
+                      <Edit2 size={12} className="mr-1" /> Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(role)}
+                      disabled={isSystem || !canManage}
+                      className="flex-1 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 size={12} className="mr-1" /> Delete
+                    </Button>
                   </div>
-                )}
-
-                <div className="flex gap-2 pt-1">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(role)} className="flex-1">
-                    <Edit2 size={12} className="mr-1" /> Edit
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDelete(role)} className="flex-1 text-destructive hover:text-destructive">
-                    <Trash2 size={12} className="mr-1" /> Delete
-                  </Button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       )}
     </div>

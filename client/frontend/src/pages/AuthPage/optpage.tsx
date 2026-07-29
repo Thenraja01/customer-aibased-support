@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AuthAPI } from "@/api/auth.api";
+import { useAuthContext } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/toast";
 
 const OTP_LENGTH = 6;
@@ -23,9 +24,11 @@ export default function OtpPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
+  const { setSession } = useAuthContext();
 
-  const state = (location.state as { email?: string }) || {};
+  const state = (location.state as { email?: string; mode?: "approval" | "2fa" }) || {};
   const email = state.email || "";
+  const mode = state.mode === "2fa" ? "2fa" : "approval";
 
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [verifying, setVerifying] = useState(false);
@@ -64,10 +67,10 @@ export default function OtpPage() {
   // Navigate away if no email
   useEffect(() => {
     if (!email) {
-      toast.warning("Missing Info", "Please start from the registration pending page.");
-      navigate("/registration-pending", { replace: true });
+      toast.warning("Missing Info", "Please start from the login or registration page.");
+      navigate(mode === "2fa" ? "/login" : "/registration-pending", { replace: true });
     }
-  }, [email, navigate, toast]);
+  }, [email, mode, navigate, toast]);
 
   const handleChange = useCallback(
     (index: number, value: string) => {
@@ -127,6 +130,15 @@ export default function OtpPage() {
     inputRefs.current[nextFocus]?.focus();
   }, []);
 
+  const navigateToDashboard = useCallback((role?: string) => {
+    const r = (role || "").toLowerCase().replace(/[\s_]+/g, "_");
+    if (r === "super_admin") navigate("/superadmin/dashboard", { replace: true });
+    else if (r === "admin" || r === "branch_admin") navigate("/admin/dashboard", { replace: true });
+    else if (r === "branch_admin") navigate("/branch/dashboard", { replace: true });
+    else if (r === "support") navigate("/support/dashboard", { replace: true });
+    else navigate("/dashboard", { replace: true });
+  }, [navigate]);
+
   const handleVerify = useCallback(async () => {
     const otpValue = otp.join("");
     if (otpValue.length < OTP_LENGTH) {
@@ -137,10 +149,20 @@ export default function OtpPage() {
     setError("");
     try {
       const res = await AuthAPI.verifyApprovalOTP(email, otpValue);
-      if (res.data.success) {
+      const { success, token, data } = res.data;
+      if (success) {
         setVerified(true);
-        toast.success("Account Verified!", "Your account is now active. Redirecting to login...");
-        setTimeout(() => navigate("/login", { replace: true }), 2000);
+       if (mode === "2fa" && token) {
+          if (!setSession(data, token, res.data.refreshToken)) {
+            setError("Failed to save session");
+            return;
+          }
+          toast.success("Verified!", `Welcome back${data?.name ? ", " + data.name : ""}. Redirecting...`);
+          setTimeout(() => navigateToDashboard(data?.role_id?.role_name), 1500);
+        } else {
+          toast.success("Account Verified!", "Your account is now active. Redirecting to login...");
+          setTimeout(() => navigate("/login", { replace: true }), 2000);
+        }
       }
     } catch (err: any) {
       const msg =
@@ -152,7 +174,7 @@ export default function OtpPage() {
     } finally {
       setVerifying(false);
     }
-  }, [otp, email, navigate, toast]);
+  }, [otp, email, mode, navigate, navigateToDashboard, toast]);
 
   const handleResend = useCallback(async () => {
     setResending(true);
@@ -200,9 +222,13 @@ export default function OtpPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
               >
-                <h2 className="text-2xl font-bold">Account Verified!</h2>
+                <h2 className="text-2xl font-bold">
+                  {mode === "2fa" ? "Verified!" : "Account Verified!"}
+                </h2>
                 <p className="text-muted-foreground mt-2">
-                  Your account is now active. Redirecting you to login…
+                  {mode === "2fa"
+                    ? "Authentication successful. Redirecting…"
+                    : "Your account is now active. Redirecting you to login…"}
                 </p>
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-4">
                   <Loader2 size={14} className="animate-spin" />
@@ -247,10 +273,12 @@ export default function OtpPage() {
                 transition={{ delay: 0.3 }}
               >
                 <CardTitle className="text-2xl sm:text-3xl font-bold">
-                  Verify Your Account
+                  {mode === "2fa" ? "Two-Factor Authentication" : "Verify Your Account"}
                 </CardTitle>
                 <CardDescription className="text-base mt-1">
-                  Enter the 6-digit code sent to your email
+                  {mode === "2fa"
+                    ? "Enter the 6-digit code from your authenticator app or email"
+                    : "Enter the 6-digit code sent to your email"}
                 </CardDescription>
               </motion.div>
             </CardHeader>
@@ -331,7 +359,7 @@ export default function OtpPage() {
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
                     <>
-                      Verify Account
+                      {mode === "2fa" ? "Authenticate" : "Verify Account"}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   )}
@@ -380,7 +408,7 @@ export default function OtpPage() {
                 className="text-center"
               >
                 <Link
-                  to="/login"
+                  to={mode === "2fa" ? "/login" : "/login"}
                   className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />

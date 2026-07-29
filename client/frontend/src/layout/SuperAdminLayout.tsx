@@ -3,37 +3,49 @@ import { Outlet, Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Building2, Users, ScrollText,
   Sparkles, Search, MessageCircle, Settings2,
-  Settings, ArrowLeft, LogOut, Menu, Bell, X, Zap, AlertTriangle
+  Settings, ArrowLeft, LogOut, Menu, Bell, X, Zap, AlertTriangle, Globe,
+  UserCheck, Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
+import FontSizeToggle from "@/components/FontSizeToggle";
+import { getSessionMeta } from "@/utils/localStorage";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 
 const navLinks = [
-  { name: "Command Center", path: "/superadmin/command-center", icon: Zap },
-  { name: "Dashboard", path: "/superadmin/dashboard", icon: LayoutDashboard },
-  { name: "Organizations", path: "/superadmin/organizations", icon: Building2 },
-  { name: "Users", path: "/superadmin/users", icon: Users },
-  { name: "Audit Logs", path: "/superadmin/audit-logs", icon: ScrollText },
-  { name: "AI Analytics", path: "/superadmin/ai-analytics", icon: Sparkles },
-  { name: "Knowledge Gaps", path: "/superadmin/knowledge-gaps", icon: AlertTriangle },
-  { name: "Search", path: "/superadmin/search", icon: Search },
-  { name: "Chat History", path: "/superadmin/chat-history", icon: MessageCircle },
-  { name: "App Settings", path: "/superadmin/app-settings", icon: Settings2 },
+  { name: "Command Center", path: "/superadmin/command-center", icon: Zap, permission: "*" },
+  { name: "Dashboard", path: "/superadmin/dashboard", icon: LayoutDashboard, permission: "report.view_dashboard" },
+  { name: "Organizations", path: "/superadmin/organizations", icon: Building2, permission: "org.view" },
+  { name: "Users", path: "/superadmin/users", icon: Users, permission: "user.view" },
+  { name: "Pending Admins", path: "/superadmin/pending-org-admins", icon: UserCheck, permission: "registration.approve" },
+  { name: "Roles", path: "/superadmin/roles", icon: Shield, permission: "role.view" },
+  { name: "Audit Logs", path: "/superadmin/audit-logs", icon: ScrollText, permission: "report.view" },
+  { name: "AI Analytics", path: "/superadmin/ai-analytics", icon: Sparkles, permission: "report.view" },
+  { name: "Knowledge Gaps", path: "/superadmin/knowledge-gaps", icon: AlertTriangle, permission: "ai.train_kb" },
+  { name: "Chat History", path: "/superadmin/chat-history", icon: MessageCircle, permission: "chat.view_history" },
+  { name: "Notifications", path: "/superadmin/notifications", icon: Bell, permission: "ai.train_kb" },
+  { name: "Send Notification", path: "/superadmin/notifications/send", icon: Globe, permission: "ai.train_kb" },
+  { name: "Search", path: "/superadmin/search", icon: Search, permission: "report.view" },
+  { name: "App Settings", path: "/superadmin/app-settings", icon: Settings2, permission: "*" },
 ];
 
 export default function SuperAdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const location = useLocation();
-  const { user, orgSettings, logout } = useAuth();
+  const { user, orgSettings, logout, can } = useAuth();
   const orgName = orgSettings?.name || user?.organization_id?.name || "SupportAI";
   const orgLogo = orgSettings?.logo?.url || null;
   const { notifications, unreadCount, loadNotifications, loadUnreadCount, markRead, markAllRead } = useNotifications();
   const notifRef = useRef<HTMLDivElement>(null);
 
+  const visibleNavLinks = navLinks.filter((link) => !link.permission || can(link.permission));
+
   useEffect(() => {
+    const sessionMeta = getSessionMeta();
+    if (!sessionMeta.token || !sessionMeta.user) return;
+    
     loadNotifications();
     loadUnreadCount();
   }, [loadNotifications, loadUnreadCount]);
@@ -86,7 +98,7 @@ export default function SuperAdminLayout() {
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {navLinks.map((link) => {
+          {visibleNavLinks.map((link) => {
             const Icon = link.icon;
             const isActive = link.path === "/admin"
               ? location.pathname === "/admin"
@@ -109,7 +121,7 @@ export default function SuperAdminLayout() {
         </nav>
 
         <div className="p-4 border-t dark:border-white/[0.06] space-y-1">
-          <Link to="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-muted-foreground rounded-lg hover:bg-muted dark:hover:bg-white/[0.04] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <Link to="/superadmin/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-muted-foreground rounded-lg hover:bg-muted dark:hover:bg-white/[0.04] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <Settings size={18} /><span>Settings</span>
           </Link>
           <Link to="/" className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-muted-foreground rounded-lg hover:bg-muted dark:hover:bg-white/[0.04] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
@@ -173,6 +185,7 @@ export default function SuperAdminLayout() {
                 </div>
               )}
             </div>
+            <FontSizeToggle />
             <ThemeToggle />
           </div>
         </header>

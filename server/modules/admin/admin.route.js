@@ -1,5 +1,5 @@
 import express from "express";
-import { protect, restrict } from "../../middleware/auth.middleware.js";
+import { protect, access, anyAccess } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { createDocumentTypeSchema, updateDocumentTypeSchema } from "../../validation/documentType.validation.js";
 import { createRoleSchema, updateRoleSchema } from "../../validation/role.validation.js";
@@ -11,78 +11,78 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get("/dashboard/stats", restrict("super admin", "admin"), adminController.dashboardStats);
+router.get("/dashboard/stats", access("report.view_dashboard"), adminController.dashboardStats);
 
-router.get("/organizations", restrict("super admin", "admin"), adminController.getOrganizations);
-router.post("/organizations", restrict("super admin", "admin"), adminController.createOrg);
-router.put("/organizations/:id", restrict("super admin", "admin"), adminController.updateOrg);
-router.delete("/organizations/:id", restrict("super admin", "admin"), adminController.deleteOrg);
-router.get("/organizations/:id/users", restrict("super admin", "admin"), adminController.getOrganizationUsers);
+router.get("/organizations", access("org.view"), adminController.getOrganizations);
+router.post("/organizations", access("*"), adminController.createOrg);
+router.put("/organizations/:id", access("*"), adminController.updateOrg);
+router.delete("/organizations/:id", access("*"), adminController.deleteOrg);
+router.get("/organizations/:id/users", access("user.view"), adminController.getOrganizationUsers);
 
-router.get("/users", restrict("super admin", "admin"), adminController.getUsers);
-router.post("/users", restrict("super admin", "admin"), adminController.addUser);
-router.put("/users/:id", restrict("super admin", "admin"), adminController.editUser);
-router.patch("/users/:id/status", restrict("super admin", "admin"), adminController.patchUserStatus);
-router.delete("/users/:id", restrict("super admin", "admin"), adminController.removeUser);
+router.get("/users", access("user.view"), adminController.getUsers);
+router.post("/users", access("user.invite"), adminController.addUser);
+router.put("/users/:id", anyAccess("user.update", "user.invite"), adminController.editUser);
+router.patch("/users/:id/status", access("user.disable"), adminController.patchUserStatus);
+router.delete("/users/:id", anyAccess("user.update", "user.disable"), adminController.removeUser);
 
-router.get("/roles", restrict("super admin", "admin"), adminController.getRoles);
-router.post("/roles", restrict("super admin", "admin"), validate(createRoleSchema), adminController.addRole);
-router.put("/roles/:id", restrict("super admin", "admin"), validate(updateRoleSchema), adminController.editRole);
-router.delete("/roles/:id", restrict("super admin", "admin"), adminController.removeRole);
+router.get("/roles", access("role.view"), adminController.getRoles);
+router.post("/roles", access("role.create"), validate(createRoleSchema), adminController.addRole);
+router.put("/roles/:id", access("role.create"), validate(updateRoleSchema), adminController.editRole);
+router.delete("/roles/:id", access("role.delete"), adminController.removeRole);
 
-router.get("/audit-logs", restrict("super admin", "admin"), adminController.getAuditLogs);
+router.get("/audit-logs", access("report.view"), adminController.getAuditLogs);
 
-router.get("/documents", restrict("super admin", "admin"), adminController.getDocuments);
-router.get("/documents/:id", restrict("super admin", "admin"), adminController.getDocumentById);
-router.get("/documents/:id/chunks", restrict("super admin", "admin"), adminController.getDocumentChunks);
+router.get("/documents", access("document.view_all"), adminController.getDocuments);
+router.get("/documents/:id", access("document.view_all"), adminController.getDocumentById);
+router.get("/documents/:id/chunks", access("document.view_all"), adminController.getDocumentChunks);
 
-router.get("/document-verifications", restrict("super admin", "admin"), adminController.getDocumentVerifications);
-router.patch("/document-verifications/:id/approve", restrict("super admin", "admin"), adminController.approveDocument);
-router.patch("/document-verifications/:id/reject", restrict("super admin", "admin"), adminController.rejectDocument);
+router.get("/document-verifications", access("document.view_all"), adminController.getDocumentVerifications);
+router.patch("/document-verifications/:id/approve", access("document.approve"), adminController.approveDocument);
+router.patch("/document-verifications/:id/reject", access("document.approve"), adminController.rejectDocument);
 
-router.get("/rag-stats", restrict("super admin", "admin"), adminController.getRAGStats);
+router.get("/rag-stats", access("report.view"), adminController.getRAGStats);
 
-router.get("/document-types", restrict("super admin"), adminController.getDocumentTypes);
-router.post("/document-types", restrict("super admin"), validate(createDocumentTypeSchema), adminController.createDocumentType);
-router.put("/document-types/:id", restrict("super admin"), validate(updateDocumentTypeSchema), adminController.updateDocumentType);
-router.delete("/document-types/:id", restrict("super admin"), adminController.deleteDocumentType);
+router.get("/document-types", access("*"), adminController.getDocumentTypes);
+router.post("/document-types", access("*"), validate(createDocumentTypeSchema), adminController.createDocumentType);
+router.put("/document-types/:id", access("*"), validate(updateDocumentTypeSchema), adminController.updateDocumentType);
+router.delete("/document-types/:id", access("*"), adminController.deleteDocumentType);
 
-router.get("/organization/settings", restrict("super admin", "admin", "support", "customer"), adminController.getOrgSettings);
-router.put("/organization/settings", restrict("super admin", "admin"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
+router.get("/organization/settings", adminController.getOrgSettings);
+router.put("/organization/settings", access("org.manage"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
 
-router.get("/organizations/:orgId/settings", restrict("super admin"), adminController.getOrgSettings);
-router.put("/organizations/:orgId/settings", restrict("super admin"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
+router.get("/organizations/:orgId/settings", access("*"), adminController.getOrgSettings);
+router.put("/organizations/:orgId/settings", access("*"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
 
-router.patch("/organizations/:id/suspend", restrict("super admin"), adminController.suspendOrg);
-router.patch("/organizations/:id/activate", restrict("super admin"), adminController.activateOrg);
-router.get("/usage/stats", restrict("super admin"), adminController.getUsageStats);
-router.post("/organizations/:id/api-keys", restrict("super admin"), adminController.createOrgApiKey);
-router.delete("/organizations/:id/api-keys/:keyId", restrict("super admin"), adminController.revokeOrgApiKey);
+router.patch("/organizations/:id/suspend", access("*"), adminController.suspendOrg);
+router.patch("/organizations/:id/activate", access("*"), adminController.activateOrg);
+router.get("/usage/stats", access("*"), adminController.getUsageStats);
+router.post("/organizations/:id/api-keys", access("*"), adminController.createOrgApiKey);
+router.delete("/organizations/:id/api-keys/:keyId", access("*"), adminController.revokeOrgApiKey);
 
-router.get("/users/basic", restrict("super admin", "tenant admin", "admin"), adminController.getUsersBasic);
+router.get("/users/basic", access("user.view"), adminController.getUsersBasic);
 
-router.get("/chats", restrict("super admin", "tenant admin", "admin"), adminController.getChats);
-router.delete("/chats", restrict("super admin", "tenant admin", "admin"), adminController.deleteAllChats);
-router.get("/chats/export", restrict("super admin", "tenant admin", "admin"), adminController.exportChats);
-router.get("/chats/:id", restrict("super admin", "tenant admin", "admin"), adminController.getChatDetail);
-router.patch("/chats/:id/status", restrict("super admin", "tenant admin", "admin"), adminController.updateChatStatus);
-router.delete("/chats/:id", restrict("super admin", "tenant admin", "admin"), adminController.deleteChat);
+router.get("/chats", access("chat.view"), adminController.getChats);
+router.delete("/chats", access("chat.delete"), adminController.deleteAllChats);
+router.get("/chats/export", access("chat.view"), adminController.exportChats);
+router.get("/chats/:id", access("chat.view"), adminController.getChatDetail);
+router.patch("/chats/:id/status", access("chat.end"), adminController.updateChatStatus);
+router.delete("/chats/:id", access("chat.delete"), adminController.deleteChat);
 
 // Command Center (Super Admin Only)
-router.get("/command-center/status", restrict("super admin"), adminController.getCommandCenterStatus);
-router.post("/command-center/toggle-maintenance", restrict("super admin"), adminController.toggleMaintenanceMode);
-router.post("/command-center/global-notification", restrict("super admin"), adminController.sendGlobalNotification);
-router.post("/command-center/impersonate", restrict("super admin"), adminController.impersonateOrg);
-router.post("/command-center/clear-cache", restrict("super admin"), adminController.clearSystemCache);
-router.post("/command-center/restart-jobs", restrict("super admin"), adminController.restartBackgroundJobs);
-router.post("/command-center/backup-db", restrict("super admin"), adminController.backupDatabase);
+router.get("/command-center/status", access("*"), adminController.getCommandCenterStatus);
+router.post("/command-center/toggle-maintenance", access("*"), adminController.toggleMaintenanceMode);
+router.post("/command-center/global-notification", access("*"), adminController.sendGlobalNotification);
+router.post("/command-center/impersonate", access("*"), adminController.impersonateOrg);
+router.post("/command-center/clear-cache", access("*"), adminController.clearSystemCache);
+router.post("/command-center/restart-jobs", access("*"), adminController.restartBackgroundJobs);
+router.post("/command-center/backup-db", access("*"), adminController.backupDatabase);
 
 // Global Application Settings (Super Admin Only)
-router.get("/global-settings", restrict("super admin"), adminController.getGlobalSettings);
-router.put("/global-settings", restrict("super admin"), validate(updateGlobalSettingsSchema), adminController.updateGlobalSettings);
+router.get("/global-settings", access("*"), adminController.getGlobalSettings);
+router.put("/global-settings", access("*"), validate(updateGlobalSettingsSchema), adminController.updateGlobalSettings);
 
 // Organization Full Details & Analytics
-router.get("/organizations/:id/full-details", restrict("super admin", "admin"), adminController.getOrgFullDetails);
-router.get("/organizations/:id/analytics", restrict("super admin", "admin"), adminController.getOrgAnalytics);
+router.get("/organizations/:id/full-details", access("org.view"), adminController.getOrgFullDetails);
+router.get("/organizations/:id/analytics", access("report.view"), adminController.getOrgAnalytics);
 
 export default router;

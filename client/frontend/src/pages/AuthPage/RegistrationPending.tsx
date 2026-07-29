@@ -74,7 +74,7 @@ export default function RegistrationPending() {
           "Your account has been approved! Check your email for the OTP."
         );
         // Navigate to OTP verification
-        navigate("/verify-otp", { state: { email } });
+        navigate("/verify-otp", { state: { email, mode: "approval" } });
       } else if (data.status === "active") {
         toast.success("Account Active!", "Your account is fully verified. You can now login.");
         navigate("/login");
@@ -271,26 +271,24 @@ export default function RegistrationPending() {
                 </Button>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    asChild
-                    className="h-10 dark:border-white/[0.08]"
-                  >
-                    <Link to="/login">
+                  <Link to="/login">
+                    <Button
+                      variant="outline"
+                      className="h-10 w-full dark:border-white/[0.08]"
+                    >
                       <ArrowRight className="mr-2 h-4 w-4" />
                       Go to Login
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    asChild
-                    className="h-10 dark:border-white/[0.08]"
-                  >
-                    <Link to="/contact">
+                    </Button>
+                  </Link>
+                  <Link to="/contact">
+                    <Button
+                      variant="outline"
+                      className="h-10 w-full dark:border-white/[0.08]"
+                    >
                       <MessageSquare className="mr-2 h-4 w-4" />
                       Contact Support
-                    </Link>
-                  </Button>
+                    </Button>
+                  </Link>
                 </div>
               </motion.div>
 

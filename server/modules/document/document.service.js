@@ -5,6 +5,7 @@ import DocumentVerification from "../document-verification/documentVerification.
 import { ingestDocument } from "../rag/rag.service.js";
 import { extractTextFromBuffer } from "../../utils/extractText.utils.js";
 import { uploadFileToGridFS, getFileFromGridFS, deleteFileFromGridFS } from "../../services/gridfs.service.js";
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 export const createDocument = async (data, userId, fileBuffer, fileName, fileMimeType, isAdmin = false) => {
   const gridFSId = await uploadFileToGridFS(fileBuffer, fileName, fileMimeType);
@@ -52,13 +53,27 @@ export const createDocument = async (data, userId, fileBuffer, fileName, fileMim
   return doc;
 };
 
-export const getAllDocuments = async (organizationId = null) => {
+export const getAllDocuments = async (organizationId = null, page = 1, limit = 20, status = "", search = "") => {
   const filter = {};
   if (organizationId) filter.organization_id = organizationId;
-  return await Document.find(filter)
-    .populate("user_id", "name email")
-    .populate("document_type_id", "name")
-    .sort({ created_at: -1 });
+  if (status) filter.status = status;
+  if (search) {
+    filter.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
+  }
+  const skip = (page - 1) * limit;
+  const [data, total] = await Promise.all([
+    Document.find(filter)
+      .populate("user_id", "name email")
+      .populate("document_type_id", "name")
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit),
+    Document.countDocuments(filter),
+  ]);
+  return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
 };
 
 export const getDocumentById = async (id) => {
@@ -70,8 +85,8 @@ export const getDocumentById = async (id) => {
 };
 
 export const getDocumentsByUser = async (userId, roleName = null, roleId = null, organizationId = null) => {
-  const normalizedRole = (roleName || "").toLowerCase().trim();
-  const isAdmin = ["super admin", "tenant admin", "admin"].includes(normalizedRole);
+  const normalizedRole = normalizeRoleName(roleName);
+  const isAdmin = isNormalizedAdminRole(normalizedRole);
 
   if (isAdmin && organizationId) {
     return await Document.find({ organization_id: organizationId }).sort({ created_at: -1 });

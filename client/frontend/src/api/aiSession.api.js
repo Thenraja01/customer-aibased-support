@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 export const AISessionAPI = {
   create: (data) => AxiosInstance.post("/ai-sessions", data),
