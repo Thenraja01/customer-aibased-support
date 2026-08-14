@@ -72,7 +72,7 @@ export default function AIAnalyticsPage() {
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 dark:border-white/[0.06]">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-bold  flex items-center gap-2">
             <Sparkles className="text-indigo-500" size={24} />
             AI Analytics & Model Telemetry
           </h1>
@@ -152,7 +152,7 @@ export default function AIAnalyticsPage() {
           {/* Chart 3: AI Spider / Radar Chart (Purpose: Model Competency Benchmark) */}
           <div className="rounded-xl border bg-card p-4 space-y-2 dark:border-white/[0.06] shadow-xs">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">3. System Competency Radar</p>
+              <p className="text-xs font-bold uppercase  text-muted-foreground">3. System Competency Radar</p>
               <p className="text-[11px] text-muted-foreground/80">Multi-axis quality evaluation</p>
             </div>
             <div className="h-52 w-full">

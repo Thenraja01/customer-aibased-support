@@ -58,6 +58,98 @@ export const resolveGap = async (req, res) => {
   }
 };
 
+export const getGapById = async (req, res) => {
+  try {
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
+    const orgId = isSuperAdmin ? (req.query.organizationId || req.user?.organizationId) : req.user?.organizationId;
+    const gap = await knowledgeGapService.getGapDetail(req.params.id, orgId);
+    res.status(200).json({ success: true, data: gap });
+  } catch (error) {
+    const status = error.message === "Knowledge gap not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const getSuggestedKnowledge = async (req, res) => {
+  try {
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
+    const orgId = isSuperAdmin ? (req.query.organizationId || req.user?.organizationId) : req.user?.organizationId;
+    const suggestions = await knowledgeGapService.getSuggestedKnowledge(req.params.id, orgId);
+    res.status(200).json({ success: true, data: suggestions });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const getSimilarGaps = async (req, res) => {
+  try {
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
+    const orgId = isSuperAdmin ? (req.query.organizationId || req.user?.organizationId) : req.user?.organizationId;
+    const similar = await knowledgeGapService.getSimilarGaps(req.params.id, orgId);
+    res.status(200).json({ success: true, data: similar });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const resolveWithFaq = async (req, res) => {
+  try {
+    const { question, answer, category } = req.body;
+    if (!question || !answer) {
+      return res.status(400).json({ success: false, message: "Question and answer are required" });
+    }
+    const faq = await knowledgeGapService.addKnowledgeFaq(
+      req.params.id,
+      { question, answer, category: category || "general" },
+      req
+    );
+    res.status(201).json({ success: true, data: faq });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const resolveWithDocument = async (req, res) => {
+  try {
+    const { title, description, content, branchId, tags, allowedRoles, visibility } = req.body;
+    if (!title || !content) {
+      return res.status(400).json({ success: false, message: "Title and content are required" });
+    }
+    const doc = await knowledgeGapService.addKnowledgeDocument(
+      req.params.id,
+      { title, description: description || "", content, branchId, tags, allowedRoles, visibility },
+      req
+    );
+    res.status(201).json({ success: true, data: doc });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const resolveWithLink = async (req, res) => {
+  try {
+    const { type, refId } = req.body;
+    if (!type || !refId) {
+      return res.status(400).json({ success: false, message: "type and refId are required" });
+    }
+    const result = await knowledgeGapService.linkExistingKnowledge(req.params.id, { type, refId }, req);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const retestGap = async (req, res) => {
+  try {
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
+    const orgId = isSuperAdmin ? (req.query.organizationId || req.user?.organizationId) : req.user?.organizationId;
+    const result = await knowledgeGapService.retestGap(req.params.id, orgId, req.user?.userId);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 export const dismissGap = async (req, res) => {
   try {
     const gap = await knowledgeGapService.dismissGap(req.params.id, req.user?._id);

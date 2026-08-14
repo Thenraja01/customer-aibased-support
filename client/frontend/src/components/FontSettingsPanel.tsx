@@ -116,7 +116,7 @@ export default function FontSettingsPanel() {
 
         <div className="space-y-2">
           <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <span className="tracking-widest text-xs">A A</span>
+            <span className=" text-xs">A A</span>
             Letter Spacing: {settings.letterSpacing}px
           </label>
           <input
@@ -137,7 +137,7 @@ export default function FontSettingsPanel() {
       </div>
 
       <div className="rounded-xl border bg-muted/30 p-4 space-y-1.5">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Preview</p>
+        <p className="text-[11px] font-medium text-muted-foreground uppercase">Preview</p>
         <p
           className="text-sm"
           style={{

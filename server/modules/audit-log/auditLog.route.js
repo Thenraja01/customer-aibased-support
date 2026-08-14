@@ -1,18 +1,26 @@
 import express from "express";
 import * as auditController from "./auditLog.controller.js";
-import { protect, access } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
+import { attachScope } from "../../middleware/branchScope.middleware.js";
+
+// RBAC: admin, branch_admin, super_admin can view audit logs
+const ADMIN_ROLES = ["admin", "branch_admin", "super_admin"];
 
 const router = express.Router();
 
 router.use(protect);
+router.use(attachScope);
+router.use(checkRole(...ADMIN_ROLES));
 
-router.post("/", access("report.view"), auditController.create);
-router.get("/", access("report.view"), auditController.getAll);
-router.get("/user/:userId", access("report.view"), auditController.getByUser);
-router.get("/table/:tableName", access("report.view"), auditController.getByTable);
-router.get("/record/:tableName/:recordId", access("report.view"), auditController.getByRecord);
-router.get("/action/:action", access("report.view"), auditController.getByAction);
-router.get("/range", access("report.view"), auditController.getByDateRange);
-router.delete("/cleanup", access("report.view"), auditController.cleanup);
+router.post("/", auditController.create);
+router.get("/", auditController.getAll);
+router.get("/paginated", auditController.getPaginated);
+router.get("/user/:userId", auditController.getByUser);
+router.get("/table/:tableName", auditController.getByTable);
+router.get("/record/:tableName/:recordId", auditController.getByRecord);
+router.get("/action/:action", auditController.getByAction);
+router.get("/range", auditController.getByDateRange);
+router.delete("/cleanup", auditController.cleanup);
 
 export default router;

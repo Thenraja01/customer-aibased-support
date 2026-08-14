@@ -1,11 +1,12 @@
 import express from "express";
 import * as superAdminController from "./superAdmin.controller.js";
-import { protect, access } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
 
 const router = express.Router();
 
 router.use(protect);
-router.use(access("*"));
+router.use(checkRole("super_admin"));
 
 router.get("/stats", superAdminController.getSystemStats);
 router.get("/admins", superAdminController.getSuperAdmins);

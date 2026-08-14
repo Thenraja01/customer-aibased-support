@@ -1,46 +1,71 @@
-import { useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useCallback, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DocumentTypeAPI from "@/api/documentType.api";
-import { setDocumentTypes, setLoading } from "@/store/adminSlice";
-import type { RootState, AppDispatch } from "@/store/store";
 
 export const useAdminDocumentTypes = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const { documentTypes, loading } = useSelector(
-    (state: RootState) => state.admin
-  );
+  const queryClient = useQueryClient();
+  const [shouldFetch, setShouldFetch] = useState(false);
+
+  const { data: documentTypesData, isLoading: loading } = useQuery({
+    queryKey: ["adminDocumentTypes"],
+    queryFn: async () => {
+      const res = await DocumentTypeAPI.getAll();
+      return res.data;
+    },
+    enabled: shouldFetch,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => DocumentTypeAPI.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminDocumentTypes"] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => DocumentTypeAPI.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminDocumentTypes"] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => DocumentTypeAPI.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminDocumentTypes"] });
+    },
+  });
 
   const fetchDocumentTypes = useCallback(async () => {
-    dispatch(setLoading(true));
-    try {
-      const res = await DocumentTypeAPI.getAll();
-      if (res.data.success) {
-        dispatch(setDocumentTypes(res.data.data));
-      }
-    } catch (error) {
-      console.error("Failed to fetch document types", error);
-    } finally {
-      dispatch(setLoading(false));
-    }
-  }, [dispatch]);
-
-  const createDocumentType = useCallback(async (data: any) => {
-    const res = await DocumentTypeAPI.create(data);
-    return res.data;
+    setShouldFetch(true);
   }, []);
 
-  const updateDocumentType = useCallback(async (id: string, data: any) => {
-    const res = await DocumentTypeAPI.update(id, data);
-    return res.data;
-  }, []);
+  const createDocumentType = useCallback(
+    async (data: any) => {
+      const res = await createMutation.mutateAsync(data);
+      return res.data;
+    },
+    [createMutation]
+  );
 
-  const deleteDocumentType = useCallback(async (id: string) => {
-    const res = await DocumentTypeAPI.remove(id);
-    return res.data;
-  }, []);
+  const updateDocumentType = useCallback(
+    async (id: string, data: any) => {
+      const res = await updateMutation.mutateAsync({ id, data });
+      return res.data;
+    },
+    [updateMutation]
+  );
+
+  const deleteDocumentType = useCallback(
+    async (id: string) => {
+      const res = await deleteMutation.mutateAsync(id);
+      return res.data;
+    },
+    [deleteMutation]
+  );
 
   return {
-    documentTypes,
+    documentTypes: documentTypesData?.success ? documentTypesData.data : [],
     loading,
     fetchDocumentTypes,
     createDocumentType,

@@ -9,6 +9,7 @@ import ChatHistoryPage from "@/pages/Customer/ChatHistoryPage";
 import ChatHistoryView from "@/pages/Customer/ChatHistoryView";
 import NotificationsPage from "@/pages/Customer/NotificationsPage";
 import CustomerDocumentsPage from "@/pages/Customer/CustomerDocumentsPage";
+import ProfilePage from "@/pages/Customer/ProfilePage";
 
 export const customerRoutes = (
   <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>
@@ -21,5 +22,6 @@ export const customerRoutes = (
     <Route path="/chat-history/:id" element={<ChatHistoryView />} />
     <Route path="/notifications" element={<NotificationsPage />} />
     <Route path="/documents" element={<CustomerDocumentsPage />} />
+    <Route path="/profile" element={<ProfilePage />} />
   </Route>
 );

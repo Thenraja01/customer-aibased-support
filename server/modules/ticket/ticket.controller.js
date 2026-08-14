@@ -4,10 +4,11 @@ import * as notifService from "../notification/notification.service.js";
 
 export const create = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const ticket = await ticketService.createTicket(req.body, orgId);
+    const orgId = req.scope?.organizationId || req.user?.organizationId;
+    const branchId = req.scope?.branchId || null;
+    const ticket = await ticketService.createTicket(req.body, orgId, branchId);
 
-    const supportUserIds = await ticketService.getSupportUserIds(orgId);
+    const supportUserIds = await ticketService.getSupportUserIds(orgId, branchId);
     if (supportUserIds.length > 0) {
       await notifService.broadcastNotification({
         title: "New ticket created",
@@ -35,9 +36,9 @@ export const create = async (req, res) => {
 
 export const getAll = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
-    const tickets = await ticketService.getAllTickets(isSuperAdmin ? null : orgId);
+    const orgId = req.scope?.isSuperAdmin ? null : req.scope?.organizationId;
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : req.scope?.branchId;
+    const tickets = await ticketService.getAllTickets(orgId, branchId);
     res.status(200).json({ success: true, data: tickets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -46,9 +47,9 @@ export const getAll = async (req, res) => {
 
 export const getStats = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
-    const stats = await ticketService.getTicketStats(isSuperAdmin ? null : orgId);
+    const orgId = req.scope?.isSuperAdmin ? null : req.scope?.organizationId;
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : req.scope?.branchId;
+    const stats = await ticketService.getTicketStats(orgId, branchId);
     res.status(200).json({ success: true, data: stats });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -57,7 +58,9 @@ export const getStats = async (req, res) => {
 
 export const getById = async (req, res) => {
   try {
-    const ticket = await ticketService.getTicketById(req.params.id);
+    const orgId = req.scope?.isSuperAdmin ? null : req.scope?.organizationId;
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : req.scope?.branchId;
+    const ticket = await ticketService.getTicketById(req.params.id, orgId, branchId);
     res.status(200).json({ success: true, data: ticket });
   } catch (error) {
     const status = error.message === "Ticket not found" ? 404 : 500;
@@ -67,8 +70,9 @@ export const getById = async (req, res) => {
 
 export const getByUser = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const tickets = await ticketService.getTicketsByUser(req.params.userId, orgId);
+    const orgId = req.scope?.isSuperAdmin ? null : req.scope?.organizationId;
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : req.scope?.branchId;
+    const tickets = await ticketService.getTicketsByUser(req.params.userId, orgId, branchId);
     res.status(200).json({ success: true, data: tickets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -77,8 +81,9 @@ export const getByUser = async (req, res) => {
 
 export const getBySupport = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const tickets = await ticketService.getTicketsBySupport(req.params.supportId, orgId);
+    const orgId = req.scope?.isSuperAdmin ? null : req.scope?.organizationId;
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : req.scope?.branchId;
+    const tickets = await ticketService.getTicketsBySupport(req.params.supportId, orgId, branchId);
     res.status(200).json({ success: true, data: tickets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -87,8 +92,9 @@ export const getBySupport = async (req, res) => {
 
 export const getByStatus = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const tickets = await ticketService.getTicketsByStatus(req.params.status, orgId);
+    const orgId = req.scope?.isSuperAdmin ? null : req.scope?.organizationId;
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : req.scope?.branchId;
+    const tickets = await ticketService.getTicketsByStatus(req.params.status, orgId, branchId);
     res.status(200).json({ success: true, data: tickets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -288,13 +294,15 @@ export const deleteMessage = async (req, res) => {
 export const escalateFromChat = async (req, res) => {
   try {
     const { chatId, subject, description } = req.body;
-    const orgId = req.user.organizationId;
+    const orgId = req.scope?.organizationId;
+    const branchId = req.scope?.branchId;
     const ticket = await ticketService.escalateFromChat({
       chatId,
       subject: subject || "Escalated from AI Chat",
       description,
       userId: req.user.userId,
       organizationId: orgId,
+      branchId: branchId,
     });
 
     if (ticket.assigned_to) {
@@ -315,9 +323,10 @@ export const escalateFromChat = async (req, res) => {
 
 export const getQueue = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const queue = await ticketService.getQueue(orgId);
-    const workload = await ticketService.getAgentWorkload(orgId);
+    const orgId = req.scope?.organizationId;
+    const branchId = req.scope?.isOrgAdmin ? null : req.scope?.branchId;
+    const queue = await ticketService.getQueue(orgId, branchId);
+    const workload = await ticketService.getAgentWorkload(orgId, branchId);
     res.json({ success: true, data: { queue, workload } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

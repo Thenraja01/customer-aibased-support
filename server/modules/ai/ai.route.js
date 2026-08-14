@@ -1,24 +1,28 @@
 import express from "express";
 import * as aiController from "./ai.controller.js";
-import { protect, access } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
+
+// RBAC: admin / branch_admin manage AI features.
+const ADMIN = ["admin", "branch_admin"];
 
 const router = express.Router();
 
 router.use(protect);
 
-router.post("/summaries", access("ai.summarize"), aiController.createConversationSummary);
-router.get("/summaries", access("ai.summarize"), aiController.getConversationSummaries);
-router.get("/summaries/:chatId", access("ai.summarize"), aiController.getConversationSummary);
+router.post("/summaries", checkRole(...ADMIN), aiController.createConversationSummary);
+router.get("/summaries", checkRole(...ADMIN), aiController.getConversationSummaries);
+router.get("/summaries/:chatId", checkRole(...ADMIN), aiController.getConversationSummary);
 
-router.post("/feedback", access("ai.summarize"), aiController.createAIFeedback);
-router.get("/feedback/stats", access("ai.train_kb"), aiController.getAIFeedbackStats);
-router.get("/feedback/chat/:chatId", access("ai.summarize"), aiController.getFeedbackByChat);
+router.post("/feedback", checkRole(...ADMIN), aiController.createAIFeedback);
+router.get("/feedback/stats", checkRole(...ADMIN), aiController.getAIFeedbackStats);
+router.get("/feedback/chat/:chatId", checkRole(...ADMIN), aiController.getFeedbackByChat);
 
-router.post("/usage", access("ai.train_kb"), aiController.recordAIUsage);
-router.get("/usage", access("ai.train_kb"), aiController.getAIUsageReport);
+router.post("/usage", checkRole(...ADMIN), aiController.recordAIUsage);
+router.get("/usage", checkRole(...ADMIN), aiController.getAIUsageReport);
 
-router.post("/jobs", access("ai.train_kb"), aiController.enqueueJob);
-router.get("/jobs/stats", access("ai.train_kb"), aiController.getJobStats);
+router.post("/jobs", checkRole(...ADMIN), aiController.enqueueJob);
+router.get("/jobs/stats", checkRole(...ADMIN), aiController.getJobStats);
 
 export const aiRouter = router;
 export default router;

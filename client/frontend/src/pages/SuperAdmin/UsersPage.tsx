@@ -6,7 +6,6 @@ import UserTable from "@/components/admin/UserTable";
 import UserForm from "@/components/admin/UserForm";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
 import { useAdminOrganizations } from "@/hooks/useAdminOrganizations";
-import { useAdminRoles } from "@/hooks/useAdminRoles";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Button } from "@/components/ui/button";
 export default function UsersPage() {
@@ -21,7 +20,6 @@ export default function UsersPage() {
   } = useAdminUsers();
 
   const { organizations, fetchOrganizations } = useAdminOrganizations();
-  const { roles, fetchRoles } = useAdminRoles();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -37,8 +35,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchOrganizations({ limit: 100 });
-    fetchRoles({ limit: 100 });
-  }, [fetchOrganizations, fetchRoles]);
+  }, [fetchOrganizations]);
 
   const handleCreate = async (data: any) => {
     await createUser(data);
@@ -67,7 +64,7 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+          <h1 className="text-3xl font-bold ">Users</h1>
           <p className="text-muted-foreground">Manage all system users.</p>
         </div>
         <Button onClick={() => { setEditingUser(null); setShowForm(true); }}>
@@ -89,7 +86,7 @@ export default function UsersPage() {
           placeholder="Search users..."
         />
 
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-lg border bg-card">
           <UserTable
             users={users}
             onEdit={(user) => { setEditingUser(user); setShowForm(true); }}
@@ -110,7 +107,6 @@ export default function UsersPage() {
         <UserForm
           user={editingUser}
           organizations={organizations}
-          roles={roles}
           onSubmit={editingUser ? handleUpdate : handleCreate}
           onClose={() => { setShowForm(false); setEditingUser(null); }}
         />

@@ -21,7 +21,7 @@ services:
     container_name: supportai-ollama
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
       - ollama-data:/root/.ollama
     healthcheck:
@@ -30,6 +30,16 @@ services:
       timeout: 10s
       retries: 5
 
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: supportai-chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/data
+
 volumes:
   redis-data:
   ollama-data:
+  chroma-data:

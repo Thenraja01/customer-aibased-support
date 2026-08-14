@@ -203,14 +203,14 @@ export default function SuperAdminCommunicationPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] rounded-xl border dark:border-white/[0.06] overflow-hidden bg-card dark:bg-card/50">
+    <div className="flex h-[calc(100vh-8rem)] rounded-lg border dark:border-white/[0.06] overflow-hidden bg-card dark:bg-card/50">
       <ChatSidebar />
 
       <div className={cn("flex-1 flex flex-col", !sidebarOpen ? "flex" : "hidden md:flex")}>
         {selectedOrgId ? (
           <>
             <div className="flex items-center gap-3 px-4 py-3 border-b dark:border-white/[0.06] bg-card">
-              <button className="md:hidden p-1 rounded-lg hover:bg-muted" onClick={() => setSidebarOpen(true)}>
+              <button className="md:hidden p-1 rounded-lg hover:bg-muted" title="Show conversations" onClick={() => setSidebarOpen(true)}>
                 <ChevronLeft size={18} />
               </button>
               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
@@ -232,11 +232,14 @@ export default function SuperAdminCommunicationPage() {
                   <p className="text-xs text-muted-foreground/60">Send a message to start the conversation</p>
                 </div>
               ) : (
-                messages.map((msg) => {
-                  const isMine = msg.sender_id._id === user?._id;
+                messages.map((msg, idx) => {
+                  const senderIdStr = typeof msg.sender_id === "object" ? msg.sender_id?._id : msg.sender_id;
+                  const senderName = typeof msg.sender_id === "object" ? msg.sender_id?.name || "User" : "User";
+                  const currentUserId = user?._id || user?.userId;
+                  const isMine = senderIdStr === currentUserId;
                   const isSeen = msg.status === "seen";
                   return (
-                    <div key={msg._id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
+                    <div key={msg._id || `${msg.created_at || ""}-${idx}`} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
                       <div
                         className={cn(
                           "max-w-[75%] rounded-xl px-4 py-2.5",
@@ -246,7 +249,7 @@ export default function SuperAdminCommunicationPage() {
                         )}
                       >
                         {!isMine && (
-                          <p className="text-[11px] font-medium mb-0.5 opacity-70">{msg.sender_id.name}</p>
+                          <p className="text-[11px] font-medium mb-0.5 opacity-70">{senderName}</p>
                         )}
                         <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                         <div className={cn("flex items-center gap-1 mt-1", isMine ? "justify-end" : "justify-start")}>
@@ -281,6 +284,7 @@ export default function SuperAdminCommunicationPage() {
               <button
                 onClick={handleSend}
                 disabled={sending || !input.trim()}
+                title="Send message"
                 className="p-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 shrink-0 transition-colors"
               >
                 {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

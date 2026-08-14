@@ -81,15 +81,17 @@
       { dispatch, rejectWithValue }
     ) => {
       try {
-        await dispatch(
-          sendMessage({
+        dispatch(
+          addMessage({
+            _id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             chat_id: chatId,
             sender_id: userId,
             content,
             message_type: "text",
             is_ai: false,
+            created_at: new Date().toISOString(),
           })
-        ).unwrap();
+        );
 
         const res = await ChatAPI.sendAI(chatId, content);
         return res.data.data;
@@ -212,6 +214,7 @@
         })
         .addCase(sendAndReceiveAI.fulfilled, (state, action) => {
           state.aiThinking = false;
+          state.sending = false;
           state.messages.push(action.payload);
         })
         .addCase(sendAndReceiveAI.rejected, (state, action) => {

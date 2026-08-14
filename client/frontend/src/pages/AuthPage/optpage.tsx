@@ -148,17 +148,20 @@ export default function OtpPage() {
     setVerifying(true);
     setError("");
     try {
-      const res = await AuthAPI.verifyApprovalOTP(email, otpValue);
-      const { success, token, data } = res.data;
+      const res = mode === "2fa"
+        ? await AuthAPI.verify2FA(email, otpValue)
+        : await AuthAPI.verifyApprovalOTP(email, otpValue);
+
+      const { success, token: _token, data } = res.data;
       if (success) {
         setVerified(true);
-       if (mode === "2fa" && token) {
-          if (!setSession(data, token, res.data.refreshToken)) {
+        if (mode === "2fa") {
+          if (!setSession(res.data)) {
             setError("Failed to save session");
             return;
           }
           toast.success("Verified!", `Welcome back${data?.name ? ", " + data.name : ""}. Redirecting...`);
-          setTimeout(() => navigateToDashboard(data?.role_id?.role_name), 1500);
+          setTimeout(() => navigateToDashboard(data?.role || data?.roleName || data?.role_id?.role_name), 1500);
         } else {
           toast.success("Account Verified!", "Your account is now active. Redirecting to login...");
           setTimeout(() => navigate("/login", { replace: true }), 2000);
@@ -174,14 +177,18 @@ export default function OtpPage() {
     } finally {
       setVerifying(false);
     }
-  }, [otp, email, mode, navigate, navigateToDashboard, toast]);
+  }, [otp, email, mode, navigate, navigateToDashboard, toast, setSession]);
 
   const handleResend = useCallback(async () => {
     setResending(true);
     setError("");
     setOtp(Array(OTP_LENGTH).fill(""));
     try {
-      await AuthAPI.requestApprovalOTP(email);
+      if (mode === "2fa") {
+        await AuthAPI.request2FAOTP(email);
+      } else {
+        await AuthAPI.requestApprovalOTP(email);
+      }
       toast.success("OTP Sent!", "A new verification code has been sent to your email.");
       setCooldown(RESEND_COOLDOWN_SECONDS);
       inputRefs.current[0]?.focus();
@@ -193,7 +200,7 @@ export default function OtpPage() {
     } finally {
       setResending(false);
     }
-  }, [email, toast]);
+  }, [email, mode, toast]);
 
   const allFilled = otp.every(Boolean);
 
@@ -245,10 +252,6 @@ export default function OtpPage() {
   // ── Main OTP form ─────────────────────────────────────────────
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-secondary/5">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-secondary/5 via-transparent to-transparent dark:from-secondary/10" />
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10 animate-pulse-glow" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-secondary/5 blur-3xl dark:bg-secondary/10 animate-pulse-glow [animation-delay:1.5s]" />
-
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-10">
         <motion.div
           className="w-full max-w-md"

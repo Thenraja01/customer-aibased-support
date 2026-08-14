@@ -1,36 +1,20 @@
 import User from "../user/user.schema.js";
 import Organization from "../organization/organization.schema.js";
-import Role from "../role/role.schema.js";
 import { logAction } from "../audit-log/auditLog.service.js";
-import { initializeRoles } from "../role/role.service.js";
-import { hasPermission, WILDCARD } from "../../utils/permissions.js";
 
 /**
  * Check if a user is a Super Admin
  */
 export const isSuperAdmin = (user) => {
-  if (!user || !user.permissions) return false;
-  return hasPermission(user.permissions, WILDCARD);
+  if (!user) return false;
+  return user.role === "super_admin" || user.roleName === "super_admin";
 };
 
 /**
  * Get all Super Admins in the system
  */
 export const getSuperAdmins = async () => {
-  const superAdminRole = await Role.findOne({ 
-    role_name: { $regex: "super_admin", $options: "i" },
-    organization_id: null 
-  });
-  
-  if (!superAdminRole) return [];
-  
-  const UserRole = (await import("../user-role/userRole.schema.js")).default;
-  const userRoles = await UserRole.find({ 
-    role_id: superAdminRole._id,
-    organization_id: null 
-  }).populate("user_id", "name email status created_at").lean();
-  
-  return userRoles.map(ur => ur.user_id);
+  return await User.find({ role: "super_admin" }).select("name email status created_at").lean();
 };
 
 /**
@@ -45,24 +29,10 @@ export const createSuperAdmin = async (adminData, createdBy) => {
     throw new Error("User with this email already exists");
   }
   
-  // Get or create Super Admin role
-  let superAdminRole = await Role.findOne({ 
-    role_name: { $regex: "super_admin", $options: "i" },
-    organization_id: null 
-  });
-  
-  if (!superAdminRole) {
-    superAdminRole = await Role.create({
-      role_name: "super_admin",
-      organization_id: null,
-      permissions: [WILDCARD],
-      status: "active",
-      description: "Super administrator with full system access",
-      isSystemRole: true
-    });
-  }
-  
-  // Create user without organization (platform-level admin)
+  const defaultOrg = await Organization.findOne();
+  const organizationId = defaultOrg ? defaultOrg._id : null;
+
+  // Create user
   const bcrypt = (await import("bcrypt")).default;
   const hashedPassword = await bcrypt.hash(password, 10);
   
@@ -74,16 +44,8 @@ export const createSuperAdmin = async (adminData, createdBy) => {
     status: "active",
     email_verified: true,
     email_verified_at: new Date(),
-    organization_id: null, // Super Admins don't belong to a specific organization
-  });
-  
-  // Assign Super Admin role
-  const UserRole = (await import("../user-role/userRole.schema.js")).default;
-  await UserRole.create({
-    user_id: user._id,
-    role_id: superAdminRole._id,
-    organization_id: null,
-    assigned_by: createdBy,
+    organization_id: organizationId,
+    role: "super_admin"
   });
   
   await logAction({
@@ -117,7 +79,7 @@ export const getSystemStats = async () => {
     User.countDocuments(),
     User.countDocuments({ status: "active" }),
     User.countDocuments({ status: "pending" }),
-    Role.countDocuments(),
+    Promise.resolve(5),
   ]);
   
   // Get recent activity
@@ -227,14 +189,14 @@ export const getOrganizationDetails = async (organizationId) => {
   
   if (!org) throw new Error("Organization not found");
   
-  const userCount = await User.countDocuments({ organization_id });
+  const userCount = await User.countDocuments({ organization_id: organizationId });
   const activeUserCount = await User.countDocuments({ 
-    organization_id, 
+    organization_id: organizationId, 
     status: "active" 
   });
   
-  const Role = (await import("../role/role.schema.js")).default;
-  const roleCount = await Role.countDocuments({ organization_id });
+  // We have a static set of 5 system roles now
+  const roleCount = 5;
   
   return {
     ...org,

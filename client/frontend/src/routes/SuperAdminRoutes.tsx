@@ -15,11 +15,10 @@ import GlobalSearchPage from "@/pages/Admin/GlobalSearchPage";
 import ChatHistoryManagementPage from "@/pages/Admin/ChatHistoryManagementPage";
 import SuperAdminChatHistoryView from "@/pages/SuperAdmin/SuperAdminChatHistoryView";
 import ChatPage from "@/pages/Customer/ChatPage";
-import KnowledgeGraphPage from "@/pages/SuperAdmin/KnowledgeGraphPage";
-import KnowledgeGapPage from "@/pages/Admin/KnowledgeGapPage";
 import ProfilePage from "@/pages/Customer/ProfilePage";
 import PendingOrgAdminsPage from "@/pages/SuperAdmin/PendingOrgAdminsPage";
 import SuperAdminCommunicationPage from "@/pages/SuperAdmin/SuperAdminCommunicationPage";
+import BusinessAICopilotPage from "@/pages/Admin/BusinessAICopilotPage";
 
 export const superAdminRoutes = (
   <Route element={<ProtectedRoute allowedRoles={["super_admin"]} />}>
@@ -38,8 +37,7 @@ export const superAdminRoutes = (
     <Route path="/superadmin/chat-history" element={<ChatHistoryManagementPage />} />
     <Route path="/superadmin/chat-history/:chatId" element={<SuperAdminChatHistoryView />} />
     <Route path="/superadmin/chatbot" element={<ChatPage />} />
-    <Route path="/superadmin/knowledge-graph" element={<KnowledgeGraphPage />} />
-    <Route path="/superadmin/knowledge-gaps" element={<KnowledgeGapPage />} />
+    <Route path="/superadmin/copilot" element={<BusinessAICopilotPage />} />
     <Route path="/superadmin/profile" element={<ProfilePage />} />
     <Route path="/superadmin/pending-org-admins" element={<PendingOrgAdminsPage />} />
     <Route path="/superadmin/communication" element={<SuperAdminCommunicationPage />} />

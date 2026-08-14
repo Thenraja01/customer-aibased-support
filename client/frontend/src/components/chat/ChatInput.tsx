@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback, memo } from "react";
 import { Send, Paperclip, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/context/SocketContext";
 import { useAuthContext } from "@/context/AuthContext";
@@ -43,7 +42,6 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setMessage(val);
-
     if (chatId && socket && val.trim()) {
       if (!typingEmittedRef.current) {
         emitTyping(true);
@@ -112,12 +110,30 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
   }, []);
 
   return (
-    <div className="px-4 pb-4 pt-2">
+    <div className="px-4 pb-4 pt-2 bg-transparent md:px-6">
       <form onSubmit={handleSubmit} className="relative">
+        {/* File preview */}
+        {selectedFile && (
+          <div className="mb-2 flex items-center gap-2 px-1">
+            <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 text-xs border border-border">
+              <Paperclip size={12} className="text-muted-foreground" />
+              <span className="text-muted-foreground truncate max-w-[200px]">{selectedFile.name}</span>
+              <button
+                type="button"
+                onClick={handleRemoveFile}
+                className="hover:text-destructive transition-colors p-0.5"
+                aria-label="Remove file"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div
           className={cn(
-            "flex items-end rounded-2xl border dark:border-white/[0.06] bg-background dark:bg-muted/30 shadow-sm",
-            "focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40 dark:focus-within:border-primary/30 transition-all"
+            "flex items-end rounded-xl border border-border bg-card",
+            "focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40 transition-all"
           )}
         >
           <input
@@ -131,9 +147,10 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="flex-shrink-0 p-3 hover:bg-muted/50 rounded-l-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-shrink-0 p-3 hover:bg-muted/50 rounded-l-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Attach file"
           >
-            <Paperclip size={18} className="text-muted-foreground" />
+            <Paperclip size={16} className="text-muted-foreground" />
           </button>
           <textarea
             ref={textareaRef}
@@ -145,43 +162,29 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
             disabled={disabled}
             rows={1}
             className={cn(
-              "flex-1 resize-none bg-transparent px-2 py-3 text-sm",
-              "placeholder:text-muted-foreground",
+              "flex-1 resize-none bg-transparent px-1 py-3 text-sm",
+              "placeholder:text-muted-foreground/60",
               "focus:outline-none",
               "min-h-[44px] max-h-[200px]",
               "disabled:cursor-not-allowed disabled:opacity-50"
             )}
           />
-          <Button
+          <button
             type="submit"
-            size="icon-sm"
             disabled={(!message.trim() && !selectedFile) || disabled}
             className={cn(
-              "flex-shrink-0 m-1.5 rounded-xl transition-all duration-200",
+              "flex-shrink-0 m-1.5 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200",
               (message.trim() || selectedFile)
-                ? "bg-gradient-to-br from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-sm shadow-primary/20"
-                : "bg-muted dark:bg-white/[0.06] text-muted-foreground"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                : "bg-muted text-muted-foreground/40"
             )}
+            aria-label="Send message"
           >
             <Send size={14} />
-          </Button>
+          </button>
         </div>
-        {selectedFile && (
-          <div className="mt-2 flex items-center gap-2 px-2">
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5 text-xs">
-              <span className="text-muted-foreground truncate max-w-[200px]">{selectedFile.name}</span>
-              <button
-                type="button"
-                onClick={handleRemoveFile}
-                className="hover:text-destructive transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-        )}
       </form>
-      <p className="text-[10px] text-muted-foreground text-center mt-2">
+      <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
         {botName} can make mistakes. Consider checking important information.
       </p>
     </div>

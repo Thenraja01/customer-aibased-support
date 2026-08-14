@@ -2,6 +2,10 @@ export const ADMIN_ROLES = ["super_admin", "admin", "branch_admin"];
 
 export const RESTRICTED_ROLES = ["super_admin", "admin", "branch_admin"];
 
+export const RESTRICTED_ROLE_KEYS = ["super_admin", "admin", "branch_admin"];
+
+export const REQUESTABLE_ROLE_KEYS = ["support", "customer"];
+
 /**
  * Role hierarchy — levels represent descending privilege.
  * Level 0 has the most access; higher numbers have less.

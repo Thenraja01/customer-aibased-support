@@ -22,10 +22,11 @@ export default {
   },
 
   // LLM Configuration
-  LLM_PROVIDER: process.env.LLM_PROVIDER || "gemini",
+  LLM_PROVIDER: process.env.LLM_PROVIDER || "ollama",
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   GROQ_API_KEY: process.env.GROQ_API_KEY,
-  LLM_MODEL: process.env.LLM_MODEL || "gemini-2.0-flash",
+  LLM_MODEL: process.env.LLM_MODEL || "llama3.2:3b",
+  OLLAMA_MODEL: process.env.OLLAMA_MODEL || process.env.LLM_MODEL || "llama3.2:3b",
   GROQ_MODEL: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
   LLM_MIN_RAG_SCORE: Number(process.env.LLM_MIN_RAG_SCORE) || 0.35,
   LLM_MAX_CONV_CHARS: Number(process.env.LLM_MAX_CONV_CHARS) || 3000,

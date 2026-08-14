@@ -8,7 +8,7 @@ const passwordSchema = z
 
 export const registerSchema = z.object({
   organization_id: z.string().trim().min(1, "Organization is required"),
-  role_id: z.string().trim().min(1, "Role is required"),
+  role: z.string().trim().min(1, "Role is required"),
   name: z.string().trim().min(1, "Name is required").max(100),
   email: emailSchema,
   phone: z.string().trim().max(20).optional(),
@@ -18,7 +18,7 @@ export const registerSchema = z.object({
 
 export const registerWithApprovalSchema = z.object({
   organization_id: z.string().trim().min(1, "Organization is required"),
-  role_id: z.string().trim().min(1, "Role is required"),
+  role: z.string().trim().min(1, "Role is required"),
   name: z.string().trim().min(1, "Name is required").max(100),
   email: emailSchema,
   phone: z.string().trim().max(20).optional(),

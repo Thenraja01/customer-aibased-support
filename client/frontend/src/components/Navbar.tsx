@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, Bot, User, LogOut, ChevronDown, LayoutDashboard } from "lucide-react";
+import { Menu, X, Bot, User, LogOut, ChevronDown, LayoutDashboard, LogIn, ArrowRight } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -36,6 +36,7 @@ const roleNavLinks: Record<string, { name: string; path: string }[]> = {
     { name: "Dashboard", path: "/branch/dashboard" },
     { name: "Documents", path: "/branch/documents" },
     { name: "Branches", path: "/branch/branches" },
+    { name: "FAQ", path: "/admin/faq" },
   ],
   support: [
     { name: "Dashboard", path: "/support/dashboard" },
@@ -187,8 +188,8 @@ export default function Navbar() {
             </div>
           ) : (
             <>
-              <Link to="/login" className={buttonVariants({ variant: "ghost" })}>Log In</Link>
-              <Link to="/register" className={buttonVariants({ variant: "default" })}>Get Started</Link>
+              <Link to="/login" className={buttonVariants({ variant: "ghost" })}><LogIn /> Log In</Link>
+              <Link to="/register" className={buttonVariants({ variant: "default" })}>Get Started <ArrowRight /></Link>
             </>
           )}
         </div>
@@ -246,8 +247,8 @@ export default function Navbar() {
                 </>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <Link to="/login" onClick={() => setMobileOpen(false)} className={buttonVariants({ variant: "outline" })}>Log In</Link>
-                  <Link to="/register" onClick={() => setMobileOpen(false)} className={buttonVariants({ variant: "default" })}>Get Started</Link>
+                  <Link to="/login" onClick={() => setMobileOpen(false)} className={buttonVariants({ variant: "outline" })}><LogIn /> Log In</Link>
+                  <Link to="/register" onClick={() => setMobileOpen(false)} className={buttonVariants({ variant: "default" })}>Get Started <ArrowRight /></Link>
                 </div>
               )}
             </div>

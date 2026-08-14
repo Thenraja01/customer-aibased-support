@@ -86,7 +86,9 @@ export default function ChatHistoryManagementPage() {
   }, [fetchChats]);
 
   const handleViewChat = (chatId: string) => {
-    navigate(chatId);
+    const isSuperAdmin = window.location.pathname.startsWith("/superadmin");
+    const basePath = isSuperAdmin ? "/superadmin/chat-history" : "/admin/chat-history";
+    navigate(`${basePath}/${chatId}`);
   };
 
   const handleDelete = async (chat: ChatRecord) => {
@@ -182,7 +184,7 @@ export default function ChatHistoryManagementPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4 dark:border-white/[0.06]">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold  flex items-center gap-2">
             <MessageSquare className="text-primary" size={26} />
             Chat History Management
           </h1>

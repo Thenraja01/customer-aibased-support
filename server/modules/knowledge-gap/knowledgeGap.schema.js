@@ -7,6 +7,12 @@ const knowledgeGapSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  branch_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Branch",
+    default: null,
+    index: true,
+  },
   user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -43,13 +49,30 @@ const knowledgeGapSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["unresolved", "reviewed", "resolved", "dismissed"],
-    default: "unresolved",
+    enum: ["open", "reviewing", "resolved", "ignored"],
+    default: "open",
     index: true,
   },
   resolution_note: {
     type: String,
     default: "",
+  },
+  resolution_type: {
+    type: String,
+    enum: ["faq", "document", "linked_document", "linked_faq", "linked_entity", "manual"],
+    default: null,
+  },
+  resolution_ref_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null,
+  },
+  linked_item_type: {
+    type: String,
+    default: null,
+  },
+  linked_item_title: {
+    type: String,
+    default: null,
   },
   resolved_by: {
     type: mongoose.Schema.Types.ObjectId,

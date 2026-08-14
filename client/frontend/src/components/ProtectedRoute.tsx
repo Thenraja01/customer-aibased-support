@@ -7,8 +7,6 @@ import { hasAnyRole } from "@/lib/roles";
 interface ProtectedRouteProps {
   portal?: Portal;
   allowedRoles?: string[];
-  requiredPermissions?: string[];
-  requireAllPermissions?: boolean;
   redirectTo?: string;
   children?: ReactNode;
 }
@@ -16,12 +14,10 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({
   portal,
   allowedRoles,
-  requiredPermissions,
-  requireAllPermissions,
   redirectTo,
   children,
 }: ProtectedRouteProps) {
-  const { user, loading, canAll, canAny } = useAuthContext();
+  const { user, loading } = useAuthContext();
 
   if (loading) {
     return (
@@ -41,15 +37,6 @@ export default function ProtectedRoute({
 
   if (allowedRoles && allowedRoles.length > 0 && !hasAnyRole(user, allowedRoles)) {
     return <Navigate to={redirectTo || homePathFor(user)} replace />;
-  }
-
-  if (requiredPermissions && requiredPermissions.length > 0) {
-    const hasPerms = requireAllPermissions
-      ? canAll(requiredPermissions)
-      : canAny(requiredPermissions);
-    if (!hasPerms) {
-      return <Navigate to={redirectTo || homePathFor(user)} replace />;
-    }
   }
 
   return children ? <>{children}</> : <Outlet />;

@@ -1,12 +1,10 @@
 import { memo, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Headphones, MessageCircle, Plus, XCircle, History, Loader2, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bot, History, Plus, XCircle, ArrowLeft } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSocket } from "@/context/SocketContext";
 import { useAuthContext } from "@/context/AuthContext";
 import { useChat } from "@/hooks/useChat";
-import { ChatAPI } from "@/api";
 import type { Chat } from "@/types/chat";
 
 interface ChatHeaderProps {
@@ -22,9 +20,10 @@ const ChatHeader = memo(function ChatHeader({ activeChat, isSupportView, onBack 
   const { endChat, loadUserChats } = useChat();
   const isNew = !activeChat;
   const isClosed = activeChat?.status === "closed";
-  const [endingAll, setEndingAll] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
 
   const isTyping = useMemo(() => {
     if (!activeChat?._id || !user?._id) return false;
@@ -33,112 +32,106 @@ const ChatHeader = memo(function ChatHeader({ activeChat, isSupportView, onBack 
     );
   }, [typingUsers, activeChat?._id, user?._id]);
 
-  const handleEndAll = useCallback(async () => {
+  const handleEndChat = useCallback(() => {
+    if (!activeChat?._id) return;
+    setConfirmTitle("End Chat");
+    setConfirmMessage("Are you sure you want to end this conversation? You can view it later in your chat history.");
     setConfirmAction(() => async () => {
-      setEndingAll(true);
       try {
-        await ChatAPI.closeAll();
+        await endChat(activeChat._id);
         loadUserChats();
       } catch (err) {
         console.error(err);
-      } finally {
-        setEndingAll(false);
       }
     });
     setConfirmOpen(true);
-  }, [loadUserChats]);
+  }, [activeChat, endChat, loadUserChats]);
 
   return (
     <>
-      <div className="flex items-center justify-between border-b dark:border-white/[0.06] px-6 py-4 bg-background/50 backdrop-blur-sm shrink-0">
+      <div className="flex items-center justify-between border-b border-border px-4 sm:px-6 py-3 bg-card shrink-0">
         <div className="flex items-center gap-3">
           {onBack && (
             <button
               type="button"
               onClick={onBack}
-              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground shrink-0 transition-colors"
               aria-label="Go back"
             >
               <ArrowLeft size={18} />
             </button>
           )}
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-sm shadow-primary/20">
-            {isNew ? (
-              <MessageCircle size={15} className="text-primary-foreground" />
-            ) : (
-              <Headphones size={15} className="text-primary-foreground" />
-            )}
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Bot size={16} className="text-primary" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold">
-              {isNew ? "New Chat" : isSupportView ? `Chat with ${(activeChat?.user_id as any)?.name || "Customer"}` : (orgSettings?.chatbot_name || "Support Chat")}
+            <h2 className="text-sm font-semibold leading-tight">
+              {isNew
+                ? "New Chat"
+                : isSupportView
+                  ? `Chat with ${(activeChat?.user_id as any)?.name || "Customer"}`
+                  : (orgSettings?.chatbot_name || "AI Support")}
             </h2>
-            {!isNew && (
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isClosed ? "bg-muted" : isTyping ? "bg-primary animate-pulse" : "bg-green-500"
-                  }`}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {isClosed ? "Closed" : isTyping ? "Typing..." : "Online"}
-                </p>
-              </div>
-            )}
-            {isNew && (
-              <p className="text-xs text-muted-foreground">Start a conversation</p>
-            )}
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isClosed ? "bg-muted-foreground/40" : isTyping ? "bg-primary animate-pulse" : "bg-emerald-500"
+                }`}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {isNew
+                  ? "Start a conversation"
+                  : isClosed
+                    ? "Closed"
+                    : isTyping
+                      ? "Typing..."
+                      : "Online"}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
             onClick={() => navigate(isSupportView ? "/support/chat-history" : "/chat-history")}
-            className="gap-2"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            aria-label="Chat History"
           >
-            <History size={16} />
+            <History size={15} />
             <span className="hidden sm:inline">Chat History</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleEndAll}
-            disabled={endingAll}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
-          >
-            {endingAll ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
-            <span className="hidden sm:inline">End All Chats</span>
-          </Button>
-          {!isClosed && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => activeChat?._id && endChat(activeChat._id)}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
+          </button>
+
+          {!isClosed && activeChat && (
+            <button
+              type="button"
+              onClick={handleEndChat}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+              aria-label="End Chat"
             >
-              <XCircle size={16} />
+              <XCircle size={15} />
               <span className="hidden sm:inline">End Chat</span>
-            </Button>
+            </button>
           )}
+
           {!isSupportView && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
+              type="button"
               onClick={() => navigate("/tickets")}
-              className="dark:hover:bg-primary/10 gap-2"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              aria-label="Create Ticket"
             >
-              <Plus size={16} />
+              <Plus size={15} />
               <span className="hidden sm:inline">Create Ticket</span>
-            </Button>
+            </button>
           )}
         </div>
       </div>
+
       <ConfirmDialog
         open={confirmOpen}
-        title="End All Chats"
-        message="Are you sure you want to end all active chats?"
+        title={confirmTitle}
+        message={confirmMessage}
         variant="warning"
         onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
         onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}

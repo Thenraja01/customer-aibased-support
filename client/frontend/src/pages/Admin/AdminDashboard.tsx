@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { UsersAPI, TicketAPI, ChatAPI, DocumentAPI, AISessionAPI, AdminAPI } from "@/api";
 import { Users, Ticket, MessageSquare, FileText, Clock, CheckCircle2, ListOrdered, BarChart3, Sparkles, MessageCircle, TrendingUp, X } from "lucide-react";
@@ -102,22 +103,22 @@ export default function AdminDashboard() {
 
       // 2. Role - User Relation Dataset (Customer, Support, Admin, Super Admin)
       const customerCount = orgUsers.filter((u: any) => {
-        const rName = (u.role_id?.role_name || u.roleName || "").toLowerCase();
+        const rName = (u.role || u.roleName || u.role_id?.role_name || "").toLowerCase();
         return rName.includes("customer") || (!rName.includes("admin") && !rName.includes("support"));
       }).length;
 
       const supportCount = orgUsers.filter((u: any) => {
-        const rName = (u.role_id?.role_name || u.roleName || "").toLowerCase();
+        const rName = (u.role || u.roleName || u.role_id?.role_name || "").toLowerCase();
         return rName.includes("support");
       }).length;
 
       const adminCount = orgUsers.filter((u: any) => {
-        const rName = (u.role_id?.role_name || u.roleName || "").toLowerCase();
+        const rName = (u.role || u.roleName || u.role_id?.role_name || "").toLowerCase();
         return rName.includes("admin") && !rName.includes("super");
       }).length;
 
       const superAdminCount = orgUsers.filter((u: any) => {
-        const rName = (u.role_id?.role_name || u.roleName || "").toLowerCase();
+        const rName = (u.role || u.roleName || u.role_id?.role_name || "").toLowerCase();
         return rName.includes("super");
       }).length;
 
@@ -150,29 +151,38 @@ export default function AdminDashboard() {
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] p-6 shadow-xs hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-black/10 transition-all duration-300 hover:-translate-y-0.5">
-      <div className="flex items-center gap-3">
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color}`}>
-          <Icon size={17} />
+    <div className="relative overflow-hidden glass-card rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
+      <div className="relative z-10 flex items-center gap-4">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${color}`}>
+          <Icon size={22} className="opacity-90" />
         </div>
         <div>
-          <p className="text-2xl font-bold">{loading ? "-" : value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-3xl font-bold  text-foreground/90">{loading ? "-" : value}</p>
+          <p className="text-sm font-medium text-muted-foreground mt-0.5">{label}</p>
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 border-b pb-4 dark:border-white/[0.06]">
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Sparkles className="text-primary" size={28} />
-          Admin Dashboard
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Welcome back, <span className="font-semibold text-foreground">{user?.name || "Admin"}</span>! Real-time organizational telemetry and role analytics.
-        </p>
+    <div className="space-y-6 pb-10">
+      <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10 dark:border-white/5">
+        <div>
+          <h1 className="text-4xl font-extrabold  flex items-center gap-3 bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+            <Sparkles className="text-primary animate-pulse" size={32} />
+            Admin Dashboard
+          </h1>
+          <p className="text-muted-foreground text-base max-w-2xl mt-1">
+            Welcome back, <span className="font-semibold text-foreground/90">{user?.name || "Admin"}</span>! Here is your real-time organizational telemetry and role analytics.
+          </p>
+        </div>
+        <Link
+          to="/admin/copilot"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/95 transition-all shadow-md hover:-translate-y-0.5 whitespace-nowrap"
+        >
+          <Sparkles size={18} />
+          Open Admin Copilot
+        </Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -180,25 +190,25 @@ export default function AdminDashboard() {
           icon={Users}
           label="Active Users"
           value={stats.activeUsers}
-          color="bg-primary/10 text-primary"
+          color="bg-primary/20 text-primary dark:bg-primary/10"
         />
         <StatCard
           icon={Ticket}
           label="Open Tickets"
           value={stats.openTickets}
-          color="bg-secondary/10 text-secondary"
+          color="bg-secondary text-secondary-foreground dark:bg-secondary/40"
         />
         <StatCard
           icon={MessageSquare}
           label="AI Sessions"
           value={stats.aiSessions}
-          color="bg-accent text-accent-foreground"
+          color="bg-accent/20 text-accent dark:bg-accent/10"
         />
         <StatCard
           icon={FileText}
           label="Pending Docs"
           value={stats.pendingDocs}
-          color="bg-primary/10 text-primary"
+          color="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
         />
       </div>
 
@@ -224,20 +234,20 @@ export default function AdminDashboard() {
       </div>
 
       {/* 3 Purpose-Driven Charts using Organization Brand Colors */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between border-b dark:border-white/[0.06] pb-3">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <BarChart3 size={22} style={{ color: brandPrimary }} />
-            Organizational Analytics (Brand Colors Applied)
+      <div className="space-y-6">
+        <div className="flex items-center justify-between pb-2">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <BarChart3 size={24} style={{ color: brandPrimary }} />
+            Organizational Analytics
           </h2>
-          <Badge variant="outline" className="text-xs font-mono">Live DB Metrics</Badge>
+          <Badge variant="secondary" className="text-xs font-mono px-3 py-1 bg-primary/10 text-primary border-primary/20">Live DB Metrics</Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Chart 1: Ticket Status Chart */}
-          <div className="rounded-xl border bg-card p-4 space-y-2 dark:border-white/[0.06] shadow-xs">
+          <div className="glass-card rounded-2xl p-5 space-y-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">1. Ticket Status & Volume Chart</p>
+              <p className="text-xs font-bold uppercase  text-muted-foreground">1. Ticket Status & Volume Chart</p>
               <p className="text-[11px] text-muted-foreground/80">Breakdown of support tickets by status</p>
             </div>
             <div className="h-52 w-full">
@@ -257,9 +267,9 @@ export default function AdminDashboard() {
           </div>
 
           {/* Chart 2: Role-User Relation Chart */}
-          <div className="rounded-xl border bg-card p-4 space-y-2 dark:border-white/[0.06] shadow-xs">
+          <div className="glass-card rounded-2xl p-5 space-y-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">2. Role-User Relation Chart</p>
+              <p className="text-xs font-bold uppercase  text-muted-foreground">2. Role-User Relation Chart</p>
               <p className="text-[11px] text-muted-foreground/80">User distribution across system roles</p>
             </div>
             <div className="h-52 w-full">
@@ -283,13 +293,13 @@ export default function AdminDashboard() {
       </div>
 
       {/* Chat Visual Analytics Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between border-b dark:border-white/[0.06] pb-3">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <MessageCircle size={22} style={{ color: brandPrimary }} />
+      <div className="space-y-6 pt-6">
+        <div className="flex items-center justify-between pb-2">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <MessageCircle size={24} style={{ color: brandPrimary }} />
             Chat Analytics
           </h2>
-          <Badge variant="outline" className="text-xs font-mono">Live DB Metrics</Badge>
+          <Badge variant="secondary" className="text-xs font-mono px-3 py-1 bg-primary/10 text-primary border-primary/20">Live DB Metrics</Badge>
         </div>
 
         {loadingChatStats ? (
@@ -297,47 +307,47 @@ export default function AdminDashboard() {
         ) : chatStats ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                  <MessageCircle size={16} />
-                  <span className="text-xs font-medium">Total Chats</span>
+              <div className="glass-card rounded-2xl p-5 hover:-translate-y-1 transition-transform">
+                <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                  <MessageCircle size={18} className="text-primary" />
+                  <span className="text-sm font-medium">Total Chats</span>
                 </div>
-                <div className="text-2xl font-bold">{chatStats.totalChats}</div>
+                <div className="text-3xl font-bold text-foreground/90">{chatStats.totalChats}</div>
               </div>
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                  <MessageSquare size={16} />
-                  <span className="text-xs font-medium">Total Messages</span>
+              <div className="glass-card rounded-2xl p-5 hover:-translate-y-1 transition-transform">
+                <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                  <MessageSquare size={18} className="text-secondary" />
+                  <span className="text-sm font-medium">Total Messages</span>
                 </div>
-                <div className="text-2xl font-bold">{chatStats.totalMessages}</div>
+                <div className="text-3xl font-bold text-foreground/90">{chatStats.totalMessages}</div>
               </div>
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                  <Users size={16} />
-                  <span className="text-xs font-medium">Total Users</span>
+              <div className="glass-card rounded-2xl p-5 hover:-translate-y-1 transition-transform">
+                <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                  <Users size={18} className="text-accent" />
+                  <span className="text-sm font-medium">Total Users</span>
                 </div>
-                <div className="text-2xl font-bold">{chatStats.totalUsers}</div>
+                <div className="text-3xl font-bold text-foreground/90">{chatStats.totalUsers}</div>
               </div>
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
-                  <TrendingUp size={16} />
-                  <span className="text-xs font-medium">Active Chats</span>
+              <div className="glass-card rounded-2xl p-5 hover:-translate-y-1 transition-transform border-green-500/20">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-3">
+                  <TrendingUp size={18} />
+                  <span className="text-sm font-medium">Active Chats</span>
                 </div>
-                <div className="text-2xl font-bold">{chatStats.activeChats}</div>
+                <div className="text-3xl font-bold text-foreground/90">{chatStats.activeChats}</div>
               </div>
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                  <X size={16} />
-                  <span className="text-xs font-medium">Closed Chats</span>
+              <div className="glass-card rounded-2xl p-5 hover:-translate-y-1 transition-transform">
+                <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                  <X size={18} />
+                  <span className="text-sm font-medium">Closed Chats</span>
                 </div>
-                <div className="text-2xl font-bold">{chatStats.closedChats}</div>
+                <div className="text-3xl font-bold text-foreground/90">{chatStats.closedChats}</div>
               </div>
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                  <BarChart3 size={16} />
-                  <span className="text-xs font-medium">Avg Messages</span>
+              <div className="glass-card rounded-2xl p-5 hover:-translate-y-1 transition-transform">
+                <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                  <BarChart3 size={18} className="text-blue-500" />
+                  <span className="text-sm font-medium">Avg Messages</span>
                 </div>
-                <div className="text-2xl font-bold">{chatStats.avgMessagesPerChat ? chatStats.avgMessagesPerChat.toFixed(1) : 0}</div>
+                <div className="text-3xl font-bold text-foreground/90">{chatStats.avgMessagesPerChat ? chatStats.avgMessagesPerChat.toFixed(1) : 0}</div>
               </div>
             </div>
 
@@ -357,9 +367,9 @@ export default function AdminDashboard() {
                 { interval: "15+ msgs", count: Math.max(1, Math.round(chatStats.totalChats * 0.05)) },
               ]} color={brandSecondary} />
 
-              <div className="rounded-xl border bg-card p-4 space-y-2 dark:border-white/[0.06] shadow-xs">
+              <div className="glass-card rounded-2xl p-5 space-y-4">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Active vs Closed Ratio</p>
+                  <p className="text-xs font-bold uppercase  text-muted-foreground">Active vs Closed Ratio</p>
                   <p className="text-[11px] text-muted-foreground/80">Current status breakdown</p>
                 </div>
                 <div className="h-52 w-full">

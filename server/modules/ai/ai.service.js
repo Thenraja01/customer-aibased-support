@@ -134,6 +134,21 @@ export const claimJob = async (jobId, workerId) => {
   );
 };
 
+/**
+ * Re-queue jobs left in "processing" by a crashed/restarted worker. Prevents
+ * documents from staying stuck in "processing" forever with no active worker.
+ */
+export const requeueStaleJobs = async (maxAgeMs = 5 * 60 * 1000) => {
+  const cutoff = new Date(Date.now() - maxAgeMs);
+  return BackgroundJob.updateMany(
+    {
+      status: "processing",
+      $or: [{ started_at: { $lte: cutoff } }, { started_at: null }],
+    },
+    { $set: { status: "queued", scheduled_at: new Date(), error_message: null }, $inc: { retry_count: 1 } }
+  );
+};
+
 export const completeJob = async (jobId, result = {}) => {
   return BackgroundJob.findByIdAndUpdate(
     jobId,
@@ -188,5 +203,6 @@ export default {
   claimJob,
   completeJob,
   failJob,
+  requeueStaleJobs,
   getJobStats,
 };

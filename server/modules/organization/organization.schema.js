@@ -19,7 +19,7 @@ const organizationSchema = new mongoose.Schema(
     email: { type: String, unique: true, lowercase: true, maxlength: 255 },
     status: {
       type: String,
-      enum: ["active", "inactive", "suspended"],
+      enum: ["active", "inactive", "suspended", "DELETION_PENDING"],
       default: "active",
     },
     plan: {
@@ -118,6 +118,7 @@ const organizationSchema = new mongoose.Schema(
     api_keys: [
       {
         key: { type: String, required: true },
+        key_hash: { type: String, default: null },
         name: { type: String, required: true },
         created_at: { type: Date, default: Date.now },
         last_used: { type: Date },

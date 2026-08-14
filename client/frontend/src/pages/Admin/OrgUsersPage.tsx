@@ -1,34 +1,58 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Loader2 } from "lucide-react";
 import UserTable from "@/components/admin/UserTable";
 import UserForm from "@/components/admin/UserForm";
 import { AdminAPI } from "@/api/admin.api";
+import BranchAPI from "@/api/branch.api";
 import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useBranchScope } from "@/hooks/useBranchScope";
 
 export default function OrgUsersPage() {
   const { user } = useAuth();
+  const { isSuperAdmin, isOrgAdmin } = usePermissions();
+  const { branchId: activeBranchId, changeBranch, isBranchLocked } = useBranchScope();
   const orgId = user?.organization_id?._id || user?.organization_id;
   const orgName = user?.organization_id?.name;
 
   const [users, setUsers] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingBranches, setLoadingBranches] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
-  const [roles, setRoles] = useState<any[]>([]);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
   const limit = 10;
+
+  // Org admins / super admins can scope the list to a branch; branch admins
+  // are locked to their own branch by useBranchScope.
+  const canSelectBranch = isSuperAdmin || isOrgAdmin;
+
+  useEffect(() => {
+    if (!orgId) return;
+    setLoadingBranches(true);
+    BranchAPI.getAll({ organization_id: orgId, limit: 100 })
+      .then((res: any) => setBranches(res.data?.data || []))
+      .catch((error) => console.error("Failed to fetch branches", error))
+      .finally(() => setLoadingBranches(false));
+  }, [orgId]);
 
   const fetchUsers = useCallback(async () => {
     if (!orgId) return;
     setLoading(true);
     try {
-      const res = await AdminAPI.getOrgUsers(orgId, { page, limit, search });
+      const params: any = { page, limit, search };
+      if (activeBranchId) {
+        params.branchId = activeBranchId;
+      }
+      const res = await AdminAPI.getOrgUsers(orgId, params);
       if (res.data.success) {
         setUsers(res.data.data);
       }
@@ -37,26 +61,16 @@ export default function OrgUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [orgId, page, search]);
-
-  const fetchRoles = useCallback(async () => {
-    try {
-      const res = await AdminAPI.getRoles({ limit: 100 });
-      if (res.data.success) {
-        setRoles(res.data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch roles", error);
-    }
-  }, []);
+  }, [orgId, page, search, activeBranchId]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  useEffect(() => {
-    fetchRoles();
-  }, [fetchRoles]);
+  const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    changeBranch(e.target.value || null);
+    setPage(1);
+  };
 
   const handleCreate = async (data: any) => {
     await AdminAPI.createUser({ ...data, organization_id: orgId });
@@ -91,15 +105,21 @@ export default function OrgUsersPage() {
     <div className="h-full overflow-y-auto p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Organization Users</h1>
+          <h1 className="text-3xl font-bold ">Organization Users</h1>
           <p className="text-muted-foreground">
-            Manage users in {orgName || "your organization"}.
+            Manage users in {orgName || "your organization"}
+            {canSelectBranch && activeBranchId
+              ? ` · ${branches.find((b) => b._id === activeBranchId)?.name || "selected branch"}`
+              : ""}
+            .
           </p>
         </div>
-        <Button onClick={() => { setEditingUser(null); setShowForm(true); }}>
-          <Plus size={16} className="mr-1" />
-          New User
-        </Button>
+        {(isSuperAdmin || isOrgAdmin || (activeBranchId && !canSelectBranch)) && (
+          <Button onClick={() => { setEditingUser(null); setShowForm(true); }}>
+            <Plus size={16} className="mr-1" />
+            New User
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -112,6 +132,29 @@ export default function OrgUsersPage() {
             className="pl-9"
           />
         </div>
+
+        {canSelectBranch && (
+          <div className="relative min-w-[200px]">
+            <select
+              value={activeBranchId || ""}
+              onChange={handleBranchChange}
+              className="select-field w-full pr-8"
+              aria-label="Filter by branch"
+            >
+              <option value="">All branches</option>
+              {branches.map((b) => (
+                <option key={b._id} value={b._id}>{b.name}</option>
+              ))}
+            </select>
+            {loadingBranches && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
+        )}
+
+        {isBranchLocked && activeBranchId && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+            Branch: {branches.find((b) => b._id === activeBranchId)?.name || "My branch"}
+          </span>
+        )}
       </div>
 
       <div className="rounded-xl border bg-card">
@@ -131,7 +174,7 @@ export default function OrgUsersPage() {
         <UserForm
           user={editingUser}
           organizations={orgsForForm}
-          roles={roles}
+          initialBranchId={canSelectBranch ? activeBranchId : null}
           onSubmit={editingUser ? handleUpdate : handleCreate}
           onClose={() => { setShowForm(false); setEditingUser(null); }}
         />

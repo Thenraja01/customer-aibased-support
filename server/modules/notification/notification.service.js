@@ -2,6 +2,9 @@ import Notification from "./notification.schema.js";
 import User from "../user/user.schema.js";
 import { getIO } from "../../config/socket.js";
 import { sendPushNotification, sendMulticastNotification } from "../../config/firebase.js";
+import NotificationCampaign from "./notification-campaign.schema.js";
+import NotificationTemplate from "./notification-template.schema.js";
+import { deliveryService } from "./delivery.service.js";
 
 export const createNotification = async (data) => {
   const notif = await Notification.create(data);
@@ -31,6 +34,8 @@ export const createNotification = async (data) => {
 export const broadcastNotification = async (data, userIds) => {
   const notifications = userIds.map((userId) => ({
     user_id: userId,
+    organization_id: data.organization_id || null,
+    branch_id: data.branch_id || null,
     title: data.title,
     message: data.message,
     type: data.type || "info",
@@ -118,48 +123,148 @@ export const clearNotifications = async (userId) => {
   return { message: "All notifications cleared" };
 };
 
-export const broadcastToOrganization = async (data, organizationId) => {
-  const users = await User.find(
-    { organization_id: organizationId, status: "active" },
-    { _id: 1, fcm_token: 1 }
-  ).lean();
+export const resolveAudienceUsers = async (organizationId, filter) => {
+  const { audienceType, branchIds, roleIds } = filter;
 
-  const userIds = users.map((u) => u._id);
+  const query = {
+    organization_id: organizationId,
+    status: "active"
+  };
+
+  if (audienceType === "branch") {
+    if (!branchIds || branchIds.length === 0) return [];
+    query.branch_id = { $in: branchIds };
+  } else if (audienceType === "role") {
+    if (!roleIds || roleIds.length === 0) return [];
+    query.role = { $in: roleIds.map(r => r.toLowerCase()) };
+  } else if (audienceType === "branch_role") {
+    if (!branchIds || branchIds.length === 0 || !roleIds || roleIds.length === 0) return [];
+    query.branch_id = { $in: branchIds };
+    query.role = { $in: roleIds.map(r => r.toLowerCase()) };
+  }
+
+  return await User.find(query, { _id: 1, fcm_token: 1, email: 1, phone: 1 }).lean();
+};
+
+export const broadcastToOrganization = async (data, organizationId, createdBy = null) => {
+  const audienceFilter = {
+    audienceType: data.audienceType || "all",
+    branchIds: data.branchIds || [],
+    roleIds: data.roleIds || [],
+  };
+
+  const targetUsers = await resolveAudienceUsers(organizationId, audienceFilter);
+  const userIds = targetUsers.map((u) => u._id);
+
   if (userIds.length === 0) return [];
 
-  const notifications = userIds.map((userId) => ({
-    user_id: userId,
+  // Create campaign log record
+  const campaign = await NotificationCampaign.create({
     organization_id: organizationId,
+    audience_type: data.audienceType || "all",
+    branch_ids: data.branchIds || [],
+    role_ids: data.roleIds || [],
+    type: data.type || "info",
     title: data.title,
     message: data.message,
-    type: data.type || "info",
-    link: data.link,
-  }));
-  const created = await Notification.insertMany(notifications);
+    delivery_methods: data.deliveryMethods || ["in_app"],
+    cta_text: data.ctaText || "",
+    cta_url: data.ctaUrl || data.link || "",
+    status: "sent",
+    created_by: createdBy || userIds[0],
+  });
 
-  try {
-    const io = getIO();
-    created.forEach((notif) => {
-      io.to(`user:${notif.user_id}`).emit("notification", notif);
-    });
-  } catch {
-    // socket not available
-  }
+  const deliveryMethods = data.deliveryMethods || ["in_app"];
+  let createdInAppNotifications = [];
 
-  try {
-    const tokens = users.map((u) => u.fcm_token).filter(Boolean);
-    if (tokens.length > 0) {
-      await sendMulticastNotification(tokens, {
-        title: data.title,
-        body: data.message,
-        data: { type: data.type || "info", link: data.link || "" },
+  if (deliveryMethods.includes("in_app")) {
+    const notifications = userIds.map((userId) => ({
+      user_id: userId,
+      organization_id: organizationId,
+      title: data.title,
+      message: data.message,
+      type: data.type || "info",
+      link: data.ctaUrl || data.link || "",
+    }));
+    createdInAppNotifications = await Notification.insertMany(notifications);
+
+    try {
+      const io = getIO();
+      createdInAppNotifications.forEach((notif) => {
+        io.to(`user:${notif.user_id}`).emit("notification", notif);
       });
+    } catch {
+      // socket not available
     }
-  } catch {
-    // push notification error
   }
 
-  return created;
+  if (deliveryMethods.includes("email")) {
+    await deliveryService.sendEmail(data, targetUsers);
+  }
+
+  if (deliveryMethods.includes("push")) {
+    await deliveryService.sendPush(data, targetUsers);
+  }
+
+  if (deliveryMethods.includes("sms")) {
+    await deliveryService.sendSMS(data, targetUsers);
+  }
+
+  if (deliveryMethods.includes("system")) {
+    await deliveryService.sendSystemAnnouncement(data, targetUsers);
+  }
+
+  return createdInAppNotifications.length > 0 ? createdInAppNotifications : [{ _id: campaign._id, campaign: true }];
+};
+
+export const getCampaignHistory = async (organizationId, page = 1, limit = 10) => {
+  const skip = (page - 1) * limit;
+  const items = await NotificationCampaign.find({ organization_id: organizationId })
+    .sort({ created_at: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate("created_by", "name email")
+    .lean();
+  
+  const total = await NotificationCampaign.countDocuments({ organization_id: organizationId });
+
+  return {
+    items,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
+  };
+};
+
+export const getCampaignById = async (campaignId, organizationId) => {
+  const campaign = await NotificationCampaign.findOne({ _id: campaignId, organization_id: organizationId })
+    .populate("created_by", "name email")
+    .lean();
+  if (!campaign) throw new Error("Campaign notification not found");
+  return campaign;
+};
+
+export const getTemplates = async (organizationId) => {
+  return await NotificationTemplate.find({ organization_id: organizationId })
+    .sort({ created_at: -1 })
+    .lean();
+};
+
+export const createTemplate = async (data, organizationId, createdBy) => {
+  return await NotificationTemplate.create({
+    ...data,
+    organization_id: organizationId,
+    created_by: createdBy,
+  });
+};
+
+export const deleteTemplate = async (templateId, organizationId) => {
+  const deleted = await NotificationTemplate.findOneAndDelete({ _id: templateId, organization_id: organizationId });
+  if (!deleted) throw new Error("Template not found or unauthorized");
+  return { message: "Template deleted successfully" };
 };
 
 export const broadcastToAll = async (data) => {

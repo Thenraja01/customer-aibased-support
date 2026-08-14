@@ -1,11 +1,15 @@
 import express from "express";
-import { protect, access } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
 import * as promptController from "./promptVersion.controller.js";
+
+// RBAC: admin / branch_admin manage prompt versions.
+const ADMIN = ["admin", "branch_admin"];
 
 const router = express.Router();
 
 router.use(protect);
-router.use(access("ai.train_kb"));
+router.use(checkRole(...ADMIN));
 
 router.get("/", promptController.getPrompt);
 router.post("/draft", promptController.saveDraft);

@@ -3,7 +3,7 @@ import { Save, Palette, Globe, LogIn, FileText, Plus, Trash2 } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
+import { AdminAPI } from "@/api/admin.api";
 import { useToast } from "@/components/ui/toast";
 
 type Tab = "marketing" | "branding" | "login" | "legal";
@@ -119,7 +119,7 @@ export default function AppSettingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Application Settings</h1>
+          <h1 className="text-3xl font-bold ">Application Settings</h1>
           <p className="text-muted-foreground">Manage global app branding, marketing content, and legal pages.</p>
         </div>
         <Button onClick={handleSave} disabled={saving}>
@@ -147,7 +147,7 @@ export default function AppSettingsPage() {
         ))}
       </div>
 
-      <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] p-6">
+      <div className="rounded-lg border bg-card dark:bg-card/50 dark:border-white/[0.06] p-5 sm:p-6">
         {activeTab === "marketing" && (
           <div className="space-y-6">
             <div>
@@ -210,7 +210,7 @@ export default function AppSettingsPage() {
                 <Input value={form.marketing?.features_title || ""} onChange={(e) => updateField("marketing.features_title", e.target.value)} />
               </div>
               {(form.marketing?.features || []).map((feature: any, index: number) => (
-                <div key={index} className="flex items-start gap-3 p-3 rounded-lg border dark:border-white/[0.06] mb-2">
+                <div key={index} className="flex items-start gap-3 p-3 mb-2">
                   <div className="flex-1 space-y-2">
                     <Input
                       value={feature.title || ""}

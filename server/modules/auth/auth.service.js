@@ -1,7 +1,10 @@
 import bcrypt from "bcrypt";
 import User from "../user/user.schema.js";
 import Organization from "../organization/organization.schema.js";
+import Branch from "../branch/branch.schema.js";
 import env from "../../config/env.js";
+import crypto from "crypto";
+import { sendEmail } from "../../utils/email.js";
 import { REQUESTABLE_ROLE_KEYS, RESTRICTED_ROLE_KEYS, ROLE_KEYS } from "../../utils/constants.js";
 import {
   signAccessToken,
@@ -125,7 +128,6 @@ export const getPendingRegistrations = async (organizationId = null) => {
 
   const users = await User.find(filter)
     .populate("organization_id", "name")
-    .populate("role", "role_name description")
     .select("-password -otp -otp_expiry -fcm_token")
     .sort({ created_at: -1 });
 
@@ -136,13 +138,20 @@ export const getPendingRegistrations = async (organizationId = null) => {
  * Approve or reject a pending user registration.
  * On approval: sets status to "approved" and records the admin.
  * The caller (route) is responsible for sending the OTP email.
+ *
+ * When `organizationId` is provided (non-super-admin caller), the target user
+ * must belong to that organization — prevents cross-tenant approval.
  */
-export const approveRegistration = async (userId, action, adminId, rejectionReason = "") => {
+export const approveRegistration = async (userId, action, adminId, rejectionReason = "", organizationId = null) => {
   const user = await User.findById(userId);
   if (!user) throw new Error("User not found");
 
   if (user.status !== "pending") {
     throw new Error(`Cannot ${action} a registration with status: ${user.status}`);
+  }
+
+  if (organizationId && user.organization_id?.toString() !== organizationId.toString()) {
+    throw new Error("Cannot manage a registration outside your organization");
   }
 
   if (action === "approve") {
@@ -183,19 +192,31 @@ export const checkUserStatus = async (email) => {
 };
 
 export const login = async ({ email, password, organization_id }, ctx = {}) => {
-  const query = { email };
+  const query = { email: email.toLowerCase().trim() };
   if (organization_id) {
     query.organization_id = organization_id;
   }
   console.log("[Login] Query:", JSON.stringify(query));
   const user = await User.findOne(query)
-    .populate("organization_id")
-    .populate("role");
+    .populate("organization_id");
 
   if (!user) {
-    console.log("[Login] User not found for query");
+    console.log({
+      emailReceived: email,
+      userFound: !!user
+    });
+    console.log("[Login] User not found for query", query);
     throw new Error("Invalid email, password, or organization");
   }
+
+  console.log({
+    emailReceived: email,
+    userFound: !!user,
+    passwordHashExists: !!user?.password,
+    status: user?.status,
+    role: user?.role,
+    tenantId: user?.organization_id
+  });
 
   // Provide helpful messages for non-active users
   if (user.status === "pending") {
@@ -213,13 +234,49 @@ export const login = async ({ email, password, organization_id }, ctx = {}) => {
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
+  console.log({
+    userFound: !!user,
+    passwordValid: isPasswordValid
+  });
+  
   if (!isPasswordValid) {
+    console.log(`[Login] Password mismatch for ${email}`);
     throw new Error("Invalid email, password, or organization");
   }
 
   if (!user.organization_id || !user.role) {
-    console.log("[Login] User has invalid organization or role reference");
+    console.log(`[Login] User has invalid organization or role reference. org=${!!user.organization_id}, role=${user.role}`);
     throw new Error("Invalid email, password, or organization");
+  }
+
+  if (user.two_factor_enabled) {
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const expiry = new Date(Date.now() + (env.OTP_EXPIRY_MINUTES || 10) * 60 * 1000);
+    user.otp = await bcrypt.hash(otp, 10);
+    user.otp_expiry = expiry;
+    await user.save();
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+        <h2 style="color:#1a1a2e;">Two-Factor Authentication</h2>
+        <p>Your one-time verification code is:</p>
+        <div style="background:#f0f4ff;border-radius:8px;padding:16px;text-align:center;margin:20px 0;">
+          <span style="font-size:32px;font-weight:bold;color:#4f46e5;letter-spacing:8px;">${otp}</span>
+        </div>
+        <p style="color:#666;font-size:14px;">This code expires in ${env.OTP_EXPIRY_MINUTES || 10} minutes.</p>
+      </div>
+    `;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Your Two-Factor Authentication Code",
+      html,
+    });
+
+    return {
+      twoFactorRequired: true,
+      email: user.email,
+    };
   }
 
   const auth = await buildAuthTokens(user, ctx);
@@ -270,14 +327,30 @@ const resolveOrgAndRole = async (user) => {
 };
 
 /**
+ * Resolve the branch reference for a user doc. Handles both populated
+ * (object) and unpopulated (id) references. Returns null for org-level
+ * users (admin / super_admin) who operate across branches.
+ */
+const resolveBranch = async (user) => {
+  const branchId = user.branch_id?._id || user.branch_id || null;
+  if (!branchId) return null;
+  if (typeof user.branch_id === "object" && user.branch_id.name) {
+    return user.branch_id;
+  }
+  return (await Branch.findById(branchId).lean()) || null;
+};
+
+/**
  * Sign a short-lived access token and persist a refresh-token session.
  * Returns the access token, the (one-time) refresh token, and a sanitized
  * user payload the client can persist.
  */
 export const buildAuthTokens = async (user, ctx = {}) => {
   const { org, role } = await resolveOrgAndRole(user);
+  const branch = await resolveBranch(user);
 
   const organizationId = org?._id || user.organization_id?._id || user.organization_id;
+  const branchId = branch?._id?.toString() || user.branch_id?._id?.toString() || user.branch_id?.toString() || null;
   const roleName = role?.role_name || user.role || "customer";
   // Use roleName as roleId since we're using string-based roles
   const roleId = roleName;
@@ -285,6 +358,7 @@ export const buildAuthTokens = async (user, ctx = {}) => {
   const accessToken = signAccessToken({
     userId: user._id,
     organizationId,
+    branchId,
     roles: [roleName],
     roleId,
     roleName,
@@ -307,6 +381,13 @@ export const buildAuthTokens = async (user, ctx = {}) => {
       typeof user.organization_id === "object"
         ? { _id: organizationId, name: orgName }
         : organizationId,
+    branch_id: branch
+      ? { _id: branch._id, name: branch.name, code: branch.code || "" }
+      : typeof user.branch_id === "string"
+      ? user.branch_id
+      : null,
+    branchId,
+    branchName: branch?.name || null,
     role:
       typeof user.role === "object"
         ? { _id: roleId, role_name: roleName }
@@ -316,7 +397,11 @@ export const buildAuthTokens = async (user, ctx = {}) => {
     email: user.email,
     phone: user.phone,
     status: user.status,
+    two_factor_enabled: user.two_factor_enabled ?? false,
+    profileImage: user.profileImage || null,
   };
+
+  console.log("[buildAuthTokens] sanitizedUser:", JSON.stringify(sanitizedUser, null, 2));
 
   return { accessToken, refreshToken, user: sanitizedUser };
 };
@@ -346,8 +431,7 @@ export const refreshTokens = async (refreshToken, ctx = {}) => {
   if (!session) throw new Error("Invalid or expired refresh token. Please sign in again.");
 
   const user = await User.findById(session.user_id)
-    .populate("organization_id")
-    .populate("role");
+    .populate("organization_id");
 
   if (!user) {
     await revokeRefreshSession(refreshToken);

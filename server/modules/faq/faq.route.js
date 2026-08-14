@@ -1,22 +1,26 @@
 import express from "express";
 import * as faqController from "./faq.controller.js";
-import { protect, access } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { createFaqSchema, updateFaqSchema } from "../../validation/index.js";
+
+// RBAC: staff (admin / branch_admin / support) manage knowledge; customers read active FAQs.
+const STAFF = ["admin", "branch_admin", "support"];
 
 const router = express.Router();
 
 router.use(protect);
 
-router.post("/", access("knowledge.create"), validate(createFaqSchema), faqController.create);
+router.post("/", checkRole(...STAFF), validate(createFaqSchema), faqController.create);
 router.get("/active", faqController.getActive);
-router.get("/my", access("knowledge.view"), faqController.getMyFaqs);
-router.get("/status/:status", access("knowledge.create"), faqController.getByStatus);
-router.get("/", access("knowledge.view"), faqController.getAll);
-router.get("/:id", access("knowledge.view"), faqController.getById);
-router.put("/:id", access("knowledge.edit"), validate(updateFaqSchema), faqController.update);
-router.patch("/:id/approve", access("knowledge.create"), faqController.approve);
-router.patch("/:id/reject", access("knowledge.create"), faqController.reject);
-router.delete("/:id", access("knowledge.delete"), faqController.remove);
+router.get("/my", checkRole(...STAFF), faqController.getMyFaqs);
+router.get("/status/:status", checkRole(...STAFF), faqController.getByStatus);
+router.get("/", checkRole(...STAFF), faqController.getAll);
+router.get("/:id", checkRole(...STAFF), faqController.getById);
+router.put("/:id", checkRole(...STAFF), validate(updateFaqSchema), faqController.update);
+router.patch("/:id/approve", checkRole(...STAFF), faqController.approve);
+router.patch("/:id/reject", checkRole(...STAFF), faqController.reject);
+router.delete("/:id", checkRole("admin"), faqController.remove);
 
 export default router;

@@ -1,78 +1,34 @@
-import type { SidebarConfig, SidebarNavItem } from "@/config/sidebar";
-import {
-  superAdminSidebar,
-  adminSidebar,
-  supportSidebar,
-  customerSidebar,
-} from "@/config/sidebar";
+import { getRoleName, ROLE_KEYS } from "./roles";
 
-export type Portal = "superadmin" | "admin" | "support" | "customer";
+export type Portal = "customer" | "support" | "admin" | "superadmin" | "branch";
 
-export const PORTAL_SIDEBARS: Record<Portal, SidebarConfig> = {
-  superadmin: superAdminSidebar,
-  admin: adminSidebar,
-  support: supportSidebar,
-  customer: customerSidebar,
+const PORTAL_ROUTES: Record<Portal, string> = {
+  customer: "/dashboard",
+  support: "/support/dashboard",
+  admin: "/admin/dashboard",
+  superadmin: "/superadmin/dashboard",
+  branch: "/branch/dashboard",
 };
 
-export function resolvePortal(user: any): Portal {
-  if (!user) return "customer";
-
-  const perms = user.permissions || [];
-  const hasWildcard = perms.includes("*");
-
-  if (hasWildcard) return "superadmin";
-  if (perms.includes("user.view")) return "admin";
-  if (perms.includes("report.view_dashboard") || perms.includes("ticket.assign") || perms.includes("chat.end")) return "support";
-
-  return "customer";
-}
-
-/** Landing path for the current user based on their role. */
-export function homePathFor(user: any): string {
-  switch (resolvePortal(user)) {
-    case "superadmin":
-      return "/superadmin/dashboard";
-    case "admin":
-      return "/admin/dashboard";
-    case "support":
-      return "/support/dashboard";
-    default:
-      return "/dashboard";
-  }
-}
-
-/** Flatten a sidebar config into a flat list of leaf nav items. */
-export function flattenNavItems(config: SidebarConfig): SidebarNavItem[] {
-  return config.flatMap((section) =>
-    section.items.flatMap((item) =>
-      item.children && item.children.length ? item.children : [item]
-    )
-  );
-}
-
-/** Find a nav item (leaf or group) by its stable `id`. */
-export function findNavItemById(
-  config: SidebarConfig,
-  id: string | null | undefined
-): SidebarNavItem | null {
-  if (!id) return null;
-  for (const section of config) {
-    for (const item of section.items) {
-      if (item.id === id) return item;
-      if (item.children) {
-        const child = item.children.find((c) => c.id === id);
-        if (child) return child;
-      }
-    }
-  }
+export function resolvePortal(user: any): Portal | null {
+  if (!user) return null;
+  
+  const roleName = getRoleName(user);
+  
+  if (roleName === ROLE_KEYS.SUPER_ADMIN) return "superadmin";
+  if (roleName === ROLE_KEYS.ADMIN) return "admin";
+  if (roleName === ROLE_KEYS.BRANCH_ADMIN) return "branch";
+  if (roleName === ROLE_KEYS.SUPPORT) return "support";
+  if (roleName === ROLE_KEYS.CUSTOMER) return "customer";
+  
   return null;
 }
 
-/** Find the leaf nav item whose `path` exactly matches a URL pathname. */
-export function findLeafByExactPath(
-  config: SidebarConfig,
-  pathname: string
-): SidebarNavItem | null {
-  return flattenNavItems(config).find((item) => item.path === pathname) || null;
+export function homePathFor(user: any): string {
+  const portal = resolvePortal(user);
+  return portal ? PORTAL_ROUTES[portal] : "/login";
+}
+
+export function canAccessPortal(user: any, portal: Portal): boolean {
+  return resolvePortal(user) === portal;
 }

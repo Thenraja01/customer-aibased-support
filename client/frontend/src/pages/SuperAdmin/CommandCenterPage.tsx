@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
+import { AdminAPI } from "@/api/admin.api";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -183,7 +183,6 @@ export default function CommandCenterPage() {
     <div className="space-y-6">
       {/* Top Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 text-white shadow-2xl border border-indigo-500/20">
-        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -197,7 +196,7 @@ export default function CommandCenterPage() {
                 </Badge>
               )}
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent flex items-center gap-2.5">
+            <h1 className="text-3xl md:text-4xl font-extrabold  bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent flex items-center gap-2.5">
               <ShieldAlert className="text-amber-400" size={32} />
               Command Center
             </h1>
@@ -222,7 +221,7 @@ export default function CommandCenterPage() {
       {/* 6 Core Telemetry Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {/* Card 1: Platform Status */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -261,7 +260,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 2: Active Organizations */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -288,7 +287,7 @@ export default function CommandCenterPage() {
             </div>
             <div className="flex justify-between py-1">
               <span className="text-muted-foreground">Plan Distribution:</span>
-              <div className="flex gap-1.5 text-xs font-mono">
+              <div className="flex flex-wrap justify-end gap-1.5 text-xs font-mono">
                 <Badge variant="outline">Enterprise: {activeOrganizationsCard?.planBreakdown?.enterprise || 0}</Badge>
                 <Badge variant="outline">Business: {activeOrganizationsCard?.planBreakdown?.business || 0}</Badge>
               </div>
@@ -297,7 +296,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 3: Online Users */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
@@ -330,7 +329,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 4: AI Services */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
@@ -365,7 +364,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 5: API Health */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
@@ -400,7 +399,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 6: Critical Alerts */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
@@ -438,7 +437,7 @@ export default function CommandCenterPage() {
 
 
       {/* Quick Actions Panel */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-5">
+      <div className="rounded-lg border bg-card p-5 sm:p-6 shadow-sm space-y-5">
         <div className="flex items-center justify-between border-b dark:border-white/[0.06] pb-4">
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2">
@@ -571,7 +570,7 @@ export default function CommandCenterPage() {
       </div>
 
       {/* Recent Activity Log Stream */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
+      <div className="rounded-lg border bg-card p-5 sm:p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b dark:border-white/[0.06] pb-3">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <ScrollText size={18} className="text-primary" />

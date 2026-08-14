@@ -1,6 +1,13 @@
 import KnowledgeGap from "./knowledgeGap.schema.js";
 import DocumentChunk from "../document/documentChunk.schema.js";
 import Document from "../document/document.schema.js";
+import * as docService from "../document/document.service.js";
+import * as faqService from "../faq/faq.service.js";
+import Faq from "../faq/faq.schema.js";
+import User from "../user/user.schema.js";
+import { broadcastNotification } from "../notification/notification.service.js";
+import * as ragService from "../rag/rag.service.js";
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 const STOP_WORDS = new Set([
   "the","a","an","is","are","was","were","in","on","at","to","for","of",
@@ -53,15 +60,19 @@ export const logFailedQuery = async ({
   bestScore,
   avgScore,
   matchedChunks,
+  branchId = null,
 }) => {
   const keywords = extractKeywords(query);
   const topic = detectTopic(keywords);
 
-  const existing = await KnowledgeGap.findOne({
+  const filter = {
     organization_id: organizationId,
     topic,
-    status: "unresolved",
-  }).sort({ created_at: -1 });
+    status: "open",
+  };
+  if (branchId) filter.branch_id = branchId;
+
+  const existing = await KnowledgeGap.findOne(filter).sort({ created_at: -1 });
 
   if (existing) {
     const queryLower = query.toLowerCase().trim();
@@ -80,8 +91,9 @@ export const logFailedQuery = async ({
     }
   }
 
-  return await KnowledgeGap.create({
+  const created = await KnowledgeGap.create({
     organization_id: organizationId,
+    branch_id: branchId,
     user_id: userId,
     chat_id: chatId,
     query,
@@ -93,6 +105,10 @@ export const logFailedQuery = async ({
     frequency: 1,
     last_seen_at: new Date(),
   });
+
+  await notifyNewGap(organizationId, created);
+
+  return created;
 };
 
 export const getKnowledgeGaps = async (organizationId, options = {}) => {
@@ -135,9 +151,9 @@ export const getGapStats = async (organizationId) => {
     topFrequentGaps,
   ] = await Promise.all([
     KnowledgeGap.countDocuments({ organization_id: organizationId }),
-    KnowledgeGap.countDocuments({ organization_id: organizationId, status: "unresolved" }),
+    KnowledgeGap.countDocuments({ organization_id: organizationId, status: "open" }),
     KnowledgeGap.countDocuments({ organization_id: organizationId, status: "resolved" }),
-    KnowledgeGap.countDocuments({ organization_id: organizationId, status: "dismissed" }),
+    KnowledgeGap.countDocuments({ organization_id: organizationId, status: "ignored" }),
     KnowledgeGap.aggregate([
       { $match: { organization_id: organizationId } },
       { $group: { _id: "$topic", count: { $sum: 1 }, avgScore: { $avg: "$best_score" } } },
@@ -179,15 +195,16 @@ export const getGapStats = async (organizationId) => {
       .lean(),
   ]);
 
-  const totalDocs = await Document.countDocuments({ organization_id: organizationId, status: "approved" });
-  const totalChunks = await DocumentChunk.countDocuments({ organization_id: organizationId, status: "approved" });
+  // KB coverage should reflect what RAG actually serves: PUBLISHED docs/chunks.
+  const totalDocs = await Document.countDocuments({ organization_id: organizationId, status: "published" });
+  const totalChunks = await DocumentChunk.countDocuments({ organization_id: organizationId, status: "published" });
 
   return {
     summary: {
       totalGaps,
-      unresolvedGaps,
+      openGaps: unresolvedGaps,
       resolvedGaps,
-      dismissedGaps,
+      ignoredGaps: dismissedGaps,
       resolutionRate: totalGaps > 0 ? Math.round(((resolvedGaps + dismissedGaps) / totalGaps) * 100) : 100,
       totalDocuments: totalDocs,
       totalChunks,
@@ -210,24 +227,37 @@ export const getGapStats = async (organizationId) => {
   };
 };
 
-export const updateGapStatus = async (gapId, status, resolutionNote = "", resolvedBy = null) => {
+export const updateGapStatus = async (gapId, status, resolutionNote = "", resolvedBy = null, options = {}) => {
+  const { resolutionType, resolutionRefId, linkedItemType, linkedItemTitle } = options;
   const update = { status };
-  if (status === "resolved" || status === "reviewed") {
+  if (status === "resolved" || status === "reviewing") {
     update.resolution_note = resolutionNote;
     update.resolved_by = resolvedBy;
     update.resolved_at = new Date();
   }
-  const gap = await KnowledgeGap.findByIdAndUpdate(gapId, update, { new: true });
+  if (status === "resolved") {
+    update.resolution_type = resolutionType || "manual";
+    update.resolution_ref_id = resolutionRefId || null;
+    update.linked_item_type = linkedItemType || null;
+    update.linked_item_title = linkedItemTitle || null;
+  }
+  const gap = await KnowledgeGap.findByIdAndUpdate(gapId, update, { returnDocument: "after" });
   if (!gap) throw new Error("Knowledge gap not found");
   return gap;
 };
 
 export const dismissGap = async (gapId, resolvedBy = null) => {
-  return updateGapStatus(gapId, "dismissed", "", resolvedBy);
+  return updateGapStatus(gapId, "ignored", "", resolvedBy);
 };
 
-export const resolveGap = async (gapId, note, resolvedBy) => {
-  return updateGapStatus(gapId, "resolved", note, resolvedBy);
+export const resolveGap = async (gapId, note, resolvedBy, options = {}) => {
+  const { resolutionType = "manual", resolutionRefId = null, linkedItemType = null, linkedItemTitle = null } = options;
+  return updateGapStatus(gapId, "resolved", note, resolvedBy, {
+    resolutionType,
+    resolutionRefId,
+    linkedItemType,
+    linkedItemTitle,
+  });
 };
 
 export const deleteGap = async (gapId) => {
@@ -239,7 +269,7 @@ export const deleteGap = async (gapId) => {
 export const getSuggestedTopics = async (organizationId) => {
   const gaps = await KnowledgeGap.find({
     organization_id: organizationId,
-    status: "unresolved",
+    status: "open",
   }).select("topic frequency best_score").lean();
 
   const topicMap = {};
@@ -259,4 +289,262 @@ export const getSuggestedTopics = async (organizationId) => {
       priority: data.totalFrequency * (1 - data.avgScore / 0.5),
     }))
     .sort((a, b) => b.priority - a.priority);
+};
+
+export const getGapById = async (gapId) => {
+  const gap = await KnowledgeGap.findById(gapId)
+    .populate("user_id", "name email")
+    .populate("resolved_by", "name email")
+    .lean();
+  if (!gap) throw new Error("Knowledge gap not found");
+  return gap;
+};
+
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const titleize = (text) =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "knowledge";
+
+const getUserContext = async (req) => {
+  const userRole = req.user?.roleName || req.user?.role || req.user?.role_id?.role_name;
+  const isAdmin =
+    isNormalizedAdminRole(normalizeRoleName(userRole)) ||
+    normalizeRoleName(userRole) === "super_admin";
+  return {
+    userId: req.user?.userId || req.user?._id,
+    orgId: req.user?.organizationId,
+    branchId: req.body?.branch_id || req.user?.branchId || req.user?.branch_id || null,
+    roleName: userRole,
+    isAdmin,
+  };
+};
+
+export const addKnowledgeFaq = async (gapId, { question, answer, category = "general" }, req) => {
+  const { userId, orgId } = await getUserContext(req);
+  if (!orgId) throw new Error("Organization context missing");
+  const faq = await faqService.createFaq(
+    {
+      organization_id: orgId,
+      question,
+      answer,
+      category,
+    },
+    { userId, roleName: req.user?.roleName }
+  );
+  await resolveGap(gapId, "Added FAQ knowledge", userId, {
+    resolutionType: "faq",
+    resolutionRefId: faq._id,
+    linkedItemType: "faq",
+    linkedItemTitle: question,
+  });
+  return faq;
+};
+
+export const addKnowledgeDocument = async (
+  gapId,
+  { title, description = "", content, branchId = null, tags = [], allowedRoles, visibility },
+  req
+) => {
+  const { userId, orgId, isAdmin } = await getUserContext(req);
+  if (!orgId) throw new Error("Organization context missing");
+  if (!content || !content.trim()) throw new Error("Content is required");
+
+  const fileBuffer = Buffer.from(content, "utf-8");
+  const fileName = `${titleize(title)}.txt`;
+
+  const doc = await docService.createDocument(
+    {
+      user_id: userId,
+      organization_id: orgId,
+      branch_id: branchId || null,
+      title,
+      description,
+      allowed_roles: allowedRoles || ["admin", "branch_admin", "support"],
+      visibility: visibility || (branchId ? "branch" : "organization"),
+    },
+    userId,
+    fileBuffer,
+    fileName,
+    "text/plain",
+    isAdmin
+  );
+
+  await resolveGap(gapId, "Added document knowledge", userId, {
+    resolutionType: "document",
+    resolutionRefId: doc._id,
+    linkedItemType: "document",
+    linkedItemTitle: title,
+  });
+
+  return doc;
+};
+
+export const linkExistingKnowledge = async (gapId, { type, refId }, req) => {
+  const { userId, orgId } = await getUserContext(req);
+  if (!orgId) throw new Error("Organization context missing");
+
+  let title = "";
+  if (type === "document") {
+    const doc = await Document.findOne({ _id: refId, organization_id: orgId });
+    if (!doc) throw new Error("Document not found");
+    title = doc.title;
+  } else if (type === "faq") {
+    const faq = await Faq.findOne({ _id: refId, organization_id: orgId });
+    if (!faq) throw new Error("FAQ not found");
+    title = faq.question;
+  } else {
+    throw new Error("Unsupported linked item type");
+  }
+
+  await resolveGap(gapId, `Linked existing ${type}`, userId, {
+    resolutionType: type === "document" ? "linked_document" : "linked_faq",
+    resolutionRefId: refId,
+    linkedItemType: type,
+    linkedItemTitle: title,
+  });
+
+  return { type, refId, title };
+};
+
+export const retestGap = async (gapId, orgId, userId = null) => {
+  const gap = await KnowledgeGap.findById(gapId).lean();
+  if (!gap) throw new Error("Knowledge gap not found");
+
+  const accessScope = {
+    roleName: "admin",
+    roleFilter: ragService.getRoleFilter("admin"),
+    authorizedDocumentIds: null,
+    statusFilter: "published",
+  };
+
+  const results = await ragService.searchWithScope(
+    gap.query,
+    orgId || gap.organization_id,
+    accessScope,
+    5,
+    userId,
+    null
+  );
+
+  const scores = (results?.document_results || []).map((r) => r.score || 0);
+  const bestScore = scores.length ? Math.max(...scores) : 0;
+  const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+  return {
+    bestScore,
+    avgScore,
+    matchedChunks: scores.length,
+    results: (results?.document_results || []).map((r) => ({
+      chunk_id: r._id,
+      document_id: r.document_id,
+      title: r.title || r.document_title || null,
+      score: r.score || 0,
+      content: (r.content || r.text || "").slice(0, 300),
+    })),
+  };
+};
+
+export const getGapDetail = async (gapId, orgId) => {
+  const gap = await getGapById(gapId);
+  if (!orgId || (gap.organization_id?.toString?.() !== orgId.toString())) {
+    throw new Error("Knowledge gap not found");
+  }
+
+  const similarGaps = await KnowledgeGap.find({
+    _id: { $ne: gap._id },
+    organization_id: orgId,
+    topic: gap.topic,
+    status: { $in: ["open", "reviewing"] },
+  })
+    .select("query topic frequency best_score status created_at")
+    .sort({ frequency: -1 })
+    .limit(5)
+    .lean();
+
+  return { ...gap, similar_gaps: similarGaps };
+};
+
+export const getSuggestedKnowledge = async (gapId, orgId) => {
+  const gap = await KnowledgeGap.findById(gapId).lean();
+  if (!gap) throw new Error("Knowledge gap not found");
+
+  const safe = escapeRegex(gap.query);
+  const keywords = (gap.keywords || []).slice(0, 5).map(escapeRegex);
+
+  const titleOr = [{ title: { $regex: safe, $options: "i" } }];
+  const kwTitleOr = keywords.map((kw) => ({ title: { $regex: kw, $options: "i" } }));
+
+  const [documents, faqs] = await Promise.all([
+    Document.find({
+      organization_id: orgId,
+      status: "published",
+      $or: [...titleOr, ...kwTitleOr],
+    })
+      .select("title description file_name status created_at")
+      .sort({ created_at: -1 })
+      .limit(6)
+      .lean(),
+    Faq.find({
+      organization_id: orgId,
+      is_active: true,
+      status: "approved",
+      $or: [
+        { question: { $regex: safe, $options: "i" } },
+        { answer: { $regex: safe, $options: "i" } },
+        ...keywords.map((kw) => ({ question: { $regex: kw, $options: "i" } })),
+      ],
+    })
+      .select("question answer category")
+      .sort({ created_at: -1 })
+      .limit(6)
+      .lean(),
+  ]);
+
+  return {
+    documents: documents.map((d) => ({ type: "document", ...d })),
+    faqs: faqs.map((f) => ({ type: "faq", ...f })),
+  };
+};
+
+export const getSimilarGaps = async (gapId, orgId, limit = 5) => {
+  const gap = await KnowledgeGap.findById(gapId).lean();
+  if (!gap) throw new Error("Knowledge gap not found");
+  return await KnowledgeGap.find({
+    _id: { $ne: gap._id },
+    organization_id: orgId,
+    $or: [{ topic: gap.topic }, { best_score: { $lte: gap.best_score + 0.05, $gte: Math.max(0, gap.best_score - 0.05) } }],
+    status: { $in: ["open", "reviewing"] },
+  })
+    .select("query topic frequency best_score status created_at")
+    .sort({ frequency: -1 })
+    .limit(limit)
+    .lean();
+};
+
+export const notifyNewGap = async (organizationId, gap) => {
+  try {
+    const admins = await User.find({
+      organization_id: organizationId,
+      role: { $in: ["admin", "super_admin"] },
+      status: "active",
+    }).select("_id").lean();
+    const userIds = admins.map((u) => u._id);
+    if (!userIds.length) return;
+    await broadcastNotification(
+      {
+        organization_id: organizationId,
+        title: "New knowledge gap detected",
+        message: `"${gap.query.slice(0, 120)}" — ${gap.frequency}×, best match ${Math.round(gap.best_score * 100)}%. Review in Knowledge Gaps.`,
+        type: "warning",
+        link: "/admin/knowledge-gaps",
+      },
+      userIds
+    );
+  } catch (err) {
+    console.warn("[KnowledgeGap] Failed to notify admins:", err.message);
+  }
 };

@@ -48,7 +48,7 @@ export default function FontSizeToggle() {
       {open && (
         <div className="absolute right-0 top-full mt-2 w-44 rounded-xl border bg-card shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="px-3 py-2 border-b">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Font Size</p>
+            <p className="text-[11px] font-medium text-muted-foreground uppercase">Font Size</p>
           </div>
           <div className="p-1.5 space-y-0.5">
             {options.map((size) => (

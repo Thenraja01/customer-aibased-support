@@ -34,7 +34,7 @@ interface PendingUser {
   dob?: string;
   created_at: string;
   organization_id: { _id: string; name: string };
-  role_id: { _id: string; role_name: string; description?: string };
+  role: string;
   status: "pending" | "approved" | "blocked" | "active";
 }
 
@@ -92,7 +92,7 @@ export default function PendingApprovalsPage() {
       u.name.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q) ||
       u.organization_id?.name?.toLowerCase().includes(q) ||
-      u.role_id?.role_name?.toLowerCase().includes(q)
+      u.role?.toLowerCase().includes(q)
     );
   });
 
@@ -264,11 +264,11 @@ export default function PendingApprovalsPage() {
             onChange={selectAll}
             className="h-4 w-4 accent-primary"
           />
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</span>
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Email</span>
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Organization</span>
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role</span>
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</span>
+          <span className="text-xs font-semibold uppercase  text-muted-foreground">Name</span>
+          <span className="text-xs font-semibold uppercase  text-muted-foreground">Email</span>
+          <span className="text-xs font-semibold uppercase  text-muted-foreground">Organization</span>
+          <span className="text-xs font-semibold uppercase  text-muted-foreground">Role</span>
+          <span className="text-xs font-semibold uppercase  text-muted-foreground">Actions</span>
         </div>
 
         <CardContent className="p-0">
@@ -319,8 +319,8 @@ export default function PendingApprovalsPage() {
                             <span className="text-xs px-2 py-0.5 rounded-full bg-muted border dark:border-white/[0.06]">
                               {user.organization_id?.name}
                             </span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted border dark:border-white/[0.06]">
-                              {user.role_id?.role_name}
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted border dark:border-white/[0.06] capitalize">
+                              {user.role}
                             </span>
                           </div>
                         </div>
@@ -374,7 +374,7 @@ export default function PendingApprovalsPage() {
                       </div>
                       <p className="text-sm truncate text-muted-foreground">{user.email}</p>
                       <p className="text-sm truncate">{user.organization_id?.name || "—"}</p>
-                      <p className="text-sm truncate capitalize">{user.role_id?.role_name || "—"}</p>
+                      <p className="text-sm truncate capitalize">{user.role || "—"}</p>
                       <div className="flex items-center gap-1.5">
                         <Button
                           size="sm"
@@ -470,7 +470,7 @@ export default function PendingApprovalsPage() {
                     <UserDetailRow
                       icon={<Briefcase />}
                       label="Role"
-                      value={selectedUser.role_id?.role_name}
+                      value={selectedUser.role}
                     />
                     <UserDetailRow
                       icon={<Clock />}

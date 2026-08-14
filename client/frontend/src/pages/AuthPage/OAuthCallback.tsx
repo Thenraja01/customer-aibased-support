@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Award, AlertCircle, Loader2 } from "lucide-react";
+import { Award, AlertCircle, Loader2, ArrowLeft, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AuthAPI } from "@/api/auth.api";
@@ -74,12 +74,13 @@ export default function OAuthCallback() {
         const data = res?.data || {};
 
         if (data.token || data.accessToken) {
-          if (!setSession(data.user || data.data, data.token || data.accessToken, data.refreshToken)) {
+          if (!setSession(data)) {
             setError("Failed to save your session. Please try again.");
             return;
           }
           const normalized = data.user || data.data || {};
           const role =
+            normalized.role ||
             normalized.roleName ||
             (Array.isArray(normalized.roles) && normalized.roles[0]) ||
             (typeof normalized.role_id === "object" ? normalized.role_id?.role_name : normalized.role_id) ||
@@ -122,7 +123,6 @@ export default function OAuthCallback() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-primary/5 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent dark:from-primary/10" />
       <div className="relative z-10 w-full max-w-sm">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -154,6 +154,7 @@ export default function OAuthCallback() {
               {error && (
                 <div className="space-y-2">
                   <Button onClick={() => navigate("/login", { replace: true })} className="w-full">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
                     Back to Login
                   </Button>
                   <Button
@@ -161,6 +162,7 @@ export default function OAuthCallback() {
                     onClick={() => navigate("/register", { replace: true })}
                     className="w-full"
                   >
+                    <UserPlus className="mr-2 h-4 w-4" />
                     Create an Account
                   </Button>
                 </div>

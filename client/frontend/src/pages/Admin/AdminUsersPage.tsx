@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import FilterBar from "@/components/FilterBar";
 import UserTable from "@/components/admin/UserTable";
 import UserForm from "@/components/admin/UserForm";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
 import { useAdminOrganizations } from "@/hooks/useAdminOrganizations";
-import { useAdminRoles } from "@/hooks/useAdminRoles";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useBranchScope } from "@/hooks/useBranchScope";
+import BranchAPI from "@/api/branch.api";
 import { Button } from "@/components/ui/button";
 
 export default function AdminUsersPage() {
@@ -22,8 +23,10 @@ export default function AdminUsersPage() {
   } = useAdminUsers();
 
   const { organizations, fetchOrganizations } = useAdminOrganizations();
-  const { roles, fetchRoles } = useAdminRoles();
+  const { branchId: activeBranchId, changeBranch, isBranchLocked } = useBranchScope();
 
+  const [branches, setBranches] = useState<any[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -33,17 +36,25 @@ export default function AdminUsersPage() {
   const debouncedSearch = useDebounce(search, 400);
 
   useEffect(() => {
-    fetchUsers({ page, limit: 10, search: debouncedSearch, status: statusFilter });
-  }, [page, debouncedSearch, statusFilter, fetchUsers]);
+    fetchUsers({ page, limit: 10, search: debouncedSearch, status: statusFilter, branchId: activeBranchId || undefined });
+  }, [page, debouncedSearch, statusFilter, activeBranchId, fetchUsers]);
 
   useEffect(() => {
     fetchOrganizations({ limit: 100 });
-    fetchRoles({ limit: 100 });
-  }, [fetchOrganizations, fetchRoles]);
+  }, [fetchOrganizations]);
+
+  useEffect(() => {
+    if (isBranchLocked && activeBranchId) return;
+    setLoadingBranches(true);
+    BranchAPI.getAll({ limit: 100 })
+      .then((res: any) => setBranches(res.data?.data || []))
+      .catch(console.error)
+      .finally(() => setLoadingBranches(false));
+  }, [isBranchLocked, activeBranchId]);
 
   const refresh = useCallback(() => {
-    fetchUsers({ page, limit: 10, search, status: statusFilter });
-  }, [fetchUsers, page, search, statusFilter]);
+    fetchUsers({ page, limit: 10, search, status: statusFilter, branchId: activeBranchId || undefined });
+  }, [fetchUsers, page, search, statusFilter, activeBranchId]);
 
   const handleCreate = async (data: any) => {
     await createUser(data);
@@ -72,7 +83,7 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+          <h1 className="text-3xl font-bold ">Users</h1>
           <p className="text-muted-foreground">Manage users across your organization and its branches.</p>
         </div>
         <Button onClick={() => { setEditingUser(null); setShowForm(true); }}>
@@ -94,7 +105,24 @@ export default function AdminUsersPage() {
         placeholder="Search users..."
       />
 
-      <div className="rounded-xl border bg-card">
+      {!isBranchLocked && (
+        <div className="flex items-center gap-2 max-w-xs">
+          <select
+            value={activeBranchId || ""}
+            onChange={(e) => { changeBranch(e.target.value || null); setPage(1); }}
+            className="select-field w-full"
+            aria-label="Filter by branch"
+          >
+            <option value="">All branches</option>
+            {branches.map((b) => (
+              <option key={b._id} value={b._id}>{b.name}</option>
+            ))}
+          </select>
+          {loadingBranches && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        </div>
+      )}
+
+      <div>
         <UserTable
           users={users}
           onEdit={(user) => { setEditingUser(user); setShowForm(true); }}
@@ -115,7 +143,6 @@ export default function AdminUsersPage() {
         <UserForm
           user={editingUser}
           organizations={organizations}
-          roles={roles}
           onSubmit={editingUser ? handleUpdate : handleCreate}
           onClose={() => { setShowForm(false); setEditingUser(null); }}
         />

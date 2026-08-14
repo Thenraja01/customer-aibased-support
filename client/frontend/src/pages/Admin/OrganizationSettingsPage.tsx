@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Save, Palette, Bot, Clock, Mail, Building2, Eye, Headphones, MessageCircle, FileText, BarChart3, Shield, Info, Database } from "lucide-react";
+import { Save, Palette, Bot, Clock, Mail, Building2, FileText, BarChart3, Shield, Info, Database, Crown, Cpu, KeyRound, CreditCard, ScrollText, LineChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/toast";
 import { Switch } from "@/components/ui/switch";
 import TicketTemplatesManager from "@/components/admin/TicketTemplatesManager";
+import AIConfigPanel from "@/components/admin/settings/AIConfigPanel";
+import BillingPanel from "@/components/admin/settings/BillingPanel";
+import AnalyticsPanel from "@/components/admin/settings/AnalyticsPanel";
+import ActivityLogPanel from "@/components/admin/settings/ActivityLogPanel";
+import ApiKeysPanel from "@/components/admin/settings/ApiKeysPanel";
+import SubscriptionPanel from "@/components/admin/settings/SubscriptionPanel";
+import StoragePanel from "@/components/admin/settings/StoragePanel";
+import BrandingPanel from "@/components/admin/settings/BrandingPanel";
+import ChatbotPanel from "@/components/admin/settings/ChatbotPanel";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 
@@ -19,15 +28,24 @@ const DEFAULT_GUARDRAILS = [
   "Escalate to a ticket if confidence is low",
 ];
 
-type Tab = "general" | "security" | "hours" | "email" | "ticket-templates" | "charts";
+type Tab = "general" | "branding" | "subscription" | "storage" | "ai-config" | "chatbot" | "hours" | "email" | "api-keys" | "billing" | "activity-log" | "analytics" | "security" | "ticket-templates" | "charts";
 
 const tabs: { id: Tab; label: string; icon: any }[] = [
-  { id: "general", label: "General", icon: Building2 },
-  { id: "security", label: "Security", icon: Shield },
+  { id: "general", label: "General Info", icon: Building2 },
+  { id: "branding", label: "Branding", icon: Palette },
+  { id: "subscription", label: "Subscription", icon: Crown },
+  { id: "storage", label: "Storage", icon: Database },
+  { id: "ai-config", label: "AI Config", icon: Cpu },
+  { id: "chatbot", label: "Chatbot", icon: Bot },
   { id: "hours", label: "Working Hours", icon: Clock },
   { id: "email", label: "Email Templates", icon: Mail },
+  { id: "api-keys", label: "API Keys", icon: KeyRound },
+  { id: "billing", label: "Billing", icon: CreditCard },
+  { id: "activity-log", label: "Activity Log", icon: ScrollText },
+  { id: "analytics", label: "Analytics Suite", icon: LineChart },
+  { id: "security", label: "Security", icon: Shield },
   { id: "ticket-templates", label: "Ticket Templates", icon: FileText },
-  { id: "charts", label: "Charts", icon: BarChart3 },
+  { id: "charts", label: "Chart Settings", icon: BarChart3 },
 ];
 
 export default function OrganizationSettingsPage() {
@@ -36,7 +54,6 @@ export default function OrganizationSettingsPage() {
   const [form, setForm] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const { setOrgSettings } = useAuth();
 
   useEffect(() => {
@@ -140,7 +157,7 @@ export default function OrganizationSettingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Organization Settings</h1>
+          <h1 className="text-3xl font-bold ">Organization Settings</h1>
           <p className="text-muted-foreground">Manage your organization branding, AI behavior, and preferences.</p>
         </div>
         <Button onClick={handleSave} disabled={saving}>
@@ -174,7 +191,7 @@ export default function OrganizationSettingsPage() {
                 <Building2 size={18} className="text-primary" />
                 General Information
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">Organization name, contact details, and branding.</p>
+              <p className="text-sm text-muted-foreground mt-1">Organization name, contact details, and domain.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -200,104 +217,43 @@ export default function OrganizationSettingsPage() {
                 <p className="text-xs text-muted-foreground">Used to identify this organization from its subdomain (e.g. acme.yourdomain.com).</p>
               </div>
             </div>
-
-            <div className="border-t dark:border-white/[0.06] pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <Palette size={16} className="text-primary" />
-                  Brand Colors
-                </h4>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPreview(!showPreview)}
-                  className="gap-1.5 text-xs"
-                >
-                  <Eye size={14} />
-                  {showPreview ? "Hide Preview" : "Live Preview"}
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {(["primary", "secondary", "accent"] as const).map((color) => (
-                  <div key={color} className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={form.brand_colors?.[color] || "#000000"}
-                      onChange={(e) => updateField(`brand_colors.${color}`, e.target.value)}
-                      className="w-10 h-10 rounded-md border cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <Label className="capitalize text-xs">{color}</Label>
-                      <Input
-                        value={form.brand_colors?.[color] || ""}
-                        onChange={(e) => updateField(`brand_colors.${color}`, e.target.value)}
-                        className="font-mono text-xs"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {showPreview && (
-                <PreviewPanel form={form} />
-              )}
-            </div>
-
-            <div className="border-t dark:border-white/[0.06] pt-6">
-              <h4 className="text-sm font-semibold flex items-center gap-2 mb-4">
-                <Bot size={16} className="text-primary" />
-                Chatbot Configuration
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Chatbot Name</Label>
-                  <Input value={form.chatbot_name} onChange={(e) => updateField("chatbot_name", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Default Language</Label>
-                  <select
-                    value={form.default_language}
-                    onChange={(e) => updateField("default_language", e.target.value)}
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/[0.06]"
-                  >
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                    <option value="zh">Chinese</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                    <option value="pt">Portuguese</option>
-                    <option value="ar">Arabic</option>
-                    <option value="hi">Hindi</option>
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-1.5 mt-4">
-                <Label>Greeting Message</Label>
-                <textarea
-                  value={form.greeting_message}
-                  onChange={(e) => updateField("greeting_message", e.target.value)}
-                  rows={2}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y dark:border-white/[0.06]"
-                />
-              </div>
-            </div>
-
-            <div className="border-t dark:border-white/[0.06] pt-6">
-              <h4 className="text-sm font-semibold mb-4">Custom System Prompt</h4>
-              <div className="space-y-1.5">
-                <textarea
-                  value={form.customPrompt}
-                  onChange={(e) => updateField("customPrompt", e.target.value)}
-                  rows={5}
-                  placeholder="Enter custom system prompt instructions for the AI..."
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y font-mono dark:border-white/[0.06]"
-                />
-                <p className="text-xs text-muted-foreground">Use {'{ORGANIZATION_NAME}'} as a placeholder for the org name.</p>
-              </div>
-            </div>
           </div>
+        )}
+
+        {activeTab === "branding" && (
+          <BrandingPanel form={form} updateField={updateField} />
+        )}
+
+        {activeTab === "subscription" && (
+          <SubscriptionPanel />
+        )}
+
+        {activeTab === "storage" && (
+          <StoragePanel />
+        )}
+
+        {activeTab === "ai-config" && (
+          <AIConfigPanel />
+        )}
+
+        {activeTab === "chatbot" && (
+          <ChatbotPanel form={form} updateField={updateField} />
+        )}
+
+        {activeTab === "api-keys" && (
+          <ApiKeysPanel />
+        )}
+
+        {activeTab === "billing" && (
+          <BillingPanel />
+        )}
+
+        {activeTab === "activity-log" && (
+          <ActivityLogPanel />
+        )}
+
+        {activeTab === "analytics" && (
+          <AnalyticsPanel />
         )}
 
         {activeTab === "security" && (
@@ -643,81 +599,6 @@ function ChartPreview({ form }: { form: any }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function PreviewPanel({ form }: { form: any }) {
-  const colors = form.brand_colors || {};
-  const primary = colors.primary || "#2563eb";
-  const secondary = colors.secondary || "#7c3aed";
-  const accent = colors.accent || "#f59e0b";
-  const chatbotName = form.chatbot_name || "Support AI";
-  const greeting = form.greeting_message || "How can I help you today?";
-
-  return (
-    <div className="mt-6 rounded-xl border dark:border-white/[0.06] overflow-hidden shadow-lg">
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 dark:bg-white/[0.03] border-b dark:border-white/[0.06]">
-        <span className="text-xs font-medium text-muted-foreground">Customer Chat Preview</span>
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: primary }} />
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: secondary }} />
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />
-        </div>
-      </div>
-
-      <div className="flex h-80" style={{ background: "hsl(var(--background))", color: "hsl(var(--foreground))" }}>
-        <div className="w-48 shrink-0 border-r dark:border-white/[0.06] p-3 flex flex-col" style={{ background: "hsl(var(--card))" }}>
-          <div className="flex items-center gap-2 pb-3 mb-3 border-b dark:border-white/[0.06]">
-            <span className="text-sm font-bold truncate" style={{ background: `linear-gradient(to right, ${primary}, ${secondary})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              {chatbotName}
-            </span>
-          </div>
-          {["Dashboard", "Chat", "Tickets"].map((item) => (
-            <div key={item} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-0.5"
-              style={item === "Chat" ? { backgroundColor: `${primary}1A`, color: primary } : { color: "hsl(var(--muted-foreground))" }}>
-              <div className="w-3.5 h-3.5 rounded" style={{ backgroundColor: item === "Chat" ? primary : "transparent" }} />
-              {item}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center gap-2 px-4 py-3 border-b dark:border-white/[0.06]" style={{ background: "hsl(var(--background))" }}>
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center shadow-sm" style={{ background: `linear-gradient(to bottom right, ${primary}, ${secondary})` }}>
-              <MessageCircle size={12} style={{ color: "#fff" }} />
-            </div>
-            <div>
-              <span className="text-xs font-semibold">New Chat</span>
-              <span className="text-[10px] block" style={{ color: "hsl(var(--muted-foreground))" }}>Start a conversation</span>
-            </div>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center justify-center p-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow-xl" style={{ background: `linear-gradient(to bottom right, ${primary}, ${secondary})`, boxShadow: `0 4px 14px ${primary}33` }}>
-              <Headphones size={22} style={{ color: "#fff" }} />
-            </div>
-            <span className="text-base font-bold mb-1" style={{ background: `linear-gradient(to right, ${primary}, ${secondary})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              {greeting}
-            </span>
-            <span className="text-[11px] text-center max-w-[240px]" style={{ color: "hsl(var(--muted-foreground))" }}>
-              Ask questions, report issues, or get help with your account.
-            </span>
-          </div>
-
-          <div className="px-4 py-3 border-t dark:border-white/[0.06] flex gap-2" style={{ background: "hsl(var(--background))" }}>
-            <input
-              readOnly
-              value="Type your message here..."
-              className="flex-1 h-9 rounded-lg border px-3 text-xs"
-              style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--input))", color: "hsl(var(--muted-foreground))" }}
-            />
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: primary }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

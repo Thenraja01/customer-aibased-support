@@ -1,11 +1,3 @@
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/ibm-plex-sans";
-@import "@fontsource-variable/source-sans-3";
-@import "@fontsource/merriweather";
-@import "@fontsource/jetbrains-mono";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -157,7 +149,6 @@
     animation: float 6s ease-in-out infinite;
   }
 }
-
 @layer components {
   .select-field {
     @apply h-9 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-sm shadow-sm transition-colors outline-none focus:border-ring focus:ring-2 focus:ring-ring/20;
@@ -192,4 +183,24 @@
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-12px); }
+}
+
+/* Sidebar slim and primary color scrollbar */
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) transparent;
+}
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  
+}
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 9999px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
 }

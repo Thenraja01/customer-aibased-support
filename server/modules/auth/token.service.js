@@ -2,20 +2,19 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import env from "../../config/env.js";
 import RefreshSession from "../refresh-session/refreshSession.schema.js";
-
 export const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
 
 /**
  * Sign a short-lived access token. Payload follows the spec:
- * { userId, organizationId, roles, email }
+ * { userId, organizationId, branchId, roles, email }
  * Permissions are intentionally NOT embedded — they are loaded from cache/DB
  * so role changes take effect immediately. roleId/roleName are included so
  * lightweight middleware (protectSimple) can read them without a DB lookup.
  */
-export const signAccessToken = ({ userId, organizationId, roles, roleId, roleName, email }) =>
+export const signAccessToken = ({ userId, organizationId, branchId, roles, roleId, roleName, email }) =>
   jwt.sign(
-    { userId, organizationId, roles, roleId, roleName, email },
+    { userId, organizationId, branchId, roles, roleId, roleName, email },
     env.JWT_SECRET,
     {
       issuer: env.JWT_ISSUER,

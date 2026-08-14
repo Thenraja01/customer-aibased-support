@@ -50,7 +50,7 @@ export default function About() {
   if (aboutText) {
     return (
       <div className="container mx-auto px-4 py-16 max-w-4xl">
-        <h1 className="text-4xl font-bold tracking-tight mb-8">About Us</h1>
+        <h1 className="text-4xl font-bold  mb-8">About Us</h1>
         <div className="prose prose-slate dark:prose-invert max-w-none">
           {aboutText.split("\n").map((paragraph, i) => (
             paragraph.trim() ? <p key={i} className="text-muted-foreground mb-4">{paragraph}</p> : null
@@ -68,7 +68,7 @@ export default function About() {
         transition={{ duration: 0.5 }}
         className="max-w-3xl mx-auto text-center mb-16"
       >
-        <h1 className="text-4xl font-bold tracking-tight mb-4">About Us</h1>
+        <h1 className="text-4xl font-bold  mb-4">About Us</h1>
         <p className="text-lg text-muted-foreground">
           We help businesses transform customer service with AI-powered automation.
         </p>

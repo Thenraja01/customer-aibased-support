@@ -5,10 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useTickets } from "@/hooks/useTickets";
-import { useSelector } from "react-redux";
+import { useAuthContext } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/toast";
 import { TicketTemplateAPI } from "@/api";
-import type { RootState } from "@/store/store";
 
 const PRIORITY_OPTIONS = [
   { value: "low", label: "Low", color: "bg-primary/10 text-primary" },
@@ -28,7 +27,7 @@ interface FormErrors {
 }
 
 const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: CreateTicketDialogProps) {
-  const { user } = useSelector((state: RootState) => state.user);
+  const { user } = useAuthContext();
   const { addTicket, creating } = useTickets();
   const toast = useToast();
 
@@ -124,7 +123,7 @@ const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: C
     };
 
     try {
-      await addTicket(payload).unwrap();
+      await addTicket(payload);
       toast.success("Ticket Created", "We'll review your request shortly");
       setTimeout(() => onClose(), 1500);
     } catch (err: any) {

@@ -1,6 +1,5 @@
 import User from "../user/user.schema.js";
 import Organization from "../organization/organization.schema.js";
-import Role from "../role/role.schema.js";
 import AuditLog from "../audit-log/auditLog.schema.js";
 import Document from "../document/document.schema.js";
 import DocumentChunk from "../document/documentChunk.schema.js";
@@ -14,7 +13,10 @@ import Notification from "../notification/notification.schema.js";
 import Ticket from "../ticket/ticket.schema.js";
 import GlobalSetting from "../global-setting/globalSetting.schema.js";
 import { getRAGStats as getRAGStatsFromService } from "../rag/rag.service.js";
+import { getActiveProvider, getActiveModel, healthCheck } from "../llm/index.js";
+import { getIO } from "../../config/socket.js";
 import { escapeRegex } from "../../utils/escapeRegex.js";
+import mongoose from "mongoose";
 
 let isMaintenanceMode = false;
 
@@ -47,7 +49,7 @@ export const getDashboardStats = async (organizationId = null) => {
     await Promise.all([
       User.countDocuments(userFilter),
       Organization.countDocuments(),
-      Role.countDocuments(),
+      5,
       AuditLog.countDocuments(),
       User.countDocuments({ ...userFilter, status: "blocked" }),
       User.countDocuments({ ...userFilter, status: "active" }),
@@ -110,29 +112,40 @@ export const getAllOrgsPaginated = async (page = 1, limit = 10, search = "", org
   };
 };
 
-export const getOrgUsers = async (orgId, page = 1, limit = 10) => {
+export const getOrgUsers = async (orgId, page = 1, limit = 10, branchId = null, search = "") => {
   const query = { organization_id: orgId };
-  const total = await User.countDocuments(query);
-  const users = await User.find(query)
-    .populate("organization_id", "name email")
-    .populate("role_id", "role_name")
-    .select("-password")
-    .sort({ created_at: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
+  if (branchId) query.branch_id = branchId;
+  if (search) {
+    const safe = escapeRegex(search);
+    query.$or = [
+      { name: { $regex: safe, $options: "i" } },
+      { email: { $regex: safe, $options: "i" } },
+    ];
+  }
+  const [total, users] = await Promise.all([
+    User.countDocuments(query),
+    User.find(query)
+      .populate("organization_id", "name email")
+      .populate("branch_id", "name code")
+      .select("-password")
+      .sort({ created_at: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+  ]);
   return {
-    data: users,
+    data: users.map((u) => ({ ...u, roleName: u.role || u.roleName })),
     pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
   };
 };
 
-export const getAllUsersPaginated = async (page = 1, limit = 10, search = "", status = "", organizationId = null) => {
+export const getAllUsersPaginated = async (page = 1, limit = 10, search = "", status = "", organizationId = null, branchId = null) => {
   const query = {};
   if (organizationId) {
     const orgIds = await getOrgAndDescendants(organizationId);
     query.organization_id = { $in: orgIds };
   }
+  if (branchId) query.branch_id = branchId;
   if (search) {
     const safe = escapeRegex(search);
     query.$or = [
@@ -141,48 +154,44 @@ export const getAllUsersPaginated = async (page = 1, limit = 10, search = "", st
     ];
   }
   if (status) query.status = status;
-  const total = await User.countDocuments(query);
-  const users = await User.find(query)
-    .populate("organization_id", "name email")
-    .populate("role_id", "role_name")
-    .select("-password")
-    .sort({ created_at: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
+  const [total, users] = await Promise.all([
+    User.countDocuments(query),
+    User.find(query)
+      .populate("organization_id", "name email")
+      .populate("branch_id", "name code")
+      .select("-password")
+      .sort({ created_at: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+  ]);
   return {
-    data: users,
+    data: users.map((u) => ({ ...u, roleName: u.role || u.roleName })),
     pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
   };
 };
 export const getAllRolesPaginated = async (page = 1, limit = 10, organizationId = null) => {
-  const filter = {};
-  
-  if (organizationId) {
-    filter.$or = [{ organization_id: organizationId }, { organization_id: null }];
-  }
-  
-  // Exclude super_admin and its variations (case-insensitive)
-  filter.role_name = { 
-    $not: { $regex: /^super[\s_-]?admin$/i } 
-  };
-  
-  const total = await Role.countDocuments(filter);
-  const roles = await Role.find(filter)
-    .populate("organization_id", "name")
-    .sort({ role_name: 1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
-    
+  const roles = [
+    { _id: "admin", role_name: "admin", description: "Organization Admin", organization_id: null },
+    { _id: "branch_admin", role_name: "branch_admin", description: "Branch Admin", organization_id: null },
+    { _id: "support", role_name: "support", description: "Support Agent", organization_id: null },
+    { _id: "customer", role_name: "customer", description: "Customer", organization_id: null }
+  ];
   return {
-    data: roles,
-    pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    data: roles.slice((page - 1) * limit, page * limit),
+    pagination: { total: roles.length, page, limit, totalPages: Math.ceil(roles.length / limit) },
   };
 };
 
-export const getAuditLogsPaginated = async (page = 1, limit = 20, filters = {}) => {
+export const getAuditLogsPaginated = async (page = 1, limit = 20, filters = {}, scope = {}) => {
   const query = {};
+  const { isSuperAdmin, organizationId, branchId, isOrgAdmin } = scope;
+
+  if (!isSuperAdmin) {
+    if (organizationId) query.organization_id = organizationId;
+    if (branchId && !isOrgAdmin) query.branch_id = branchId;
+  }
+
   if (filters.userId) query.user_id = filters.userId;
   if (filters.action) query.action = { $regex: escapeRegex(filters.action), $options: "i" };
   if (filters.tableName) query.table_name = filters.tableName;
@@ -407,6 +416,90 @@ export const revokeApiKey = async (orgId, keyId) => {
     { new: true }
   );
   if (!org) throw new Error("Organization or API key not found");
+  return { message: "API key revoked" };
+};
+
+// ── Org self-service API keys (hashed storage) ───────────────────────
+// Unlike the legacy super-admin flow (which stores the plaintext key for the
+// owner to read later), self-service keys are stored as a SHA-256 hash with a
+// masked preview. The plaintext key is returned exactly once, at creation.
+
+export const getMyOrgApiKeys = async (orgId) => {
+  const org = await Organization.findById(orgId).select("api_keys").lean();
+  if (!org) throw new Error("Organization not found");
+  return (org.api_keys || []).map((k) => ({
+    _id: k._id,
+    name: k.name,
+    is_active: k.is_active,
+    last_used: k.last_used,
+    created_at: k.created_at,
+    key_preview: k.key ? `sk_live_••••${k.key.slice(-4)}` : null,
+  }));
+};
+
+export const createMyOrgApiKey = async (orgId, name, createdBy = null) => {
+  const crypto = await import("crypto");
+  const raw = `sk_live_${crypto.randomBytes(32).toString("hex")}`;
+  const hash = crypto.createHash("sha256").update(raw).digest("hex");
+
+  const org = await Organization.findByIdAndUpdate(
+    orgId,
+    {
+      $push: {
+        api_keys: {
+          key: `sk_live_••••${raw.slice(-4)}`,
+          key_hash: hash,
+          name,
+          created_at: new Date(),
+          is_active: true,
+        },
+      },
+    },
+    { new: true }
+  );
+  if (!org) throw new Error("Organization not found");
+
+  // Audit trail (best-effort)
+  try {
+    const auditLogService = await import("../audit-log/auditLog.service.js");
+    await auditLogService.logAction({
+      user_id: createdBy,
+      organization_id: orgId,
+      action: "ORG_API_KEY_CREATED",
+      table_name: "organization",
+      record_id: String(orgId),
+      new_value: { name },
+    });
+  } catch (err) {
+    console.error("[APIKey] Audit log failed:", err.message);
+  }
+
+  // Return the raw key exactly once
+  return { key: raw, name, id: org.api_keys[org.api_keys.length - 1]._id };
+};
+
+export const revokeMyOrgApiKey = async (orgId, keyId, createdBy = null) => {
+  const org = await Organization.findOneAndUpdate(
+    { _id: orgId, "api_keys._id": keyId },
+    { $set: { "api_keys.$.is_active": false } },
+    { new: true }
+  );
+  if (!org) throw new Error("Organization or API key not found");
+
+  try {
+    const auditLogService = await import("../audit-log/auditLog.service.js");
+    await auditLogService.logAction({
+      user_id: createdBy,
+      organization_id: orgId,
+      action: "ORG_API_KEY_REVOKED",
+      table_name: "organization",
+      record_id: String(orgId),
+      new_value: { keyId: String(keyId) },
+    });
+  } catch (err) {
+    console.error("[APIKey] Audit log failed:", err.message);
+  }
+
   return { message: "API key revoked" };
 };
 
@@ -689,7 +782,7 @@ export const getCommandCenterStatus = async () => {
     env: process.env.NODE_ENV || "development",
     memoryUsedMB,
     totalMemoryMB,
-    dbState: "connected",
+    dbState: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
   };
 
   const activeOrganizationsCard = {
@@ -705,18 +798,55 @@ export const getCommandCenterStatus = async () => {
     blocked: blockedUsers,
   };
 
+  // ── Live telemetry (replaces previously hardcoded/dummy values) ────────
+  // Active LLM provider/model, resolved from the configured providers.
+  const activeProvider = getActiveProvider();
+  const activeModel = getActiveModel();
+
+  // AI status from the active provider's real health check (falls back to
+  // "Unknown" if the check fails — never a hardcoded "Healthy").
+  let aiStatus = "Unknown";
+  try {
+    const checks = await healthCheck();
+    const activeCheck = checks.find((c) => c.provider === activeProvider);
+    aiStatus = activeCheck?.status || "Unknown";
+  } catch {
+    aiStatus = "Unknown";
+  }
+
+  // Real DB round-trip latency via the Mongo admin ping.
+  let dbPingMs = -1;
+  try {
+    const pingStart = Date.now();
+    await mongoose.connection.db.admin().ping();
+    dbPingMs = Date.now() - pingStart;
+  } catch {
+    dbPingMs = -1;
+  }
+
+  // Real connected Socket.IO client count (0 when the socket server is not
+  // reachable/initialized yet).
+  let socketClients = 0;
+  try {
+    socketClients =
+      getIO().engine?.clientsCount || getIO().sockets?.sockets?.size || 0;
+  } catch {
+    socketClients = 0;
+  }
+
   const aiServicesCard = {
     totalSessions: totalAiSessions,
     totalMessages,
     monthlyAiRequests: totalAiRequests,
-    activeModel: "Gemini 1.5 Flash",
-    status: "Healthy",
+    activeModel,
+    provider: activeProvider,
+    status: aiStatus,
   };
 
   const apiHealthCard = {
-    dbPingMs: Math.floor(Math.random() * 15) + 5,
+    dbPingMs,
     expressStatus: "200 OK",
-    socketClients: 12,
+    socketClients,
     totalStorageMB,
     overallHealth: "100%",
   };
@@ -913,7 +1043,7 @@ export const getOrganizationAnalytics = async (orgId) => {
   if (!org) throw new Error("Organization not found");
 
   const [users, tickets, chats, aiSessions, docs] = await Promise.all([
-    User.find({ organization_id: orgId }).select("status created_at role_id").lean(),
+    User.find({ organization_id: orgId }).select("status created_at role").lean(),
     Ticket.find({ organization_id: orgId }).select("status priority created_at").lean(),
     Chat.find({ organization_id: orgId }).select("status created_at").lean(),
     AISession.find({ organization_id: orgId }).select("tokens_used created_at model").lean(),
@@ -1285,5 +1415,59 @@ export const getOrganizationAnalytics = async (orgId) => {
     featureUsage: { linear: featureUsageLinear, circle: featureUsageCircle, spider: featureUsageSpider },
     geographicAnalytics: { linear: geoLinear, circle: geoCircle, spider: geoSpider },
   };
+};
+
+export const exportAuditLogs = async (filters = {}, scope = {}) => {
+  const query = {};
+  const { isSuperAdmin, organizationId, branchId, isOrgAdmin } = scope;
+
+  if (!isSuperAdmin) {
+    if (organizationId) query.organization_id = organizationId;
+    if (branchId && !isOrgAdmin) query.branch_id = branchId;
+  }
+
+  if (filters.userId) query.user_id = filters.userId;
+  if (filters.action) query.action = { $regex: escapeRegex(filters.action), $options: "i" };
+  if (filters.tableName) query.table_name = filters.tableName;
+  if (filters.from || filters.to) {
+    query.created_at = {};
+    if (filters.from) query.created_at.$gte = new Date(filters.from);
+    if (filters.to) query.created_at.$lte = new Date(filters.to);
+  }
+
+  const logs = await AuditLog.find(query)
+    .populate("user_id", "name email")
+    .sort({ created_at: -1 })
+    .lean();
+
+  const headers = [
+    "Timestamp",
+    "User",
+    "Email",
+    "Action",
+    "Table",
+    "Record ID",
+    "Organization ID",
+    "Branch ID",
+    "IP Address",
+    "Old Value",
+    "New Value",
+  ];
+
+  const rows = logs.map((log) => [
+    new Date(log.created_at).toISOString(),
+    `"${(typeof log.user_id === "object" ? log.user_id?.name : log.user_id) || "Unknown"}"`,
+    `"${(typeof log.user_id === "object" ? log.user_id?.email : "") || ""}"`,
+    log.action,
+    log.table_name,
+    log.record_id,
+    log.organization_id || "",
+    log.branch_id || "",
+    log.ip_address || "",
+    `"${JSON.stringify(log.old_value || {}).replace(/"/g, '""')}"`,
+    `"${JSON.stringify(log.new_value || {}).replace(/"/g, '""')}"`,
+  ]);
+
+  return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
 };
 

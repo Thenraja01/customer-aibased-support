@@ -23,4 +23,10 @@ export const broadcastToOrgSchema = z.object({
   message: z.string().trim().min(1, "Message is required").max(2000),
   type: z.enum(["info", "warning", "success", "error"]).optional(),
   link: z.string().max(500).optional(),
+  audienceType: z.enum(["all", "branch", "role", "branch_role"]).optional(),
+  branchIds: z.array(z.string()).optional(),
+  roleIds: z.array(z.string()).optional(),
+  deliveryMethods: z.array(z.string()).optional(),
+  ctaText: z.string().optional(),
+  ctaUrl: z.string().optional(),
 });

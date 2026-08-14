@@ -68,7 +68,7 @@ export default function FAQPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Frequently Asked Questions</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold ">Frequently Asked Questions</h1>
         <p className="text-sm text-muted-foreground">
           Find quick answers to common questions about our services.
         </p>
@@ -88,7 +88,7 @@ export default function FAQPage() {
       </div>
 
       {filteredFaqs.length === 0 ? (
-        <div className="rounded-xl border bg-card dark:bg-card/50 p-8 sm:p-12 text-center">
+        <div className="rounded-lg border bg-card dark:bg-card/50 p-8 sm:p-12 text-center">
           <HelpCircle size={48} className="mx-auto text-muted-foreground/40 mb-4" />
           <p className="text-muted-foreground font-medium">
             {searchQuery ? "No FAQs match your search" : "No FAQs available at the moment"}
@@ -104,7 +104,7 @@ export default function FAQPage() {
           {filteredFaqs.map((faq, index) => {
             const isOpen = openIndex === index;
             return (
-              <div key={faq._id} className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden transition-shadow hover:shadow-sm" role="listitem">
+              <div key={faq._id} className="rounded-lg border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden transition-shadow hover:shadow-sm" role="listitem">
                 <button
                   onClick={() => toggleFAQ(index)}
                   onKeyDown={(e) => handleKeyDown(e, index)}

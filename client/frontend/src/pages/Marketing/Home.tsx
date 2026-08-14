@@ -107,12 +107,6 @@ export default function Home() {
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-background/75 dark:bg-background/80 -z-0" />
 
-        {/* Existing gradient */}
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background/30 to-background dark:from-primary/15 dark:via-background/40 dark:to-background" />
-
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/10 blur-3xl dark:bg-primary/5 animate-pulse-glow" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-secondary/10 blur-3xl dark:bg-secondary/5 animate-pulse-glow [animation-delay:1.5s]" />
-
         <div className="container relative z-10 mx-auto max-w-5xl text-center">
           <div className="container mx-auto max-w-5xl text-center">
             <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
@@ -124,7 +118,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl mb-6"
+              className="text-4xl font-extrabold  sm:text-5xl md:text-6xl lg:text-7xl mb-6"
             >
               {appName}
               <br />
@@ -169,7 +163,7 @@ export default function Home() {
           variants={staggerContainer}
           className="text-center mb-12"
         >
-          <motion.h2 variants={fadeUp} custom={0} className="text-3xl font-bold tracking-tight mb-4">
+          <motion.h2 variants={fadeUp} custom={0} className="text-3xl font-bold  mb-4">
             Our Services
           </motion.h2>
           <motion.p variants={fadeUp} custom={1} className="text-muted-foreground max-w-2xl mx-auto">
@@ -216,11 +210,11 @@ export default function Home() {
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
           variants={staggerContainer}
-          className="rounded-2xl bg-muted/50 dark:bg-gradient-to-br dark:from-card/80 dark:via-card/40 dark:to-card/80 dark:border dark:border-white/[0.06] p-8 lg:p-12 dark:shadow-xl dark:shadow-black/10"
+          className="rounded-lg bg-muted/50 dark:bg-gradient-to-br dark:from-card/80 dark:via-card/40 dark:to-card/80 dark:border dark:border-white/[0.06] p-8 lg:p-12 dark:shadow-xl dark:shadow-black/10"
         >
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div variants={fadeUp} custom={0}>
-              <h2 className="text-3xl font-bold tracking-tight mb-4">
+              <h2 className="text-3xl font-bold  mb-4">
                 {m.features_title || "Powerful Features for Modern Support"}
               </h2>
               <p className="text-muted-foreground mb-8">
@@ -242,7 +236,7 @@ export default function Home() {
               {statCards.map((stat) => (
                 <div
                   key={stat.label}
-                  className="rounded-xl bg-background dark:bg-gradient-to-br dark:from-background dark:to-card p-6 shadow-sm border dark:border-white/[0.06] dark:hover:border-primary/20 transition-colors duration-300"
+                  className="p-6"
                 >
                   <stat.icon className="h-8 w-8 text-primary mb-2" />
                   <div className="text-2xl font-bold">{stat.value}</div>
@@ -261,11 +255,11 @@ export default function Home() {
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-secondary p-8 lg:p-16 text-center dark:shadow-2xl dark:shadow-primary/20 relative overflow-hidden"
+          className="rounded-lg bg-gradient-to-br from-primary via-primary/90 to-secondary p-8 lg:p-16 text-center dark:shadow-2xl dark:shadow-primary/20 relative overflow-hidden"
         >
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvc3ZnPg==')] dark:opacity-100 opacity-0" />
           <div className="relative">
-            <h2 className="text-3xl font-bold tracking-tight mb-4">
+            <h2 className="text-3xl font-bold  mb-4">
               Ready to Transform Your Customer Support?
             </h2>
             <p className="max-w-2xl mx-auto mb-8 text-primary-foreground/90">

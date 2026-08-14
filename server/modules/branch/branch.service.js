@@ -18,8 +18,9 @@ export const createBranch = async (branchData) => {
   return branch;
 };
 
-export const getAllBranches = async (organizationId, page = 1, limit = 20) => {
+export const getAllBranches = async (organizationId, branchId = null, page = 1, limit = 20) => {
   const filter = { organization_id: organizationId };
+  if (branchId) filter._id = branchId;
   const skip = (page - 1) * limit;
   const [data, total] = await Promise.all([
     Branch.find(filter).sort({ name: 1 }).skip(skip).limit(limit),
@@ -28,9 +29,10 @@ export const getAllBranches = async (organizationId, page = 1, limit = 20) => {
   return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
 };
 
-export const getBranchById = async (id, organizationId = null) => {
+export const getBranchById = async (id, organizationId = null, branchId = null) => {
   const filter = { _id: id };
   if (organizationId) filter.organization_id = organizationId;
+  if (branchId) filter._id = branchId;
   const branch = await Branch.findOne(filter).populate("organization_id", "name");
   if (!branch) throw new Error("Branch not found");
   return branch;
@@ -52,11 +54,12 @@ export const deleteBranch = async (id, organizationId = null) => {
   return { message: "Branch deleted successfully" };
 };
 
-export const searchBranches = async (query, organizationId, page = 1, limit = 20) => {
+export const searchBranches = async (query, organizationId, branchId = null, page = 1, limit = 20) => {
   const filter = {
     organization_id: organizationId,
     name: { $regex: query, $options: "i" },
   };
+  if (branchId) filter._id = branchId;
   const skip = (page - 1) * limit;
   const [data, total] = await Promise.all([
     Branch.find(filter).sort({ name: 1 }).skip(skip).limit(limit),

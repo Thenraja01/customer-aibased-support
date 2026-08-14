@@ -11,9 +11,10 @@ export const isAdminUser = (req) => {
   const user = req.user;
   if (!user) return false;
 
-  const roleName = typeof user.role_id === 'object'
-    ? user.role_id?.role_name
-    : user.role_id;
+  const roleName =
+    user.roleName ||
+    user.role ||
+    (typeof user.role_id === 'object' ? user.role_id?.role_name : user.role_id);
 
   return isNormalizedAdminRole(normalizeRoleName(roleName));
 };
@@ -34,7 +35,6 @@ export const tenantIsolation = async (req, res, next) => {
     }
 
     const populatedUser = await User.findById(user._id)
-      .populate('role_id')
       .lean();
 
     if (!populatedUser) {
@@ -45,7 +45,7 @@ export const tenantIsolation = async (req, res, next) => {
       });
     }
 
-    const userRole = populatedUser.role_id;
+    const userRole = populatedUser.role;
     
     // Super admins can access all organizations
     const normalizedUserRole = normalizeRoleName(userRole?.role_name);

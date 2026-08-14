@@ -45,6 +45,7 @@ const backgroundJobSchema = new mongoose.Schema(
       type: Schema.Types.ObjectId,
       ref: "Organization",
       default: null,
+      index: true,
     },
     user_id: {
       type: Schema.Types.ObjectId,
@@ -89,5 +90,6 @@ backgroundJobSchema.plugin(tenantPlugin);
 
 backgroundJobSchema.index({ status: 1, priority: -1, scheduled_at: 1 });
 backgroundJobSchema.index({ job_type: 1, status: 1, organization_id: 1 });
+backgroundJobSchema.index({ organization_id: 1, created_at: -1 });
 
 export default mongoose.model("BackgroundJob", backgroundJobSchema);

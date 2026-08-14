@@ -23,21 +23,21 @@ interface FormData {
   phone: string;
   dob: string;
   organization_id: string;
-  role_id: string;
+  role: string;
   password: string;
   confirmPassword: string;
 }
 
 interface FormErrors {
   name?: string; email?: string; phone?: string; dob?: string;
-  organization_id?: string; role_id?: string;
+  organization_id?: string; role?: string;
   password?: string; confirmPassword?: string;
   general?: string;
 }
 
 const INITIAL_FORM: FormData = {
   name: "", email: "", phone: "", dob: "",
-  organization_id: "", role_id: "",
+  organization_id: "", role: "",
   password: "", confirmPassword: "",
 };
 
@@ -48,7 +48,7 @@ function validateForm(data: FormData): FormErrors {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email format";
   if (data.phone && !/^\+?[\d\s\-()]{7,}$/.test(data.phone)) e.phone = "Invalid phone number";
   if (!data.organization_id) e.organization_id = "Please select an organization";
-  if (!data.role_id) e.role_id = "Please select a role";
+  if (!data.role) e.role = "Please select a role";
   if (!data.password) e.password = "Password is required";
   else if (data.password.length < 8) e.password = "Password must be at least 8 characters";
   if (data.password !== data.confirmPassword) e.confirmPassword = "Passwords do not match";
@@ -119,7 +119,7 @@ export default function Register() {
     if (loading) return;
     const validation = validateForm(form);
     setErrors(validation);
-    setTouched({ name: true, email: true, phone: true, dob: true, organization_id: true, role_id: true, password: true, confirmPassword: true });
+    setTouched({ name: true, email: true, phone: true, dob: true, organization_id: true, role: true, password: true, confirmPassword: true });
     if (Object.values(validation).some(Boolean)) return;
 
     setLoading(true);
@@ -131,7 +131,7 @@ export default function Register() {
         dob: form.dob || undefined,
         password: form.password,
         organization_id: form.organization_id,
-        role_id: form.role_id,
+        role: form.role,
       });
       setStep("success");
     } catch (err: any) {
@@ -153,9 +153,7 @@ export default function Register() {
   if (step === "success") {
     return (
       <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-primary/5">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent dark:from-primary/10" />
-        <div className="absolute top-0 left-0 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10 animate-pulse-glow" />
-        <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-10">
+        <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
           <motion.div className="w-full max-w-md" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <Card className="border-0 shadow-2xl bg-card/95 backdrop-blur-md dark:bg-card/80 dark:border-white/[0.06]">
               <CardHeader className="text-center space-y-4 pb-4 px-8 pt-10">
@@ -180,8 +178,8 @@ export default function Register() {
                   {organizations.find((o) => o._id === form.organization_id) && (
                     <div className="flex items-center gap-2.5"><Building2 className="h-4 w-4 text-primary shrink-0" /><span className="text-sm">{organizations.find((o) => o._id === form.organization_id)?.name}</span></div>
                   )}
-                  {roles.find((r) => r._id === form.role_id) && (
-                    <div className="flex items-center gap-2.5"><Briefcase className="h-4 w-4 text-primary shrink-0" /><span className="text-sm capitalize">{roles.find((r) => r._id === form.role_id)?.role_name}</span></div>
+                  {roles.find((r) => r._id === form.role) && (
+                    <div className="flex items-center gap-2.5"><Briefcase className="h-4 w-4 text-primary shrink-0" /><span className="text-sm capitalize">{roles.find((r) => r._id === form.role)?.role_name}</span></div>
                   )}
                 </motion.div>
 
@@ -219,10 +217,6 @@ export default function Register() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-primary/5">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent dark:from-primary/10" />
-      <div className="absolute top-0 left-0 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10 animate-pulse-glow" />
-      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-secondary/5 blur-3xl dark:bg-secondary/10 animate-pulse-glow [animation-delay:1.5s]" />
-
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
         <motion.div className="w-full max-w-md" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
           <Card className="border-0 shadow-2xl bg-card/95 backdrop-blur-md px-6 sm:px-10 py-8 sm:py-10 dark:bg-card/80 dark:border-white/[0.06]">
@@ -308,18 +302,20 @@ export default function Register() {
                     {errors.organization_id && <p className="text-xs text-destructive flex items-center gap-1 mt-1" role="alert"><AlertCircle size={12} />{errors.organization_id}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="role_id">Role</Label>
+                    <Label htmlFor="role">Role</Label>
                     <div className="relative">
-                      <select id="role_id" name="role_id" value={form.role_id} onChange={handleChange} onBlur={handleBlur}
+                      <select id="role" name="role" value={form.role} onChange={handleChange} onBlur={handleBlur}
                         disabled={loading || rolesLoading}
-                        className={`select-field pl-10 h-11 ${errors.role_id ? "border-destructive" : ""}`}
-                        aria-invalid={!!errors.role_id} required>
+                        className={`select-field pl-10 h-11 ${errors.role ? "border-destructive" : ""}`}
+                        aria-invalid={!!errors.role} required>
                         <option value="">{rolesLoading ? "Loading..." : "Select"}</option>
-                        {roles.map((r) => <option key={r._id} value={r._id}>{r.role_name}</option>)}
+                        {roles.filter(r => r._id === "support" || r._id === "customer").map((r) => (
+                          <option key={r._id} value={r._id}>{r.role_name}</option>
+                        ))}
                       </select>
                       <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     </div>
-                    {errors.role_id && <p className="text-xs text-destructive flex items-center gap-1 mt-1" role="alert"><AlertCircle size={12} />{errors.role_id}</p>}
+                    {errors.role && <p className="text-xs text-destructive flex items-center gap-1 mt-1" role="alert"><AlertCircle size={12} />{errors.role}</p>}
                   </div>
                 </div>
 

@@ -29,5 +29,7 @@ declare module "@/api/auth.api" {
     forgotPassword: (email: string) => Promise<any>;
     verifyResetOtp: (email: string, otp: string) => Promise<any>;
     resetPassword: (email: string, otp: string, newPassword: string) => Promise<any>;
+    verify2FA: (email: string, otp: string) => Promise<any>;
+    request2FAOTP: (email: string) => Promise<any>;
   };
 }

@@ -20,7 +20,8 @@ import {
   consumeOAuthState,
 } from "./oauth.service.js";
 import env from "../../config/env.js";
-import { protect, access } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import {
   registerSchema,
@@ -33,7 +34,6 @@ import {
   resetPasswordWithOtpSchema,
 } from "../../validation/index.js";
 import Organization from "../organization/organization.schema.js";
-import Role from "../role/role.schema.js";
 import User from "../user/user.schema.js";
 import GlobalSetting from "../global-setting/globalSetting.schema.js";
 import {
@@ -66,6 +66,9 @@ router.post("/v1/login", async (req, res) => {
       ip: req.ip,
       userAgent: req.get("User-Agent") || "",
     });
+    if (result.twoFactorRequired) {
+      return res.status(200).json({ success: true, twoFactorRequired: true, email: result.email });
+    }
     res.status(200).json({ success: true, message: result.message, token: result.token, refreshToken: result.refreshToken, data: result.user });
   } catch (error) {
     // Parse structured error codes from the login service
@@ -86,6 +89,106 @@ router.post("/v1/login", async (req, res) => {
 
     console.error("Login error:", error);
     res.status(400).json({ success: false, message: userMessage, code, status: code });
+  }
+});
+
+router.post("/v1/login/verify-2fa", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: "Email and OTP are required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).populate("organization_id");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Account not found" });
+    }
+
+    if (!user.otp || !user.otp_expiry) {
+      return res.status(400).json({ success: false, message: "No 2FA verification requested or session expired." });
+    }
+
+    if (new Date() > user.otp_expiry) {
+      user.otp = null;
+      user.otp_expiry = null;
+      await user.save();
+      return res.status(400).json({ success: false, message: "OTP has expired. Please log in again." });
+    }
+
+    const bcrypt = await import("bcrypt");
+    const isValid = await bcrypt.default.compare(otp, user.otp);
+    if (!isValid) {
+      return res.status(400).json({ success: false, message: "Invalid verification code" });
+    }
+
+    // Clear OTP
+    user.otp = null;
+    user.otp_expiry = null;
+    await user.save();
+
+    const auth = await buildAuthResponse(user, {
+      ip: req.ip,
+      userAgent: req.get("User-Agent") || "",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: auth.message,
+      token: auth.token,
+      refreshToken: auth.refreshToken,
+      data: auth.user,
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/v1/login/request-2fa", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Account not found" });
+    }
+
+    if (!user.two_factor_enabled) {
+      return res.status(400).json({ success: false, message: "Two-factor authentication is not enabled for this account." });
+    }
+
+    const crypto = await import("crypto");
+    const bcrypt = await import("bcrypt");
+    const { sendEmail } = await import("../../utils/email.js");
+
+    const otp = crypto.default.randomInt(100000, 999999).toString();
+    const expiry = new Date(Date.now() + (env.OTP_EXPIRY_MINUTES || 10) * 60 * 1000);
+    user.otp = await bcrypt.default.hash(otp, 10);
+    user.otp_expiry = expiry;
+    await user.save();
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+        <h2 style="color:#1a1a2e;">Two-Factor Authentication</h2>
+        <p>Your one-time verification code is:</p>
+        <div style="background:#f0f4ff;border-radius:8px;padding:16px;text-align:center;margin:20px 0;">
+          <span style="font-size:32px;font-weight:bold;color:#4f46e5;letter-spacing:8px;">${otp}</span>
+        </div>
+        <p style="color:#666;font-size:14px;">This code expires in ${env.OTP_EXPIRY_MINUTES || 10} minutes.</p>
+      </div>
+    `;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Your Two-Factor Authentication Code",
+      html,
+    });
+
+    res.status(200).json({ success: true, message: `Verification code sent to ${user.email}` });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
   }
 });
 
@@ -195,8 +298,7 @@ router.post("/v1/otp/verify-approval", async (req, res) => {
     if (!email || !otp) return res.status(400).json({ success: false, message: "Email and OTP are required" });
     await verifyApprovalOtp(email, otp);
     const user = await User.findOne({ email: email.toLowerCase().trim() })
-      .populate("organization_id")
-      .populate("role");
+      .populate("organization_id");
     if (!user) return res.status(404).json({ success: false, message: "Account not found" });
     const auth = await buildAuthResponse(user, {
       ip: req.ip,
@@ -286,12 +388,12 @@ router.post("/v1/reset-password", validate(resetPasswordWithOtpSchema), async (r
 router.get(
   "/v1/pending-registrations",
   protect,
-  access("registration.approve"),
+  checkRole("admin", "branch_admin", "super_admin"),
   async (req, res) => {
     try {
-      // Org admins only see their own org's pending registrations
+      // Org admins only see their own org's pending registrations; Super Admin sees all
       const organizationId =
-        req.user.roleName === "admin" ? req.user.organizationId : null;
+        req.user.roleName === "super_admin" ? null : req.user.organizationId;
       const users = await getPendingRegistrations(organizationId);
       res.status(200).json({ success: true, data: users });
     } catch (error) {
@@ -307,14 +409,16 @@ router.get(
 router.post(
   "/v1/approve-registration/:id",
   protect,
-  access("registration.approve"),
+  checkRole("admin", "branch_admin", "super_admin"),
   validate(approveRegistrationSchema),
   async (req, res) => {
     try {
       const { id } = req.params;
       const { action, rejection_reason } = req.body;
 
-      const updatedUser = await approveRegistration(id, action, req.user.userId, rejection_reason);
+      const callerOrgId =
+        req.user.roleName === "super_admin" ? null : req.user.organizationId;
+      const updatedUser = await approveRegistration(id, action, req.user.userId, rejection_reason, callerOrgId);
 
       // Automatically send OTP email on approval
       if (action === "approve") {

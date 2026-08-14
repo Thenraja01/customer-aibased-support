@@ -54,11 +54,25 @@ const userSchema = new mongoose.Schema(
     approved_at: { type: Date, default: null },
     rejection_reason: { type: String, maxlength: 500, default: null },
 
+    // Who created this user (for audit trail)
+    created_by: { type: Schema.Types.ObjectId, ref: "User", default: null },
+
     fcm_token: { type: String, default: null },
     otp: { type: String, default: null },
     otp_expiry: { type: Date, default: null },
+    profileImage: { type: String, default: null },
+    two_factor_enabled: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: "created_at", updatedAt: false } }
 );
+
+// Compound indexes for tenant + branch queries
+userSchema.index({ organization_id: 1, branch_id: 1 });
+userSchema.index({ organization_id: 1, role: 1 });
+userSchema.index({ organization_id: 1, branch_id: 1, role: 1 });
+
+// Custom validation: non-super_admin users should have a branch_id
+// (enforced at the service layer rather than schema level to allow
+//  org_admin users that operate across branches)
 
 export default mongoose.model("User", userSchema);

@@ -1,22 +1,34 @@
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "nomic-embed-text";
 const EMBEDDING_DIM = Number(process.env.EMBEDDING_DIM) || 768;
+const FETCH_TIMEOUT_MS = 30_000;
 
 let modelReady = false;
+let warmupInProgress = false;
 let lastError = null;
 
 export const getEmbeddingDim = () => EMBEDDING_DIM;
-
 export const isModelReady = () => modelReady;
-
 export const getLastError = () => lastError;
+
+// Abort-controller helper for fetch timeout
+const fetchWithTimeout = async (url, options, timeoutMs = FETCH_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 export const healthCheck = async () => {
   try {
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/tags`);
-    if (!res.ok) return false;
+    const res = await fetchWithTimeout(`${OLLAMA_BASE_URL}/api/tags`, {}, 10_000);
+    if (!res.ok) { modelReady = false; return false; }
     const data = await res.json();
-    modelReady = data.models?.some((m) => m.name.startsWith(EMBEDDING_MODEL));
+    modelReady = data.models?.some((m) => m.name.startsWith(EMBEDDING_MODEL.split(":")[0])) ?? false;
     if (!modelReady) lastError = `Model "${EMBEDDING_MODEL}" not found in Ollama`;
     return modelReady;
   } catch (err) {
@@ -27,46 +39,93 @@ export const healthCheck = async () => {
 };
 
 const pullModel = async () => {
-  try {
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/pull`, {
+  console.log(`[OllamaEmbedding] Pulling model "${EMBEDDING_MODEL}"…`);
+  const res = await fetchWithTimeout(
+    `${OLLAMA_BASE_URL}/api/pull`,
+    {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: EMBEDDING_MODEL }),
-    });
-    if (!res.ok) throw new Error(`Pull failed: ${res.statusText}`);
-    modelReady = true;
-    lastError = null;
+    },
+    5 * 60_000   // 5 min for a model pull
+  );
+  if (!res.ok) throw new Error(`Pull failed: ${res.statusText}`);
+  // Ollama streams progress lines; consume them
+  await res.text();
+  modelReady = true;
+  lastError = null;
+  console.log(`[OllamaEmbedding] Model "${EMBEDDING_MODEL}" ready.`);
+};
+
+/**
+ * Warm-up: called once at server startup.
+ * Runs in background — does NOT block startup.
+ */
+export const warmupEmbeddingModel = async () => {
+  if (modelReady || warmupInProgress) return;
+  warmupInProgress = true;
+  try {
+    const ready = await healthCheck();
+    if (!ready) await pullModel();
   } catch (err) {
+    console.error("[OllamaEmbedding] Warm-up failed:", err.message);
     lastError = err.message;
-    throw err;
+  } finally {
+    warmupInProgress = false;
   }
 };
 
+/**
+ * Get a real semantic embedding from Ollama.
+ * Returns null on any failure — NEVER returns a fake vector.
+ */
 export const getEmbedding = async (text) => {
+  if (!text || typeof text !== "string" || text.trim().length === 0) {
+    return null;
+  }
+
   try {
-    if (!modelReady) await healthCheck();
-    if (!modelReady) await pullModel();
+    if (!modelReady) {
+      const ready = await healthCheck();
+      if (!ready) {
+        console.warn("[OllamaEmbedding] Model not ready, skipping embedding.");
+        return null;
+      }
+    }
 
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/embeddings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: EMBEDDING_MODEL, prompt: text }),
-    });
+    const res = await fetchWithTimeout(
+      `${OLLAMA_BASE_URL}/api/embeddings`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: EMBEDDING_MODEL, prompt: text }),
+      }
+    );
 
-    if (!res.ok) throw new Error(`Ollama API error: ${res.statusText}`);
+    if (!res.ok) throw new Error(`Ollama API error: ${res.status} ${res.statusText}`);
 
     const data = await res.json();
+    if (!data.embedding || !Array.isArray(data.embedding) || data.embedding.length === 0) {
+      throw new Error("Ollama returned empty or invalid embedding");
+    }
     return data.embedding;
   } catch (err) {
     console.error(`[OllamaEmbedding] Error:`, err.message);
     lastError = err.message;
-    return null;
+    return null;  // ← Always null on failure — never fake vectors
   }
 };
 
+/**
+ * Batch embedding — sequential to avoid overloading Ollama.
+ * Returns null for any item that fails.
+ */
 export const getEmbeddingBatch = async (texts) => {
-  const results = await Promise.allSettled(texts.map((t) => getEmbedding(t)));
-  return results.map((r) => (r.status === "fulfilled" ? r.value : null));
+  const results = [];
+  for (const t of texts) {
+    results.push(await getEmbedding(t));
+  }
+  return results;
 };
 
 export { EMBEDDING_MODEL, OLLAMA_BASE_URL };

@@ -66,7 +66,13 @@ export interface IUser {
   _id?: string;
 
   organization_id: IOrganization;
-  role_id: IRole;
+  branch_id?: any;
+  branchId?: string;
+  branchName?: string;
+  user_type?: string;
+  role_id?: IRole | string;
+  role?: string;
+  roleName?: string;
 
   name: string;
   email: string;

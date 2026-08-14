@@ -1,58 +1,88 @@
-import { useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchTickets,
-  fetchUserTickets,
-  createTicket,
-  closeTicket,
-  fetchTicketStats,
-} from "@/store/ticketSlice";
-import type { RootState, AppDispatch } from "@/store/store";
+import { useCallback, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { TicketAPI } from "@/api/ticket.api.js";
+import { useAuthContext } from "@/context/AuthContext";
 
 export function useTickets() {
-  const dispatch = useDispatch<AppDispatch>();
-  const { tickets, stats, loading, creating, error } = useSelector(
-    (state: RootState) => state.ticket
-  );
-  const { user } = useSelector((state: RootState) => state.user);
+  const queryClient = useQueryClient();
+  const { user } = useAuthContext();
+  const [params, setParams] = useState<Record<string, string> | undefined>(undefined);
+  const [loadType, setLoadType] = useState<"user" | "all" | null>(null);
+
+  const { data: ticketsData, isLoading: ticketsLoading, error: ticketsError } = useQuery({
+    queryKey: ["tickets", loadType, user?._id, params],
+    queryFn: async () => {
+      if (loadType === "user" && user?._id) {
+        const res = await TicketAPI.getByUser(user._id);
+        return res.data?.data || res.data;
+      } else if (loadType === "all") {
+        const res = await TicketAPI.getAll(params);
+        return res.data?.data || res.data;
+      }
+      return [];
+    },
+    enabled: loadType !== null,
+  });
+
+  const { data: statsData } = useQuery({
+    queryKey: ["tickets", "stats"],
+    queryFn: async () => {
+      const res = await TicketAPI.getStats();
+      return res.data?.data || res.data;
+    },
+    enabled: false, // only fetch if loadStats is called, though ideally this would just be a separate query. For now we mimic the old behavior.
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => TicketAPI.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: (ticketId: string) => TicketAPI.close(ticketId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+  });
 
   const loadUserTickets = useCallback(() => {
-    if (user?._id) {
-      dispatch(fetchUserTickets(user._id));
-    }
-  }, [dispatch, user]);
+    setLoadType("user");
+  }, []);
 
   const loadAllTickets = useCallback(
-    (params?: Record<string, string>) => {
-      dispatch(fetchTickets(params));
+    (newParams?: Record<string, string>) => {
+      setParams(newParams);
+      setLoadType("all");
     },
-    [dispatch]
+    []
   );
 
   const addTicket = useCallback(
-    (data: any) => {
-      return dispatch(createTicket(data));
+    async (data: any) => {
+      return createMutation.mutateAsync(data);
     },
-    [dispatch]
+    [createMutation]
   );
 
   const endTicket = useCallback(
-    (ticketId: string) => {
-      return dispatch(closeTicket(ticketId));
+    async (ticketId: string) => {
+      return closeMutation.mutateAsync(ticketId);
     },
-    [dispatch]
+    [closeMutation]
   );
 
   const loadStats = useCallback(() => {
-    dispatch(fetchTicketStats());
-  }, [dispatch]);
+    queryClient.fetchQuery({ queryKey: ["tickets", "stats"] });
+  }, [queryClient]);
 
   return {
-    tickets,
-    stats,
-    loading,
-    creating,
-    error,
+    tickets: ticketsData || [],
+    stats: statsData || null,
+    loading: ticketsLoading,
+    creating: createMutation.isPending,
+    error: ticketsError ? (ticketsError as Error).message : null,
     loadUserTickets,
     loadAllTickets,
     addTicket,

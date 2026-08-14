@@ -10,13 +10,14 @@ export const STORAGE_KEYS = {
   USER: "auth_user",
   ROLE_ID: "auth_role_id",
   ROLE: "auth_role",
-  PERMISSIONS: "auth_permissions",
   ORG_ID: "auth_org_id",
   ORG_SETTINGS: "auth_org_settings",
+  BRANCH_ID: "auth_branch_id",
   NAME: "auth_name",
   EMAIL: "auth_email",
   STATUS: "auth_status",
   SELECTED_TENANT: "selected_tenant_id",
+  SELECTED_BRANCH: "selected_branch_id",
 } as const;
 
 // ── Safe read / write (guards against SSR & private mode) ──────────
@@ -57,7 +58,6 @@ export interface SessionUser {
   roles?: string[];
   organization_id: string | { _id: string; name: string };
   organizationId?: string;
-  permissions?: string[];
   [key: string]: any;
 }
 
@@ -77,7 +77,7 @@ export interface SessionData {
 }
 
 /**
- * Extract the discrete identifiers (user_id, role_id, permissions, org_id, etc.) from a
+ * Extract the discrete identifiers (user_id, role_id, org_id, etc.) from a
  * user object so each is stored under its own localStorage key and remains
  * visible/debuggable.
  */
@@ -85,16 +85,15 @@ function extractSessionFields(user: any): {
   userId: string;
   roleId: string;
   role: string;
-  permissions: string[];
   orgId: string;
+  branchId: string;
   name: string;
   email: string;
   status: string;
 } {
   const userId = user._id || user.userId || "";
-  const roleId = user.role_id?._id || user.role_id || "";
-  const role = user.roleName || user.role_id?.role_name || "";
-  const permissions = user.permissions || user.role_id?.permissions || [];
+  const role = user.role || user.roleName || user.role_id?.role_name || "";
+  const roleId = user.role_id?._id || user.role_id || role || "";
   
   const orgObj =
     typeof user.organization_id === "object"
@@ -102,6 +101,7 @@ function extractSessionFields(user: any): {
       : { _id: user.organization_id, name: user.orgName };
 
   const orgId = orgObj?._id || user.organizationId || "";
+  const branchId = user.branch_id?._id || user.branchId || user.branch_id || "";
   const name = user.name || "";
   const email = user.email || "";
   const status = user.status || "";
@@ -110,8 +110,8 @@ function extractSessionFields(user: any): {
     userId: String(userId),
     roleId: String(roleId),
     role,
-    permissions,
     orgId: String(orgId),
+    branchId: String(branchId),
     name,
     email,
     status,
@@ -120,12 +120,12 @@ function extractSessionFields(user: any): {
 
 /**
  * Persist the complete session: token, refresh token, user object, and the
- * discrete user_id, role_id, permissions, org_id, etc. fields — each under its own key.
+ * discrete user_id, role_id, org_id, etc. fields — each under its own key.
  */
 export function saveSession(data: SessionData): boolean {
   const { token, refreshToken, user, orgSettings } = data;
 
-  const { userId, roleId, role, permissions, orgId, name, email, status } = extractSessionFields(user);
+  const { userId, roleId, role, orgId, branchId, name, email, status } = extractSessionFields(user);
 
   const ok =
     safeSetItem(STORAGE_KEYS.TOKEN, token) &&
@@ -134,8 +134,8 @@ export function saveSession(data: SessionData): boolean {
     safeSetItem(STORAGE_KEYS.USER, user) &&
     safeSetItem(STORAGE_KEYS.ROLE_ID, roleId) &&
     safeSetItem(STORAGE_KEYS.ROLE, role) &&
-    safeSetItem(STORAGE_KEYS.PERMISSIONS, permissions) &&
     safeSetItem(STORAGE_KEYS.ORG_ID, orgId) &&
+    safeSetItem(STORAGE_KEYS.BRANCH_ID, branchId) &&
     safeSetItem(STORAGE_KEYS.NAME, name) &&
     safeSetItem(STORAGE_KEYS.EMAIL, email) &&
     safeSetItem(STORAGE_KEYS.STATUS, status);
@@ -157,8 +157,8 @@ export function getSessionMeta() {
     userId: safeGetItem<string>(STORAGE_KEYS.USER_ID, ""),
     roleId: safeGetItem<string>(STORAGE_KEYS.ROLE_ID, ""),
     role: safeGetItem<string>(STORAGE_KEYS.ROLE, ""),
-    permissions: safeGetItem<string[]>(STORAGE_KEYS.PERMISSIONS, []),
     orgId: safeGetItem<string>(STORAGE_KEYS.ORG_ID, ""),
+    branchId: safeGetItem<string>(STORAGE_KEYS.BRANCH_ID, ""),
     name: safeGetItem<string>(STORAGE_KEYS.NAME, ""),
     email: safeGetItem<string>(STORAGE_KEYS.EMAIL, ""),
     status: safeGetItem<string>(STORAGE_KEYS.STATUS, ""),

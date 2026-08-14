@@ -163,7 +163,7 @@ export default function RolePermissionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Role Permissions</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold ">Role Permissions</h1>
         <p className="text-muted-foreground text-sm">
           Assign granular permissions to each role. Changes take effect immediately for members.
         </p>
@@ -314,7 +314,7 @@ export default function RolePermissionsPage() {
                         <div key={cat.module} className="rounded-xl border dark:border-white/[0.06] overflow-hidden">
                           <div className="flex items-center justify-between px-4 py-3 bg-muted/30">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              <span className="text-xs font-semibold uppercase  text-muted-foreground">
                                 {cat.module}
                               </span>
                               <Badge variant="outline" className="text-[10px]">

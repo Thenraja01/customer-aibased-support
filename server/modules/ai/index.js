@@ -26,5 +26,6 @@ export { default as AIFeedback } from "./schemas/aiFeedback.schema.js";
 export { default as AIUsage } from "./schemas/aiUsage.schema.js";
 export { default as BackgroundJob } from "./schemas/backgroundJob.schema.js";
 export { default as softDeletePlugin } from "./schemas/softDelete.plugin.js";
+export { default as AIConfig } from "./schemas/aiConfig.schema.js";
 
 export { aiRouter } from "./ai.route.js";

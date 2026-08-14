@@ -66,6 +66,7 @@ declare module "@/api/auth.api.js" {
 
 declare module "@/api/axiosInstance" {
   const AxiosInstance: any;
+  export const AUTH_TOKEN_EVENT: string;
   export default AxiosInstance;
 }
 
@@ -87,8 +88,4 @@ declare module "@/api/ticket.api" {
 
 declare module "@/api/notification.api" {
   export const NotificationAPI: any;
-}
-
-declare module "@/api/admin.api" {
-  export const AdminAPI: any;
 }

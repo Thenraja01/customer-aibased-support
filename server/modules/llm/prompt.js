@@ -1,4 +1,60 @@
 import * as organizationService from "../organization/organization.service.js";
+import Faq from "../faq/faq.schema.js";
+import KnowledgeGap from "../knowledge-gap/knowledgeGap.schema.js";
+import User from "../user/user.schema.js";
+import { extractKeywords } from "../rag/rag.service.js";
+
+const FAQ_STOP_WORDS = new Set(["the", "a", "an", "is", "are", "was", "were", "in", "on", "at", "to", "for", "of", "and", "or", "but", "i", "my", "me", "you", "do", "does", "how", "what", "can", "please"]);
+
+const scoreFaqMatch = (queryKeywords, faq) => {
+  const q = (faq.question || "").toLowerCase();
+  const a = (faq.answer || "").toLowerCase();
+  let score = 0;
+  for (const kw of queryKeywords) {
+    const lowerKw = kw.toLowerCase();
+    if (q.includes(lowerKw)) score += 2;
+    else if (a.includes(lowerKw)) score += 1;
+  }
+  return queryKeywords.length ? score / queryKeywords.length : 0;
+};
+
+const getRelevantFaqs = async (organizationId, query, limit = 4) => {
+  // BUG FIX: threshold raised from 0.3 to FAQ_MIN_SCORE env var (default 0.6)
+  const FAQ_MIN_SCORE = Number(process.env.FAQ_MIN_SCORE) || 0.6;
+  try {
+    const faqs = await Faq.find({ organization_id: organizationId, is_active: true, status: "approved" })
+      .select("question answer category")
+      .lean();
+    if (!faqs.length) return [];
+    const keywords = extractKeywords(query);
+    return faqs
+      .map((f) => ({ ...f, score: scoreFaqMatch(keywords, f) }))
+      .filter((f) => f.score >= FAQ_MIN_SCORE)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+};
+
+const getKnowledgeGapHints = async (organizationId, query, limit = 3) => {
+  try {
+    const keywords = extractKeywords(query);
+    const gaps = await KnowledgeGap.find({ organization_id: organizationId, status: { $in: ["open", "reviewing"] } })
+      .sort({ frequency: -1 })
+      .select("query topic frequency resolution_note")
+      .lean();
+    if (!gaps.length) return [];
+    return gaps
+      .filter((g) => {
+        const lowerQ = g.query.toLowerCase();
+        return keywords.some((kw) => lowerQ.includes(kw.toLowerCase()));
+      })
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+};
 
 export const SYSTEM_PROMPT = `You are an expert AI Customer Support Assistant for {{ORGANIZATION_NAME}}.
 
@@ -27,20 +83,27 @@ Never mention internal implementation details such as RAG, vector search, embedd
 PRIORITY OF INFORMATION
 ==================================================
 
-Use information in the following priority order:
+Use information in the following strict priority order:
 
-1. System Instructions
+1. System Instructions and Retrieval Priority constraints
 2. Current User Question
-3. Conversation History
-4. Retrieved Knowledge Base Documents
-5. User Memory
-6. General Knowledge
+3. Tenant-specific retrieved documents (approved, matching the user's organization)
+4. Documents matching the user's role
+5. Relevant FAQs from the organization's FAQ database
+6. Conversation History
+7. User Memory
+
+IMPORTANT: General knowledge is NOT in this list.
+If the organization has a knowledge base (indicated by a "RETRIEVAL PRIORITY" section below),
+you MUST answer ONLY from retrieved documents, FAQs, and conversation context.
+Never supplement or replace company documentation with general knowledge.
 
 If multiple sources conflict:
 
 - Follow the highest priority source.
 - Prefer newer conversation context over older messages.
 - Prefer official documentation over assumptions.
+- NEVER prefer general knowledge over retrieved company documentation.
 
 ==================================================
 KNOWLEDGE BASE USAGE
@@ -48,9 +111,10 @@ KNOWLEDGE BASE USAGE
 
 The Knowledge Base contains official company information.
 
-When answering:
+When answering the CURRENT USER QUESTION:
 
-- Use retrieved documents as the primary source.
+- Use retrieved documents as the primary source. They contain the ground truth for the current query.
+- Even if Conversation History shows previous "couldn't find" responses for similar queries, you MUST use the Retrieved Documents for the current question if they are relevant.
 - Combine information from multiple documents when appropriate.
 - Summarize instead of copying large passages.
 - Explain information naturally.
@@ -59,6 +123,45 @@ When answering:
 Never quote large document sections verbatim.
 
 If documentation contains multiple relevant pieces, merge them into one coherent answer.
+
+==================================================
+CURRENT USER PROFILE
+==================================================
+
+A "CURRENT USER PROFILE" section may contain the user's name, email, phone, role, and organization details.
+
+Use this information to:
+
+- Personalize the response (address the user by name naturally when appropriate).
+- Tailor detail levels to the user's role (e.g., internal staff vs. external customer).
+- Provide organization-specific context when relevant.
+
+Never expose the raw profile data or mention that profile fields were provided.
+
+==================================================
+RELEVANT FAQS
+==================================================
+
+A "RELEVANT FAQS" section contains approved Q&A pairs from the organization's FAQ knowledge base.
+
+When answering:
+
+- Prefer FAQ answers when they directly address the user's question.
+- Blend FAQ content naturally into your response; do not read the FAQ verbatim.
+- Do not mention that you retrieved from a FAQ.
+
+==================================================
+KNOWN KNOWLEDGE GAPS
+==================================================
+
+A "KNOWN KNOWLEDGE GAPS" section lists questions that the organization could not previously answer (unresolved gaps) and their frequency.
+
+Use this section to:
+
+- Recognize when the current question matches a known gap.
+- Be honest that the information is not currently available in the knowledge base.
+- Suggest contacting support for the specific topic instead of fabricating an answer.
+- Never reveal that a "knowledge gap" tracking system exists; simply state the information isn't available.
 
 ==================================================
 WHEN INFORMATION IS NOT FOUND
@@ -271,14 +374,14 @@ IF NO DOCUMENTS ARE RETRIEVED
 
 If the "RELEVANT DOCUMENTS" section says "No relevant company documentation was found" or "Access Restricted":
 - You must NOT fabricate policies, procedures, or company-specific information.
-- Do NOT use general knowledge to answer questions about company-specific policies, pricing, or internal procedures.
-- Respond with: "I couldn't find information available for your role or in the approved knowledge base. Please contact your administrator or support team if you need access to additional resources."
-- If the question is about general topics (not company-specific), you may use general knowledge.
+- Do NOT use general knowledge to answer questions about company-specific policies, pricing, features, or internal procedures.
+- If a "RETRIEVAL PRIORITY" section exists saying the organization HAS a knowledge base, you MUST NOT fall back to general knowledge for ANY topic. Respond ONLY from retrieved documents.
+- Respond with: "I couldn't find that information in our approved documentation. Would you like me to create a support ticket, or can I help you with something else?"
 - Never reveal that role-based access controls exist. Simply state that the information isn't available.
 
-Rely on conversation context and general knowledge only when it does not conflict with company-specific information.
-
 If the answer depends on company policy and no documentation is available, state that you don't have enough information rather than guessing.
+
+Do NOT use general knowledge as a substitute for company documentation that should exist but was not retrieved.
 
 ==================================================
 ANSWER TEMPLATE
@@ -317,11 +420,35 @@ Never fabricate company-specific information.
 
 Always prioritize being accurate, helpful, and trustworthy.`;
 
-export const buildPrompt = async ({ systemPrompt, organizationId, conversationContext, memoryContext, ragContext, userMessage }) => {
+/**
+ * Build the full LLM prompt.
+ *
+ * BUG FIX: accepts pre-loaded `organization` object to avoid an extra DB call
+ * on every message (aiChat.service.js already fetches the org).
+ * Falls back to DB lookup only if `organization` is not provided.
+ */
+export const buildPrompt = async ({
+  systemPrompt,
+  organizationId,
+  organization,
+  orgHasKnowledgeBase,       // ← true if org has any approved docs
+  conversationContext,
+  memoryContext,
+  ragContext,
+  userMessage,
+  userId,
+  userProfile,
+  faqContext,
+  knowledgeGapContext,
+}) => {
   let orgName = "your organization";
   let customPrompt = null;
-  
-  if (organizationId) {
+
+  // Use pre-loaded org if available, otherwise fetch from DB
+  if (organization) {
+    if (organization.name) orgName = organization.name;
+    if (organization.customPrompt) customPrompt = organization.customPrompt;
+  } else if (organizationId) {
     try {
       const org = await organizationService.getOrganizationById(organizationId);
       if (org?.name) orgName = org.name;
@@ -329,9 +456,30 @@ export const buildPrompt = async ({ systemPrompt, organizationId, conversationCo
     } catch {}
   }
 
-  const prompt = (customPrompt || systemPrompt || SYSTEM_PROMPT).replace("{{ORGANIZATION_NAME}}", orgName);
+  const prompt = (customPrompt || systemPrompt || SYSTEM_PROMPT).replace(
+    "{{ORGANIZATION_NAME}}",
+    orgName
+  );
 
   const parts = [prompt];
+
+  // Priority 5: When org has a knowledge base, inject a hard constraint
+  // that prevents the LLM from falling back to general knowledge.
+  if (orgHasKnowledgeBase) {
+    parts.push(
+      "\n\n=== RETRIEVAL PRIORITY ===\n" +
+      "This organization HAS an approved knowledge base.\n" +
+      "You MUST answer EXCLUSIVELY from the retrieved documents, FAQs, and conversation context below.\n" +
+      "Do NOT use general knowledge, assumptions, or external information for ANY topic.\n" +
+      "If the retrieved documents do not contain the answer, state clearly:\n" +
+      '"I could not find that information in our approved documentation. Would you like me to create a support ticket or connect you with a human agent?"\n' +
+      "Never fabricate company-specific information even if you \"think\" you know the answer from general training data."
+    );
+  }
+
+  if (userProfile) {
+    parts.push("\n\n=== CURRENT USER PROFILE ===\n" + userProfile);
+  }
 
   if (conversationContext) {
     parts.push("\n\n=== RECENT CONVERSATION ===\n" + conversationContext);
@@ -339,6 +487,14 @@ export const buildPrompt = async ({ systemPrompt, organizationId, conversationCo
 
   if (memoryContext) {
     parts.push("\n\n=== USER CONTEXT ===\n" + memoryContext);
+  }
+
+  if (faqContext) {
+    parts.push("\n\n=== RELEVANT FAQS ===\n" + faqContext);
+  }
+
+  if (knowledgeGapContext) {
+    parts.push("\n\n=== KNOWN KNOWLEDGE GAPS ===\n" + knowledgeGapContext);
   }
 
   parts.push(
@@ -351,3 +507,33 @@ export const buildPrompt = async ({ systemPrompt, organizationId, conversationCo
 
   return parts.join("\n");
 };
+
+export const buildUserProfile = (user, organization) => {
+  if (!user) return null;
+  const lines = [
+    `Name: ${user.name || "Not provided"}`,
+    `Email: ${user.email || "Not provided"}`,
+    `Role: ${user.roleName || user.role || "Unknown"}`,
+    `Organization: ${organization?.name || "Unknown"}`,
+  ];
+  if (user.phone) lines.push(`Phone: ${user.phone}`);
+  if (organization?.address) lines.push(`Organization Address: ${organization.address}`);
+  if (organization?.email) lines.push(`Organization Email: ${organization.email}`);
+  return lines.join("\n");
+};
+
+export const buildFaqContext = (faqs) => {
+  if (!faqs || faqs.length === 0) return null;
+  return faqs
+    .map((f) => `Q: ${f.question}\nA: ${f.answer}`)
+    .join("\n\n");
+};
+
+export const buildKnowledgeGapContext = (gaps) => {
+  if (!gaps || gaps.length === 0) return null;
+  return gaps
+    .map((g) => `- Topic: ${g.topic} | Question: ${g.query} | Frequency: ${g.frequency}`)
+    .join("\n");
+};
+
+export { getRelevantFaqs, getKnowledgeGapHints };

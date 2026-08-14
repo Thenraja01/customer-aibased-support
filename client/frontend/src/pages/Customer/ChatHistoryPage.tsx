@@ -1,53 +1,32 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { ChatAPI } from "@/api";
-import { MessageSquare, Clock, Trash2, Eye, Search, Loader2 } from "lucide-react";
+import { useGlobalChat } from "@/context/ChatContext";
+import { MessageSquare, Clock, Trash2, Eye, Search, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-
-interface Chat {
-  _id: string;
-  topic: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
 
 export default function ChatHistoryPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  const { chats, loading, loadUserChats, deleteChat } = useGlobalChat();
+  
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    loadChats();
-  }, [user]);
-
-  const loadChats = async () => {
-    if (!user?._id) return;
-    setLoading(true);
-    try {
-      const res = await ChatAPI.getByUser(user._id);
-      if (res.data.success) {
-        setChats(res.data.data);
-      }
-    } catch {
-      toast.error("Error", "Failed to load chat history. Please try again.");
-    } finally {
-      setLoading(false);
+    if (user?._id) {
+      loadUserChats();
     }
-  };
+  }, [user?._id, loadUserChats]);
 
   const handleDelete = useCallback(async (chatId: string) => {
     setDeleting(chatId);
     try {
-      await ChatAPI.delete(chatId);
-      setChats((prev) => prev.filter((chat) => chat._id !== chatId));
+      await deleteChat(chatId);
       toast.success("Chat Deleted", "The conversation has been removed.");
     } catch {
       toast.error("Error", "Failed to delete chat. Please try again.");
@@ -55,7 +34,7 @@ export default function ChatHistoryPage() {
       setDeleting(null);
       setConfirmDelete(null);
     }
-  }, [toast]);
+  }, [deleteChat, toast]);
 
   const filtered = search
     ? chats.filter((c) => c.topic?.toLowerCase().includes(search.toLowerCase()))
@@ -87,10 +66,10 @@ export default function ChatHistoryPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Chat History</h1>
+          <h1 className="text-2xl font-bold ">Chat History</h1>
           <p className="text-sm text-muted-foreground mt-1">View and manage your past conversations with the AI assistant.</p>
         </div>
-        <Button onClick={() => navigate("/chat")} size="sm">Start New Chat</Button>
+        <Button onClick={() => navigate("/chat")} size="sm"><Plus size={16} className="mr-1" />Start New Chat</Button>
       </div>
 
       <div className="relative">
@@ -105,13 +84,13 @@ export default function ChatHistoryPage() {
         />
       </div>
 
-      <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden">
+      <div className="rounded-lg border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden">
         {chats.length === 0 ? (
           <div className="p-8 sm:p-12 text-center">
             <MessageSquare size={48} className="mx-auto text-muted-foreground/40 mb-4" />
             <p className="text-muted-foreground font-medium">No chat history yet.</p>
             <p className="text-xs text-muted-foreground mt-1 mb-4">Start a conversation with the AI assistant.</p>
-            <Button onClick={() => navigate("/chat")}>Start Your First Chat</Button>
+            <Button onClick={() => navigate("/chat")}><Plus size={16} className="mr-1" />Start Your First Chat</Button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 sm:p-12 text-center">

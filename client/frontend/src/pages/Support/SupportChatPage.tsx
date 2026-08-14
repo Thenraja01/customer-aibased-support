@@ -1,7 +1,8 @@
 import { useEffect, useCallback, useRef, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import type { RootState, AppDispatch } from "@/store/store";
-import { Loader2, AlertCircle } from "lucide-react";
+import { useDispatch } from "react-redux";
+import { useAuthContext } from "@/context/AuthContext";
+import type { AppDispatch } from "@/store/store";
+import { Loader2, AlertCircle, XCircle } from "lucide-react";
 import { useChat } from "@/hooks/useChat";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { setActiveChat, clearError } from "@/store/chatSlice";
@@ -13,11 +14,15 @@ import ChatInput from "@/components/chat/ChatInput";
 import TypingIndicator from "@/components/chat/TypingIndicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ChatAPI } from "@/api";
+import { useToast } from "@/components/ui/toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function SupportChatPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.user);
+  const { user, token } = useAuthContext();
   const { socket } = useSocket();
+  const queryClient = useQueryClient();
+  const toast = useToast();
 
   const {
     activeChat,
@@ -29,7 +34,6 @@ export default function SupportChatPage() {
     error,
     loadUserChats,
     startNewChat,
-    sendWithAI,
     resetMessages,
   } = useChat();
 
@@ -37,6 +41,15 @@ export default function SupportChatPage() {
   const { containerRef, handleScroll } = useChatScroll(messages);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+
+  // Streaming & Checklist states
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [agentStatusList, setAgentStatusList] = useState<string[]>([]);
+  const [currentStatus, setCurrentStatus] = useState("");
+  const [streamingCitations, setStreamingCitations] = useState<any[]>([]);
+  const [pendingConfirm, setPendingConfirm] = useState<any | null>(null);
+  const [lastUserMessage, setLastUserMessage] = useState("");
 
   useEffect(() => {
     dispatch(setActiveChat(null));
@@ -68,6 +81,93 @@ export default function SupportChatPage() {
     }
   }, [error, dispatch]);
 
+  // Handle SSE response stream
+  const handleSend = useCallback(
+    async (text: string, actionConfirmObj: any = null) => {
+      if (!text.trim()) return;
+      if (!activeChat?._id || !user?._id || isStreaming) {
+        toast.warning("Warning", "Please wait for the current message to complete");
+        return;
+      }
+
+      setLastUserMessage(text);
+      setIsStreaming(true);
+      setStreamingText("");
+      setAgentStatusList([]);
+      setCurrentStatus("Analyzing question");
+      setStreamingCitations([]);
+      setPendingConfirm(null);
+
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3030";
+        const baseUrl = backendUrl.endsWith("/") ? backendUrl.slice(0, -1) : backendUrl;
+
+        const response = await fetch(`${baseUrl}/chats/ai/stream`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            chatId: activeChat._id,
+            message: text,
+            actionConfirm: actionConfirmObj
+          })
+        });
+
+        if (!response.body) {
+          throw new Error("No response stream body available.");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const sseData = line.startsWith("data: ") ? line.slice(6) : line;
+            if (!sseData.trim()) continue;
+
+            try {
+              const data = JSON.parse(sseData);
+              if (data.type === "status") {
+                setCurrentStatus(data.status);
+                setAgentStatusList((prev) => [...new Set([...prev, data.status])]);
+              } else if (data.type === "token") {
+                setStreamingText((prev) => prev + data.token);
+              } else if (data.type === "confirmation") {
+                setPendingConfirm(data.pendingAction);
+                setIsStreaming(false);
+                return;
+              } else if (data.type === "done") {
+                setStreamingCitations(data.citations || []);
+                queryClient.invalidateQueries({ queryKey: ["messages", activeChat._id] });
+                setIsStreaming(false);
+                setLastUserMessage("");
+                return;
+              } else if (data.type === "error") {
+                throw new Error(data.message);
+              }
+            } catch (err) {}
+          }
+        }
+      } catch (err: any) {
+        console.error("Streaming error:", err);
+        toast.error("Error", err.message || "Failed to get response");
+        setIsStreaming(false);
+      }
+    },
+    [activeChat, user, token, isStreaming, queryClient]
+  );
+
   const handleStartWithMessage = useCallback(
     async (initialMessage: string) => {
       if (!user?._id || !user?.organization_id?._id) {
@@ -75,12 +175,14 @@ export default function SupportChatPage() {
       }
       isCreatingRef.current = true;
       try {
-        const chat = await startNewChat({
+        await startNewChat({
           user_id: user._id,
           organization_id: user.organization_id._id,
           topic: initialMessage.substring(0, 50),
         });
-        await sendWithAI(chat._id, user._id, initialMessage);
+        
+        // Wait for state updates then trigger stream
+        setTimeout(() => handleSend(initialMessage), 300);
         loadUserChats();
       } catch (err) {
         console.error(err);
@@ -88,21 +190,7 @@ export default function SupportChatPage() {
         isCreatingRef.current = false;
       }
     },
-    [user, startNewChat, sendWithAI, loadUserChats]
-  );
-
-  const handleSend = useCallback(
-    async (text: string) => {
-      if (!text.trim()) return;
-      if (!activeChat?._id || !user?._id || sending || aiThinking) return;
-
-      try {
-        await sendWithAI(activeChat._id, user._id, text);
-      } catch (error) {
-        console.error(error);
-      }
-    },
-    [activeChat, user, sending, aiThinking, sendWithAI]
+    [user, startNewChat, handleSend, loadUserChats]
   );
 
   const handleEndChat = useCallback(async () => {
@@ -117,6 +205,29 @@ export default function SupportChatPage() {
     });
     setConfirmOpen(true);
   }, [activeChat, loadUserChats]);
+
+  // Combined messages to show streaming items
+  const displayMessages = [...messages];
+  if (isStreaming && lastUserMessage) {
+    displayMessages.push({
+      _id: "temp-user",
+      content: lastUserMessage,
+      is_ai: false,
+      sender_id: user?._id,
+      created_at: new Date().toISOString()
+    });
+
+    if (streamingText) {
+      displayMessages.push({
+        _id: "temp-ai",
+        content: streamingText,
+        is_ai: true,
+        sender_id: "ai",
+        created_at: new Date().toISOString(),
+        citations: streamingCitations
+      } as any);
+    }
+  }
 
   if (!activeChat && !loading) {
     return (
@@ -167,9 +278,9 @@ export default function SupportChatPage() {
                 <p className="text-sm text-muted-foreground">Loading messages...</p>
               </div>
             </div>
-          ) : messages.length === 0 ? (
+          ) : displayMessages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              {sending || aiThinking ? (
+              {isStreaming ? (
                 <TypingIndicator />
               ) : (
                 <p className="text-sm text-muted-foreground">Say hello to the AI assistant!</p>
@@ -177,19 +288,88 @@ export default function SupportChatPage() {
             </div>
           ) : (
             <div className="py-2">
-              {messages.map((msg) => (
+              {displayMessages.map((msg, idx) => (
                 <ChatMessage
-                  key={msg._id}
+                  key={msg._id || `${msg.created_at || ""}-${idx}`}
                   message={msg}
                   isOwn={msg.sender_id === user?._id}
                 />
               ))}
-              {(sending || aiThinking) && <TypingIndicator />}
+
+              {/* Agent Status Checklist */}
+              {isStreaming && (
+                <div className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl mx-auto my-3 shadow-sm border-dashed">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin text-primary" />
+                    Agent Processing States
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {[
+                      { label: "Analyzing Question", status: "Analyzing question" },
+                      { label: "Analyzing Capabilities", status: "Checking topic capabilities" },
+                      { label: "Searching Knowledge Base", status: "Searching knowledge base" },
+                      { label: "Checking Graph Relations", status: "Checking graph relationships" },
+                      { label: "Generating Response", status: "Generating response" }
+                    ].map((item, index) => {
+                      const isMatchedStatus = agentStatusList.some(s => s.toLowerCase().includes(item.status.toLowerCase())) ||
+                                              currentStatus.toLowerCase().includes(item.status.toLowerCase());
+                      const isCurrent = currentStatus.toLowerCase().includes(item.status.toLowerCase());
+
+                      return (
+                        <div key={index} className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${
+                            isCurrent ? "bg-amber-500 animate-pulse scale-125" : isMatchedStatus ? "bg-emerald-500" : "bg-slate-350 dark:bg-slate-700"
+                          }`} />
+                          <span className={isCurrent ? "font-semibold text-slate-850 dark:text-slate-100" : isMatchedStatus ? "text-slate-600 dark:text-slate-350" : "text-slate-400"}>
+                            {item.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Action Confirmation */}
+              {pendingConfirm && (
+                <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-250 dark:border-amber-900/30 rounded-2xl my-4 max-w-xl mx-auto shadow-sm space-y-3">
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs uppercase tracking-wider">
+                    <AlertCircle size={14} />
+                    Action Confirmation Required
+                  </div>
+                  <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed">
+                    {pendingConfirm.preview?.message}
+                  </p>
+                  <div className="flex items-center gap-2 justify-end pt-1">
+                    <button
+                      onClick={() => {
+                        setPendingConfirm(null);
+                        setLastUserMessage("");
+                      }}
+                      className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 text-slate-500 rounded-xl text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        const action = pendingConfirm.action;
+                        const payload = pendingConfirm.payload;
+                        setPendingConfirm(null);
+                        handleSend(lastUserMessage, { action, confirmed: true, payload });
+                      }}
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-medium shadow-sm transition-all"
+                    >
+                      Approve Action
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        <div className="border-t bg-white bg-background/80 backdrop-blur-xl shrink-0">
+        <div className="border-t bg-background/80 backdrop-blur-xl shrink-0">
           {activeChat && messages.length > 0 && (
             <div className="px-4 py-2 border-b flex gap-2">
               <button
@@ -197,13 +377,14 @@ export default function SupportChatPage() {
                 disabled={activeChat.status === "closed"}
                 className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 disabled:opacity-50 transition-colors"
               >
+                <XCircle size={14} aria-hidden="true" />
                 End Chat
               </button>
             </div>
           )}
           <ChatInput
-            onSend={handleSend}
-            disabled={sending || aiThinking || loading}
+            onSend={(text) => handleSend(text)}
+            disabled={sending || aiThinking || isStreaming || loading}
             chatId={activeChat?._id}
           />
         </div>

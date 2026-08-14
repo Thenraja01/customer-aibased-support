@@ -13,13 +13,13 @@ export default function RolesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Roles</h1>
+        <h1 className="text-3xl font-bold ">Roles</h1>
         <p className="text-muted-foreground">
           Manage access control roles for the system.
         </p>
       </div>
 
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-lg border bg-card p-5 sm:p-6">
         <RoleManager
           roles={roles}
           onCreate={createRole}

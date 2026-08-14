@@ -1,10 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import Layout from "@/layout/layout";
-import SuperAdminLayout from "@/layout/SuperAdminLayout";
-import AdminLayout from "@/layout/AdminLayout";
-import SupportLayout from "@/layout/SupportLayout";
-import BranchLayout from "@/layout/BranchLayout";
-import CustomerLayout from "@/layout/CustomerLayout";
+import AppShell from "@/layout/AppShell";
 import { publicRoutes } from "./PublicRoutes";
 import { superAdminRoutes } from "./SuperAdminRoutes";
 import { adminRoutes } from "./AdminRoutes";
@@ -22,23 +18,11 @@ export default function AppRoutes() {
         <Route path="*" element={<NotFound />} />
       </Route>
 
-      <Route element={<SuperAdminLayout />}>
+      <Route element={<AppShell />}>
         {superAdminRoutes}
-      </Route>
-
-      <Route element={<AdminLayout />}>
         {adminRoutes}
-      </Route>
-
-      <Route element={<SupportLayout />}>
         {supportRoutes}
-      </Route>
-
-      <Route element={<BranchLayout />}>
         {branchRoutes}
-      </Route>
-
-      <Route element={<CustomerLayout />}>
         {customerRoutes}
         {profileRoute}
       </Route>

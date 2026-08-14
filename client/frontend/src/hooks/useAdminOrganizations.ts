@@ -1,86 +1,100 @@
-import { useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useCallback, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminAPI } from "@/api/admin.api";
-import {
-  setOrganizations,
-  setOrgPagination,
-  setOrgUsers,
-  setOrgUserPagination,
-  setLoading,
-} from "@/store/adminSlice";
-import type { RootState, AppDispatch } from "@/store/store";
 
 export const useAdminOrganizations = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const { organizations, orgPagination, orgUsers, orgUserPagination, loading } =
-    useSelector((state: RootState) => state.admin);
+  const queryClient = useQueryClient();
+  const [params, setParams] = useState<{ page?: number; limit?: number; search?: string } | undefined>(undefined);
+  const [shouldFetch, setShouldFetch] = useState(false);
+
+  const [orgUsersParams, setOrgUsersParams] = useState<{ orgId: string; page?: number; limit?: number } | null>(null);
+
+  const { data: orgsData, isLoading: orgsLoading } = useQuery({
+    queryKey: ["adminOrganizations", params],
+    queryFn: async () => {
+      const res = await AdminAPI.getOrganizations(params);
+      return res.data;
+    },
+    enabled: shouldFetch,
+  });
+
+  const { data: orgUsersData, isLoading: orgUsersLoading } = useQuery({
+    queryKey: ["adminOrgUsers", orgUsersParams],
+    queryFn: async () => {
+      if (!orgUsersParams) return null;
+      const { orgId, ...rest } = orgUsersParams;
+      const res = await AdminAPI.getOrgUsers(orgId, rest);
+      return res.data;
+    },
+    enabled: orgUsersParams !== null,
+  });
+
+  const createOrgMutation = useMutation({
+    mutationFn: (data: any) => AdminAPI.createOrganization(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminOrganizations"] });
+    },
+  });
+
+  const updateOrgMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => AdminAPI.updateOrganization(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminOrganizations"] });
+    },
+  });
+
+  const deleteOrgMutation = useMutation({
+    mutationFn: (id: string) => AdminAPI.deleteOrganization(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminOrganizations"] });
+    },
+  });
 
   const fetchOrganizations = useCallback(
-    async (params?: { page?: number; limit?: number; search?: string }) => {
-      dispatch(setLoading(true));
-      try {
-        const res = await AdminAPI.getOrganizations(params);
-        if (res.data.success) {
-          dispatch(setOrganizations(res.data.data));
-          dispatch(setOrgPagination(res.data.pagination));
-        }
-      } catch (error) {
-        console.error("Failed to fetch organizations", error);
-      } finally {
-        dispatch(setLoading(false));
-      }
+    async (newParams?: { page?: number; limit?: number; search?: string }) => {
+      setParams(newParams);
+      setShouldFetch(true);
     },
-    [dispatch]
+    []
+  );
+
+  const fetchOrgUsers = useCallback(
+    async (orgId: string, params?: { page?: number; limit?: number }) => {
+      setOrgUsersParams({ orgId, ...params });
+    },
+    []
   );
 
   const createOrganization = useCallback(
     async (data: any) => {
-      const res = await AdminAPI.createOrganization(data);
+      const res = await createOrgMutation.mutateAsync(data);
       return res.data;
     },
-    []
+    [createOrgMutation]
   );
 
   const updateOrganization = useCallback(
     async (id: string, data: any) => {
-      const res = await AdminAPI.updateOrganization(id, data);
+      const res = await updateOrgMutation.mutateAsync({ id, data });
       return res.data;
     },
-    []
+    [updateOrgMutation]
   );
 
-  const deleteOrganization = useCallback(async (id: string) => {
-    const res = await AdminAPI.deleteOrganization(id);
-    return res.data;
-  }, []);
-
-  const fetchOrgUsers = useCallback(
-    async (
-      orgId: string,
-      params?: { page?: number; limit?: number }
-    ) => {
-      dispatch(setLoading(true));
-      try {
-        const res = await AdminAPI.getOrgUsers(orgId, params);
-        if (res.data.success) {
-          dispatch(setOrgUsers(res.data.data));
-          dispatch(setOrgUserPagination(res.data.pagination));
-        }
-      } catch (error) {
-        console.error("Failed to fetch org users", error);
-      } finally {
-        dispatch(setLoading(false));
-      }
+  const deleteOrganization = useCallback(
+    async (id: string) => {
+      const res = await deleteOrgMutation.mutateAsync(id);
+      return res.data;
     },
-    [dispatch]
+    [deleteOrgMutation]
   );
 
   return {
-    organizations,
-    orgPagination,
-    orgUsers,
-    orgUserPagination,
-    loading,
+    organizations: orgsData?.success ? orgsData.data : [],
+    orgPagination: orgsData?.success ? orgsData.pagination : null,
+    orgUsers: orgUsersData?.success ? orgUsersData.data : [],
+    orgUserPagination: orgUsersData?.success ? orgUsersData.pagination : null,
+    loading: orgsLoading || orgUsersLoading,
     fetchOrganizations,
     createOrganization,
     updateOrganization,

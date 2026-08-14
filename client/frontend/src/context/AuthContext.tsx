@@ -1,79 +1,90 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
-import { useDispatch } from "react-redux";
-import { setUser as setReduxUser, logout as reduxLogout } from "@/store/slices";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from "react";
 import { AuthAPI } from "@/api/auth.api.js";
-import { AdminAPI } from "@/api/admin.api.js";
+import { AdminAPI } from "@/api";
 import { UsersAPI } from "@/api/user.api.js";
 import { requestForToken } from "@/config/firebase";
+import { AUTH_TOKEN_EVENT } from "@/api/axiosInstance";
 import { fetchTenantSettings, applyBrandColors } from "@/hooks/useTenant";
-import { getSessionMeta, saveSession, clearSession, safeSetItem, safeGetItem, STORAGE_KEYS } from "@/utils/localStorage";
+import {
+  safeGetItem,
+  safeSetItem,
+  saveSession,
+  clearSession,
+  getUserFromStorage,
+  getTokenFromStorage,
+} from "@/utils/localStorage";
 
 interface AuthContextType {
   user: any;
   token: string | null;
+  refreshToken: string | null;
   orgSettings: any;
   setOrgSettings: (settings: any) => void;
   tenant: any;
   tenantLoading: boolean;
   loading: boolean;
+  isAuthenticated: boolean;
   authError: string | null;
   login: (email: string, password: string, organizationId?: string) => Promise<boolean>;
   loginWithOrg: (email: string, password: string, organizationId: string) => Promise<boolean>;
+  setSession: (data: any) => boolean;
   logout: () => void;
-  setSession: (userData: any, authToken: string, refreshToken?: string) => boolean;
-  isAuthenticated: boolean;
-  /** Check if the current user has a permission (or wildcard). */
-  can: (permission: string) => boolean;
-  /** Check if the current user has ANY of the given permissions. */
-  canAny: (permissions: string[]) => boolean;
-  /** Check if the current user has ALL of the given permissions. */
-  canAll: (permissions: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+/**
+ * Normalize the backend user into a stable shape the UI can rely on:
+ *   - `roles[]` — role names (e.g. ["Admin"])
+ *   - `roleName` — primary role name (roles[0])
+ *   - `role_id` — legacy single-role field, kept for backward compatibility
+ */
 function normalizeUser(user: any) {
   if (!user) return null;
-  const normalized = { ...user, _id: user._id || user.id };
-  if (typeof normalized.role_id === "object" && normalized.role_id?.role_name) {
-    normalized.role_id = {
-      ...normalized.role_id,
-      role_name: normalized.role_id.role_name.toLowerCase().replace(/\s+/g, "_"),
+  const roles = Array.isArray(user.roles)
+    ? user.roles.map((r: any) =>
+        typeof r === "string" ? r : r?.role_name || r?.name || ""
+      ).filter(Boolean)
+    : [];
+  const primaryRole = roles[0] || null;
+
+  const normalized: any = {
+    ...user,
+    _id: user._id || user.id || user.userId,
+    userId: user.userId || user._id || user.id,
+    roles,
+    roleName: user.roleName || primaryRole || null,
+  };
+
+  if (primaryRole) {
+    normalized.role_id = normalized.role_id || {
+      _id: user.roleIds?.[0] || null,
+      role_name: primaryRole.toLowerCase().replace(/\s+/g, "_"),
     };
   }
+
   return normalized;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const dispatch = useDispatch();
   const isMountedRef = useRef(true);
   const isCreatingRef = useRef(false);
 
-  // Initialize from localStorage instead of state
-  const sessionMeta = getSessionMeta();
-  const [token, setToken] = useState<string | null>(sessionMeta.token || null);
-  const [user, setUser] = useState<any>(sessionMeta.user || null);
-  const isAuthenticated = !!token && !!user;
-
-  // Permission helpers
-  const can = useCallback((permission: string): boolean => {
-    if (!user) return false;
-    const perms = user.permissions || [];
-    return perms.includes("*") || perms.includes(permission);
-  }, [user]);
-
-  const canAny = useCallback((permissions: string[]): boolean => {
-    return permissions.some(can);
-  }, [can]);
-
-  const canAll = useCallback((permissions: string[]): boolean => {
-    return permissions.every(can);
-  }, [can]);
-
-  const [orgSettings, setOrgSettings] = useState<any>(sessionMeta.orgSettings);
+  const [user, setUser] = useState<any>(() => normalizeUser(getUserFromStorage()));
+  const [orgSettings, setOrgSettings] = useState<any>(() => safeGetItem("auth_org_settings"));
+  const [token, setToken] = useState<string | null>(() => safeGetItem("auth_token"));
+  const [refreshToken, setRefreshToken] = useState<string | null>(() => safeGetItem("auth_refresh_token"));
   const [tenant, setTenant] = useState<any>(null);
-  const [tenantLoading, setTenantLoading] = useState(false); // Set to false since we're reading from localStorage
-  const [loading] = useState(false);
+  const [tenantLoading, setTenantLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,12 +94,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Keep React auth state in sync when the axios interceptor silently rotates
+  // the access token (or a failed refresh clears the session).
   useEffect(() => {
-    if (!isAuthenticated) return;
+    const handleTokenEvent = () => {
+      const freshToken = getTokenFromStorage();
+      setToken(freshToken);
+      if (freshToken) {
+        const storedUser = getUserFromStorage();
+        if (storedUser) {
+          setUser((prev: any) => normalizeUser(storedUser) || prev);
+        }
+      } else {
+        setUser(null);
+        setRefreshToken(null);
+      }
+    };
+    window.addEventListener(AUTH_TOKEN_EVENT, handleTokenEvent);
+    return () => {
+      window.removeEventListener(AUTH_TOKEN_EVENT, handleTokenEvent);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?._id) return;
 
     let isSubscribed = true;
-    const sessionMeta = getSessionMeta();
-    const orgId = sessionMeta.orgId;
+    const orgId = typeof user.organization_id === "object"
+      ? user.organization_id?._id
+      : user.organization_id;
 
     if (orgId) {
       AdminAPI.getOrgSettings()
@@ -97,38 +131,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (res?.data?.success) {
             const settings = res.data.data;
             setOrgSettings(settings);
-            saveSession({
-              token: sessionMeta.token || "",
-              refreshToken: localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN) || "",
-              user: sessionMeta.user,
-              orgSettings: settings,
-            });
+            safeSetItem("auth_org_settings", settings);
           }
         })
         .catch((error) => {
           if (isSubscribed) {
-            console.error("Failed to load org settings:", error);
+            if (import.meta.env.DEV) console.warn("Org settings unavailable:", error?.response?.status || error?.message);
           }
         });
     }
 
     requestForToken()
-      .then((fcmToken) => {
+      .then((token) => {
         if (!isSubscribed) return;
-        if (fcmToken && sessionMeta.userId) {
-          UsersAPI.updateProfile({ fcm_token: fcmToken }).catch((error) => {
-            console.error("Failed to update FCM token:", error);
+        if (token && user?._id) {
+          UsersAPI.updateProfile({ fcm_token: token }).catch((error) => {
+            if (import.meta.env.DEV) console.warn("Failed to update FCM token:", error?.message);
           });
         }
       })
       .catch((error) => {
-        console.error("Failed to request FCM token:", error);
+        if (import.meta.env.DEV) console.warn("Failed to request FCM token:", error?.message);
       });
 
     return () => {
       isSubscribed = false;
     };
-  }, [isAuthenticated]);
+  }, [user?._id]);
 
   useEffect(() => {
     if (orgSettings?.brand_colors) {
@@ -137,42 +166,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [orgSettings]);
 
   useEffect(() => {
-    if (isAuthenticated && user) {
-      dispatch(setReduxUser(user));
-    }
-  }, [isAuthenticated, user, dispatch]);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!user && orgSettings) {
       setTenantLoading(false);
       return;
     }
 
     let isSubscribed = true;
-    const sessionMeta = getSessionMeta();
-    const orgId = sessionMeta.orgId;
 
-    if (orgId) {
-      fetchTenantSettings(orgId)
-        .then((tenantData) => {
-          if (!isSubscribed) return;
-          setTenant(tenantData);
-          setTenantLoading(false);
-        })
-        .catch((error) => {
-          if (isSubscribed) {
-            console.error("Failed to load tenant settings:", error);
-            setTenantLoading(false);
+    const loadTenant = async () => {
+      try {
+        const data = await fetchTenantSettings();
+        if (!isSubscribed) return;
+        if (data) {
+          setTenant(data);
+          if (!orgSettings) {
+            setOrgSettings(data);
           }
-        });
-    } else {
-      setTenantLoading(false);
-    }
+          if (data.brand_colors) {
+            applyBrandColors(data.brand_colors);
+          }
+        }
+        setTenantLoading(false);
+      } catch (error) {
+        if (!isSubscribed) return;
+        console.error("Failed to load tenant settings:", error);
+        setTenantLoading(false);
+      }
+    };
+
+    loadTenant();
 
     return () => {
       isSubscribed = false;
     };
-  }, [isAuthenticated]);
+  }, []);
 
   const login = useCallback(async (email: string, password: string, organizationId?: string) => {
     setAuthError(null);
@@ -196,32 +227,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const normalized = normalizeUser(res.data.data);
+      const normalized = normalizeUser(res.data.data || res.data.user);
       if (!normalized) {
         setAuthError("Invalid user data received");
         return false;
       }
 
-      const tokenStr = res.data.token || res.data.accessToken;
-      const refreshTokenStr = res.data.refreshToken || "";
-      const storageOk = safeSetItem(STORAGE_KEYS.TOKEN, tokenStr)
-        && safeSetItem(STORAGE_KEYS.REFRESH_TOKEN, refreshTokenStr)
-        && safeSetItem(STORAGE_KEYS.USER, normalized);
+      const tokenStr = res.data.accessToken || res.data.token;
+      const refreshStr = res.data.refreshToken || "";
+      const storageOk = saveSession({
+        token: tokenStr,
+        refreshToken: refreshStr,
+        user: normalized,
+      });
 
       if (!storageOk) {
         setAuthError("Failed to save session data");
         return false;
       }
 
-      if (organizationId) {
-        safeSetItem(STORAGE_KEYS.SELECTED_TENANT, organizationId);
-      }
-
       if (!isMountedRef.current) return false;
 
       setToken(tokenStr);
+      setRefreshToken(refreshStr);
       setUser(normalized);
-      dispatch(setReduxUser(normalized));
 
       const orgId = typeof normalized.organization_id === "object"
         ? normalized.organization_id?._id
@@ -234,10 +263,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const settings = settingsRes.data.data;
             setOrgSettings(settings);
             setTenant(settings);
-            safeSetItem(STORAGE_KEYS.ORG_SETTINGS, settings);
+            safeSetItem("auth_org_settings", settings);
           }
-        } catch (settingsError) {
-          console.error("Failed to load org settings after login:", settingsError);
+        } catch (settingsError: any) {
+          if (import.meta.env.DEV) console.warn("Org settings unavailable after login:", settingsError?.response?.status || settingsError?.message);
         }
       }
 
@@ -250,7 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       isCreatingRef.current = false;
     }
-  }, [dispatch]);
+  }, []);
 
   const loginWithOrg = useCallback(async (email: string, password: string, organizationId: string) => {
     if (!organizationId) {
@@ -260,70 +289,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return login(email, password, organizationId);
   }, [login]);
 
-  const logout = useCallback(() => {
-    const refreshToken = safeGetItem<string>(STORAGE_KEYS.REFRESH_TOKEN);
-    if (refreshToken) {
-      AuthAPI.logout(refreshToken).catch((error) => {
-        console.error("Failed to revoke session server-side:", error);
-      });
-    }
-    clearSession();
-    setToken(null);
-    setUser(null);
-    setOrgSettings(null);
-    setTenant(null);
-    setAuthError(null);
-    dispatch(reduxLogout());
-  }, [dispatch]);
-
-  const setSession = useCallback((userData: any, authToken: string, refreshToken?: string): boolean => {
-    const normalized = normalizeUser(userData);
-    if (!normalized) {
-      setAuthError("Invalid user data");
+  /**
+   * Persist a session returned by an OAuth callback (or any flow that
+   * already produced tokens + a user object). Returns false on failure.
+   */
+  const setSession = useCallback((data: any): boolean => {
+    const tokenStr = data?.accessToken || data?.token;
+    if (!tokenStr) {
+      setAuthError("No access token in session data");
       return false;
     }
 
-    const storageOk = safeSetItem(STORAGE_KEYS.TOKEN, authToken)
-      && safeSetItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken || "")
-      && safeSetItem(STORAGE_KEYS.USER, normalized);
+    const normalized = normalizeUser(data.user || data.data);
+    if (!normalized) {
+      setAuthError("Invalid user data in session");
+      return false;
+    }
+
+    const refreshStr = data.refreshToken || "";
+    const storageOk = saveSession({
+      token: tokenStr,
+      refreshToken: refreshStr,
+      user: normalized,
+      orgSettings: data.orgSettings,
+    });
 
     if (!storageOk) {
       setAuthError("Failed to save session data");
       return false;
     }
 
-    setToken(authToken);
+    setToken(tokenStr);
+    setRefreshToken(refreshStr);
     setUser(normalized);
-    dispatch(setReduxUser(normalized));
 
     const orgId = typeof normalized.organization_id === "object"
       ? normalized.organization_id?._id
       : normalized.organization_id;
 
     if (orgId) {
-      safeSetItem(STORAGE_KEYS.SELECTED_TENANT, orgId);
+      AdminAPI.getOrgSettings()
+        .then((res) => {
+          if (res?.data?.success) {
+            const settings = res.data.data;
+            setOrgSettings(settings);
+            setTenant(settings);
+            safeSetItem("auth_org_settings", settings);
+          }
+        })
+        .catch(() => {});
     }
 
     return true;
-  }, [dispatch]);
+  }, []);
+
+  const logout = useCallback(() => {
+    try {
+      const rt = refreshToken;
+      clearSession();
+
+      if (rt) {
+        AuthAPI.logout({ refreshToken: rt }).catch(() => {
+          /* best-effort server-side session revocation */
+        });
+      }
+    } catch (error) {
+      console.error("Failed to clear localStorage during logout:", error);
+    }
+
+    setToken(null);
+    setRefreshToken(null);
+    setUser(null);
+    setOrgSettings(null);
+    setTenant(null);
+    setAuthError(null);
+  }, [refreshToken]);
+
+
 
   const value = {
     user,
     token,
+    refreshToken,
     orgSettings,
     setOrgSettings,
     tenant,
     tenantLoading,
     loading,
+    isAuthenticated: !!user && !!token,
     authError,
     login,
     loginWithOrg,
-    logout,
     setSession,
-    isAuthenticated,
-    can,
-    canAny,
-    canAll,
+    logout,
   };
 
   return (

@@ -89,11 +89,17 @@ export default function Login() {
       const { success, status: userStatus, token, data, message } = res.data;
 
       if (success && token) {
-        if (!setSession(data, token, res.data.refreshToken)) {
+        if (!setSession(res.data)) {
           setStatus({ type: "invalid_credentials" });
           return;
         }
-        navigateToDashboard(data?.role_id?.role_name);
+        navigateToDashboard(data?.role || data?.roleName);
+        return;
+      }
+
+      if (res.data.twoFactorRequired) {
+        setStatus({ type: "otp_required", email: email.trim() });
+        navigate("/verify-otp", { state: { email: email.trim(), mode: "2fa" } });
         return;
       }
 
@@ -131,10 +137,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-primary/5">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent dark:from-primary/10" />
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10 animate-pulse-glow" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-secondary/5 blur-3xl dark:bg-secondary/10 animate-pulse-glow [animation-delay:1.5s]" />
-
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
         <motion.div
           className="w-full max-w-md"

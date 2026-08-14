@@ -12,7 +12,6 @@ import {
   resolveRequestableRole,
 } from "./auth.service.js";
 import { signOAuthGrant, verifyOAuthGrant } from "./token.service.js";
-import { getUsersWithPermission, getRoleNames } from "../user-role/userRole.service.js";
 import { invalidateUserCache } from "../../middleware/auth.middleware.js";
 
 const audit = (data) => logAction(data).catch(() => {});
@@ -43,7 +42,7 @@ export const consumeOAuthState = async (provider, state) => {
 
 const notifyOrgAdmins = async (organizationId, user) => {
   try {
-    const admins = await getUsersWithPermission(organizationId, "registration.approve");
+    const admins = await User.find({ organization_id: organizationId, role: { $in: ["admin", "super_admin"] } }).lean();
     for (const admin of admins) {
       await createNotification({
         user_id: admin._id,
@@ -97,14 +96,11 @@ export const handleOAuthIdentity = async (identity, ctx = {}) => {
   }
 
   if (user) {
-    const roles = await getRoleNames(user._id, user.organization_id);
     const adminEmail = (process.env.SUPER_ADMIN_EMAIL || "superadmin@supportai.com").toLowerCase().trim();
     const isSuperAdmin =
       user.email.toLowerCase().trim() === adminEmail ||
-      roles.some((r) => {
-        const norm = String(r).toLowerCase().replace(/[\s_]+/g, "");
-        return norm.includes("superadmin") || norm.includes("admin");
-      });
+      user.role === "super_admin" ||
+      user.role === "admin";
 
     if (isSuperAdmin && user.status !== "active") {
       user.status = "active";

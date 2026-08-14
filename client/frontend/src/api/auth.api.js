@@ -314,4 +314,22 @@ export const AuthAPI = {
       throw error;
     }
   },
+
+  verify2FA: async (email, otp) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/login/verify-2fa`, { email, otp });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  request2FAOTP: async (email) => {
+    try {
+      const response = await AxiosInstance.post(`${BASE_URL}/login/request-2fa`, { email });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
 };

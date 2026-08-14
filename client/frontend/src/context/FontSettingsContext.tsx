@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { getTokenFromStorage } from "@/utils/localStorage";
 
 export type FontSize = "small" | "medium" | "large" | "x-large";
 export type FontFamily = "system" | "sans" | "serif" | "mono" | "dyslexic";
@@ -80,6 +81,40 @@ export function FontSettingsProvider({ children }: { children: ReactNode }) {
     applySettings(settings);
     saveSettings(settings);
   }, [settings]);
+
+  // Fetch settings from backend API
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSettings = async () => {
+      try {
+        const token = getTokenFromStorage();
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        
+        // This endpoint might not exist yet, so we catch errors gracefully
+        const res = await fetch('/api/settings/ui', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && isMounted) {
+            // Only update valid matching keys
+            setSettings(prev => {
+              const updated = { ...prev };
+              if (data.fontFamily) updated.fontFamily = data.fontFamily;
+              if (data.fontSize) updated.fontSize = data.fontSize;
+              if (data.lineHeight) updated.lineHeight = data.lineHeight;
+              if (data.letterSpacing !== undefined) updated.letterSpacing = data.letterSpacing;
+              return updated;
+            });
+          }
+        }
+      } catch (err) {
+        // Silently fallback to localStorage or defaults if API is unavailable
+        console.debug("Backend UI settings API unavailable, using local fallbacks.", err);
+      }
+    };
+    fetchSettings();
+    return () => { isMounted = false; };
+  }, []);
 
   const setFontSize = useCallback((fontSize: FontSize) => {
     setSettings((prev) => ({ ...prev, fontSize }));

@@ -11,6 +11,21 @@ const AxiosInstance = axios.create({
   timeout: 20000,
 });
 
+/**
+ * Broadcast whenever the stored access token changes (refresh success or
+ * logout). Consumers that read auth state outside axios (raw fetch / SSE)
+ * can subscribe and re-read the fresh token from storage.
+ */
+export const AUTH_TOKEN_EVENT = "auth:token-refreshed";
+
+const dispatchTokenEvent = () => {
+  try {
+    window.dispatchEvent(new Event(AUTH_TOKEN_EVENT));
+  } catch {
+    /* ignore */
+  }
+};
+
 let isRefreshing = false;
 let pendingQueue: Array<(token: string | null) => void> = [];
 
@@ -22,9 +37,20 @@ const flushQueue = (token: string | null) => {
 // Request interceptor — attach the current access token.
 AxiosInstance.interceptors.request.use(
   (config) => {
-    const token = safeGetItem<string>(STORAGE_KEYS.TOKEN);
+    let token = safeGetItem<string>(STORAGE_KEYS.TOKEN);
     if (token) {
+      if (typeof token === "string") {
+        token = token.replace(/^["']|["']$/g, "").trim();
+      }
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const tenantId = safeGetItem<string>(STORAGE_KEYS.ORG_ID);
+    if (tenantId) {
+      config.headers["x-tenant-id"] = tenantId;
+    }
+    const branchId = safeGetItem<string>(STORAGE_KEYS.BRANCH_ID);
+    if (branchId) {
+      config.headers["x-branch-id"] = branchId;
     }
     return config;
   },
@@ -81,6 +107,7 @@ AxiosInstance.interceptors.response.use(
           refreshToken: newRefreshToken || currentRefresh,
           user: res.data?.user || safeGetItem(STORAGE_KEYS.USER) || {},
         });
+        dispatchTokenEvent();
         flushQueue(accessToken);
 
         original.headers.Authorization = `Bearer ${accessToken}`;
@@ -107,6 +134,7 @@ function flushAndRedirect() {
   } catch {
     /* ignore */
   }
+  dispatchTokenEvent();
   if (redirected) return;
   redirected = true;
   const path = window.location.pathname;

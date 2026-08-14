@@ -1,8 +1,9 @@
 import { useEffect, useCallback, useRef, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { RootState, AppDispatch } from "@/store/store";
-import { Loader2, AlertCircle, TicketCheck } from "lucide-react";
+import type { AppDispatch } from "@/store/store";
+import { useAuthContext } from "@/context/AuthContext";
+import { Loader2, AlertCircle, TicketCheck, XCircle } from "lucide-react";
 import { useChat } from "@/hooks/useChat";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { clearError } from "@/store/chatSlice";
@@ -15,13 +16,15 @@ import ChatInput from "@/components/chat/ChatInput";
 import TypingIndicator from "@/components/chat/TypingIndicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ChatPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.user);
+  const { user, token } = useAuthContext();
   const { socket } = useSocket();
+  const queryClient = useQueryClient();
 
   const {
     activeChat,
@@ -34,7 +37,6 @@ export default function ChatPage() {
     loadUserChats,
     startNewChat,
     loadMessages,
-    sendWithAI,
     resetMessages,
     selectChat,
   } = useChat();
@@ -48,10 +50,17 @@ export default function ChatPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Check if we have a chatId from state or URL
+  // Streaming & Live agent status checklist states
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [agentStatusList, setAgentStatusList] = useState<string[]>([]);
+  const [currentStatus, setCurrentStatus] = useState("");
+  const [streamingCitations, setStreamingCitations] = useState<any[]>([]);
+  const [pendingConfirm, setPendingConfirm] = useState<any | null>(null);
+  const [lastUserMessage, setLastUserMessage] = useState("");
+
   const chatId = location.state?.chatId || new URLSearchParams(location.search).get('id');
 
-  // Load chats on mount
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -64,23 +73,19 @@ export default function ChatPage() {
     loadUserChats();
   }, [user?._id, loadUserChats]);
 
-  // Handle chat selection from URL/state
   useEffect(() => {
     if (!user?._id) return;
 
     const loadSpecificChat = async () => {
       if (chatId) {
-        // Load existing chat
         try {
           await loadMessages(chatId);
-          // The activeChat should be set by loadMessages or we need to find it
         } catch (error) {
           console.error("Failed to load chat:", error);
           toast.error("Error", "Failed to load chat");
           navigate("/chat", { replace: true });
         }
       } else {
-        // New chat - clear any existing messages
         resetMessages();
         selectChat(null);
       }
@@ -90,7 +95,6 @@ export default function ChatPage() {
     loadSpecificChat();
   }, [chatId, user?._id, loadMessages, resetMessages, selectChat, navigate]);
 
-  // Socket join/leave
   useEffect(() => {
     if (activeChat?._id && socket) {
       socket.emit("join:chat", activeChat._id);
@@ -100,14 +104,12 @@ export default function ChatPage() {
     }
   }, [activeChat?._id, socket]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       resetMessages();
     };
   }, [resetMessages]);
 
-  // Error timeout
   useEffect(() => {
     if (error) {
       const t = setTimeout(() => dispatch(clearError()), 5000);
@@ -115,10 +117,96 @@ export default function ChatPage() {
     }
   }, [error, dispatch]);
 
+  // Handle SSE response stream
+  const handleSend = useCallback(
+    async (text: string, actionConfirmObj: any = null) => {
+      if (!text.trim()) return;
+      if (!activeChat?._id || !user?._id || isStreaming) {
+        toast.warning("Warning", "Please wait for the current message to complete");
+        return;
+      }
+
+      setLastUserMessage(text);
+      setIsStreaming(true);
+      setStreamingText("");
+      setAgentStatusList([]);
+      setCurrentStatus("Analyzing question");
+      setStreamingCitations([]);
+      setPendingConfirm(null);
+
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3030";
+        const baseUrl = backendUrl.endsWith("/") ? backendUrl.slice(0, -1) : backendUrl;
+
+        const response = await fetch(`${baseUrl}/chats/ai/stream`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            chatId: activeChat._id,
+            message: text,
+            actionConfirm: actionConfirmObj
+          })
+        });
+
+        if (!response.body) {
+          throw new Error("No response stream body available.");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const sseData = line.startsWith("data: ") ? line.slice(6) : line;
+            if (!sseData.trim()) continue;
+
+            try {
+              const data = JSON.parse(sseData);
+              if (data.type === "status") {
+                setCurrentStatus(data.status);
+                setAgentStatusList((prev) => [...new Set([...prev, data.status])]);
+              } else if (data.type === "token") {
+                setStreamingText((prev) => prev + data.token);
+              } else if (data.type === "confirmation") {
+                setPendingConfirm(data.pendingAction);
+                setIsStreaming(false);
+                return;
+              } else if (data.type === "done") {
+                setStreamingCitations(data.citations || []);
+                queryClient.invalidateQueries({ queryKey: ["messages", activeChat._id] });
+                setIsStreaming(false);
+                setLastUserMessage("");
+                return;
+              } else if (data.type === "error") {
+                throw new Error(data.message);
+              }
+            } catch (err) {}
+          }
+        }
+      } catch (err: any) {
+        console.error("Streaming error:", err);
+        toast.error("Error", err.message || "Failed to get response");
+        setIsStreaming(false);
+      }
+    },
+    [activeChat, user, token, isStreaming, queryClient]
+  );
+
   const handleStartWithMessage = useCallback(
     async (initialMessage: string) => {
       if (!user?._id || !user?.organization_id?._id) {
-        console.warn("handleStartWithMessage: missing user or org", user);
         toast.error("Error", "Unable to start chat");
         return;
       }
@@ -134,41 +222,20 @@ export default function ChatPage() {
         });
 
         if (chat?._id) {
-          // Navigate to the same route with chatId in state
           navigate("/chat", { 
             state: { chatId: chat._id },
             replace: true 
           });
-          
-          // Send the message
-          await sendWithAI(chat._id, user._id, initialMessage);
+          // Wait for mount then run stream
+          setTimeout(() => handleSend(initialMessage), 300);
         }
       } catch (err) {
-        console.error("handleStartWithMessage error:", err);
         toast.error("Error", "Failed to start chat");
       } finally {
         isCreatingRef.current = false;
       }
     },
-    [user, startNewChat, sendWithAI, navigate]
-  );
-
-  const handleSend = useCallback(
-    async (text: string) => {
-      if (!text.trim()) return;
-      if (!activeChat?._id || !user?._id || sending || aiThinking) {
-        toast.warning("Warning", "Please wait for the current message to complete");
-        return;
-      }
-
-      try {
-        await sendWithAI(activeChat._id, user._id, text);
-      } catch (error) {
-        console.error("Send error:", error);
-        toast.error("Error", "Failed to send message");
-      }
-    },
-    [activeChat, user, sending, aiThinking, sendWithAI]
+    [user, startNewChat, handleSend, navigate]
   );
 
   const handleEscalate = useCallback(async () => {
@@ -182,7 +249,6 @@ export default function ChatPage() {
       setEscalated(true);
       toast.success("Success", "Chat escalated to ticket");
     } catch (error) {
-      console.error("Escalate error:", error);
       toast.error("Error", "Failed to escalate chat");
     } finally {
       setEscalating(false);
@@ -195,11 +261,9 @@ export default function ChatPage() {
     try {
       await ChatAPI.close(activeChat._id);
       toast.success("Success", "Chat ended successfully");
-      // Navigate to new chat
       navigate("/chat", { replace: true });
       loadUserChats();
     } catch (err) {
-      console.error("End chat error:", err);
       toast.error("Error", "Failed to end chat");
     }
   }, [activeChat, loadUserChats, navigate]);
@@ -208,7 +272,31 @@ export default function ChatPage() {
     navigate("/chat", { replace: true });
   }, [navigate]);
 
-  // Show welcome screen if no active chat and not loading
+  // Combined messages to show streaming items
+  const displayMessages = [...messages];
+  if (isStreaming && lastUserMessage) {
+    // Add temporary user message
+    displayMessages.push({
+      _id: "temp-user",
+      content: lastUserMessage,
+      is_ai: false,
+      sender_id: user?._id,
+      created_at: new Date().toISOString()
+    });
+
+    // Add temporary AI message showing current tokens
+    if (streamingText) {
+      displayMessages.push({
+        _id: "temp-ai",
+        content: streamingText,
+        is_ai: true,
+        sender_id: "ai",
+        created_at: new Date().toISOString(),
+        citations: streamingCitations
+      } as any);
+    }
+  }
+
   if (!activeChat && !loading && !messagesLoading && !chatId) {
     return (
       <div className="flex flex-col h-[calc(100vh-4rem)] bg-background dark:bg-gradient-to-b dark:from-background dark:to-background/80">
@@ -227,7 +315,6 @@ export default function ChatPage() {
     );
   }
 
-  // Show loading state
   if ((loading || messagesLoading) && isInitialLoad) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
@@ -265,9 +352,9 @@ export default function ChatPage() {
               <p className="text-sm text-muted-foreground">Loading messages...</p>
             </div>
           </div>
-        ) : messages.length === 0 ? (
+        ) : displayMessages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            {sending || aiThinking ? (
+            {isStreaming ? (
               <TypingIndicator />
             ) : (
               <p className="text-sm text-muted-foreground">Say hello to the AI assistant!</p>
@@ -275,19 +362,89 @@ export default function ChatPage() {
           </div>
         ) : (
           <div className="py-2">
-            {messages.map((msg) => (
+            {displayMessages.map((msg, idx) => (
               <ChatMessage
-                key={msg._id}
+                key={msg._id || `${msg.created_at || ""}-${idx}`}
                 message={msg}
                 isOwn={!msg.is_ai && msg.sender_id === user?._id}
+                onEscalate={handleEscalate}
               />
             ))}
-            {(sending || aiThinking) && <TypingIndicator />}
+
+            {/* Agent Status Checklist */}
+            {isStreaming && (
+              <div className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl mx-auto my-3 shadow-sm border-dashed">
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin text-primary" />
+                  Agent Processing States
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {[
+                    { label: "Analyzing Question", status: "Analyzing question" },
+                    { label: "Analyzing Capabilities", status: "Checking topic capabilities" },
+                    { label: "Searching Knowledge Base", status: "Searching knowledge base" },
+                    { label: "Checking Graph Relations", status: "Checking graph relationships" },
+                    { label: "Generating Response", status: "Generating response" }
+                  ].map((item, index) => {
+                    const isMatchedStatus = agentStatusList.some(s => s.toLowerCase().includes(item.status.toLowerCase())) ||
+                                            currentStatus.toLowerCase().includes(item.status.toLowerCase());
+                    const isCurrent = currentStatus.toLowerCase().includes(item.status.toLowerCase());
+
+                    return (
+                      <div key={index} className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${
+                          isCurrent ? "bg-amber-500 animate-pulse scale-125" : isMatchedStatus ? "bg-emerald-500" : "bg-slate-350 dark:bg-slate-700"
+                        }`} />
+                        <span className={isCurrent ? "font-semibold text-slate-850 dark:text-slate-100" : isMatchedStatus ? "text-slate-600 dark:text-slate-350" : "text-slate-400"}>
+                          {item.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Pending Interactive Action Confirmation */}
+            {pendingConfirm && (
+              <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-250 dark:border-amber-900/30 rounded-2xl my-4 max-w-xl mx-auto shadow-sm space-y-3">
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs uppercase tracking-wider">
+                  <AlertCircle size={14} />
+                  Action Confirmation Required
+                </div>
+                <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed">
+                  {pendingConfirm.preview?.message}
+                </p>
+                <div className="flex items-center gap-2 justify-end pt-1">
+                  <button
+                    onClick={() => {
+                      setPendingConfirm(null);
+                      setLastUserMessage("");
+                    }}
+                    className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 text-slate-500 rounded-xl text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const action = pendingConfirm.action;
+                      const payload = pendingConfirm.payload;
+                      setPendingConfirm(null);
+                      handleSend(lastUserMessage, { action, confirmed: true, payload });
+                    }}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-medium shadow-sm transition-all"
+                  >
+                    Approve Action
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      <div className="border-t bg-white bg-background/80 backdrop-blur-xl shrink-0">
+      <div className="border-t bg-background/80 backdrop-blur-xl shrink-0">
         {activeChat && messages.length > 0 && (
           <div className="px-4 py-2 border-b flex gap-2">
             <button
@@ -309,13 +466,14 @@ export default function ChatPage() {
               disabled={activeChat.status === "closed"}
               className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
+              <XCircle size={14} aria-hidden="true" />
               End Chat
             </button>
           </div>
         )}
         <ChatInput
-          onSend={handleSend}
-          disabled={sending || aiThinking || loading || !activeChat}
+          onSend={(text) => handleSend(text)}
+          disabled={sending || aiThinking || isStreaming || loading || !activeChat}
           chatId={activeChat?._id}
         />
       </div>

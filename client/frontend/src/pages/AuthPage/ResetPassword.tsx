@@ -199,7 +199,7 @@ export default function ResetPassword() {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background/95 to-background/90 p-4"
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background/95 to-background/90 px-4 sm:px-6 py-8 sm:py-12"
       onKeyDown={handleKeyDown}
     >
       <div className="w-full max-w-md">
@@ -215,14 +215,14 @@ export default function ResetPassword() {
         </div>
 
         {/* Main Card */}
-        <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] shadow-lg overflow-hidden">
+        <div className="rounded-lg border bg-card dark:bg-card/50 dark:border-white/[0.06] shadow-lg overflow-hidden">
           {/* Header */}
           <div className="p-6 pb-0">
             <div className="flex flex-col items-center text-center">
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                 <Key size={24} className="text-primary" aria-hidden="true" />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight">Reset Password</h1>
+              <h1 className="text-2xl font-bold ">Reset Password</h1>
               <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">
                 {isSuccess 
                   ? "Your password has been reset successfully" 
@@ -251,6 +251,7 @@ export default function ResetPassword() {
                   onClick={() => navigate("/login")}
                   className="w-full"
                 >
+                  <ArrowLeft size={18} className="mr-2" aria-hidden="true" />
                   Go to Login
                 </Button>
               </div>

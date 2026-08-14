@@ -3,7 +3,7 @@ import ChatMemory from "./memory.schema.js";
 import Message from "../message/message.schema.js";
 import Chat from "../chat/chat.schema.js";
 import { chunkHashMap, keywordIndexMap } from "../rag/hashmap.service.js";
-import { getEmbedding } from "../../services/embedding.service.js";
+import { getCachedEmbedding } from "../../services/embeddingCache.service.js";
 
 const shortTermCache = new Map();
 const SHORT_TERM_TTL = 30 * 60 * 1000;
@@ -57,6 +57,7 @@ export const appendToShortTerm = (chatId, message) => {
     entry.messages.push(message);
     entry.timestamp = Date.now();
   }
+  return Promise.resolve();
 };
 
 // Build conversation context window for the AI
@@ -153,31 +154,48 @@ export const searchMemoriesByKeyword = async (userId, keywords, limit = 10) => {
 };
 
 // Get memories relevant to a query (similarity-based)
-export const getRelevantMemories = async (userId, query, limit = 5) => {
+// BUG FIX: accepts organizationId for tenant isolation
+export const getRelevantMemories = async (userId, query, limit = 5, organizationId = null) => {
   const queryEmbedding = await computeMemoryEmbedding(query);
 
-  const memories = await ChatMemory.find({
+  const filter = {
     user_id: userId,
     is_active: true,
     embedding: { $exists: true, $ne: [] },
-  }).limit(50);
+  };
+  // Tenant isolation: if organizationId provided, only return memories scoped to that org
+  // (Memory schema must have organization_id field; if it doesn't, this is a no-op guard)
+  if (organizationId) filter.organization_id = { $in: [organizationId, null, undefined] };
+
+  const memories = await ChatMemory.find(filter).limit(100);
 
   if (memories.length === 0) return [];
+
+  // If queryEmbedding is null (Ollama down), fall back to recency sort
+  if (!queryEmbedding) {
+    console.warn("[Memory] Embedding unavailable — returning most recent memories");
+    return memories.slice(0, limit).map((m) => ({ ...m.toObject(), relevance: 0 }));
+  }
 
   const scored = memories.map((m) => ({
     ...m.toObject(),
     relevance: cosineSim(queryEmbedding, m.embedding),
   }));
 
-  return scored
+  const topMemories = scored
     .sort((a, b) => b.relevance - a.relevance)
-    .slice(0, limit)
-    .map((m) => {
-      m.access_count = (m.access_count || 0) + 1;
-      m.last_accessed_at = new Date();
-      m.save();
-      return m;
-    });
+    .slice(0, limit);
+
+  // BUG FIX: use updateOne (fire-and-forget) instead of .save() inside .map()
+  // .save() on a plain object (from .toObject()) would have thrown anyway
+  const now = new Date();
+  const ids = topMemories.map((m) => m._id);
+  ChatMemory.updateMany(
+    { _id: { $in: ids } },
+    { $inc: { access_count: 1 }, $set: { last_accessed_at: now } }
+  ).catch((err) => console.warn("[Memory] Failed to update access stats:", err.message));
+
+  return topMemories;
 };
 
 // Update a memory
@@ -334,33 +352,14 @@ export const buildFullContext = async (userId, chatId, query, maxShortTerm = 10,
 
 async function computeMemoryEmbedding(text) {
   try {
-    const emb = await getEmbedding(text);
-    if (emb) return emb;
+    const emb = await getCachedEmbedding(text);
+    // getCachedEmbedding now returns null on Ollama failure — no fake vectors
+    if (emb && Array.isArray(emb) && emb.length > 0) return emb;
   } catch (err) {
-    console.error(`[Memory] Ollama embedding failed, using fallback:`, err.message);
+    console.error(`[Memory] Embedding failed:`, err.message);
   }
-  const words = text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .split(/\s+/)
-    .filter((w) => w.length > 2);
-
-  const DIM = 128;
-  const vec = new Array(DIM).fill(0);
-
-  words.forEach((word, i) => {
-    let hash = 0;
-    for (let j = 0; j < word.length; j++) {
-      hash = ((hash << 5) - hash + word.charCodeAt(j)) | 0;
-    }
-    const idx = Math.abs(hash % DIM);
-    vec[idx] += 1 / (i + 1);
-  });
-
-  const mag = Math.sqrt(vec.reduce((s, v) => s + v * v, 0));
-  if (mag > 0) vec.forEach((_, i) => (vec[i] /= mag));
-
-  return vec;
+  // Return null — callers handle gracefully
+  return null;
 }
 
 function cosineSim(a, b) {

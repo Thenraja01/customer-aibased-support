@@ -3,9 +3,11 @@ import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 dotenv.config();
 
-import Role from './modules/role/role.schema.js';
+
 import Organization from './modules/organization/organization.schema.js';
+import Branch from './modules/branch/branch.schema.js';
 import User from './modules/user/user.schema.js';
+import { chromaService } from './config/chroma.js';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/supportai';
 
@@ -22,6 +24,13 @@ const DEFAULT_ORG = {
   domain: '',
 };
 
+const DEFAULT_BRANCH = {
+  name: 'HQ Branch',
+  address: '123 Main St, Tech City',
+  contact_number: '123-456-7890',
+  status: 'active'
+};
+
 const args = process.argv.slice(2);
 
 async function ensureDefaultOrg() {
@@ -32,42 +41,40 @@ async function ensureDefaultOrg() {
   );
 }
 
-async function ensureSuperAdminRole() {
-  return await Role.findOneAndUpdate(
-    { role_name: 'super admin' },
-    { $setOnInsert: { permissions: ['*'], status: 'active', description: 'Super administrator with full system access' } },
-    { upsert: true, new: true }
-  );
-}
-
-async function createRole(roleName) {
-  const role = await Role.findOneAndUpdate(
-    { role_name: roleName },
-    { $setOnInsert: { permissions: [], status: 'active', description: `${roleName} role` } },
-    { upsert: true, new: true }
-  );
-  console.log(`Role created: ${role.role_name}`);
-  return role;
-}
-
 async function seedDefault() {
-  const role = await ensureSuperAdminRole();
-  console.log(`Role ensured: ${role.role_name}`);
-
   const org = await ensureDefaultOrg();
   console.log(`Organization ensured: ${org.name}`);
+
+  // Create default branch
+  let branch = await Branch.findOne({ organization_id: org._id, name: DEFAULT_BRANCH.name });
+  if (!branch) {
+    branch = await Branch.create({
+      ...DEFAULT_BRANCH,
+      organization_id: org._id,
+    });
+    console.log(`Branch created: ${branch.name}`);
+  } else {
+    console.log(`Branch ensured: ${branch.name}`);
+  }
+
+  try {
+    await chromaService.init();
+    console.log('Chroma DB Initialized');
+  } catch (err) {
+    console.log('Chroma DB init skipped or failed (is it running?):', err.message);
+  }
 
   const existing = await User.findOne({ email: ADMIN_EMAIL });
   if (existing) {
     const needsUpdate =
       existing.organization_id?.toString() !== org._id.toString() ||
-      existing.role_id?.toString() !== role._id.toString();
+      existing.role !== 'super_admin';
     if (needsUpdate) {
       await User.findByIdAndUpdate(existing._id, {
         organization_id: org._id,
-        role_id: role._id,
+        role: 'super_admin',
       });
-      console.log(`Super admin updated with fresh org/role refs: ${ADMIN_EMAIL}`);
+      console.log(`Super admin updated with fresh org refs: ${ADMIN_EMAIL}`);
     } else {
       console.log(`Super admin already exists: ${ADMIN_EMAIL}`);
     }
@@ -75,7 +82,7 @@ async function seedDefault() {
     const hashed = await bcrypt.hash(ADMIN_PASSWORD, 10);
     await User.create({
       organization_id: org._id,
-      role_id: role._id,
+      role: 'super_admin',
       name: ADMIN_NAME,
       email: ADMIN_EMAIL,
       password: hashed,
@@ -87,11 +94,6 @@ async function seedDefault() {
 }
 
 async function createUser(roleName, orgId) {
-  const role = await Role.findOne({ role_name: roleName });
-  if (!role) {
-    console.error(`Role "${roleName}" not found. Create it first.`);
-    return;
-  }
 
   const email = `${roleName.replace(/\s+/g, '.')}@supportai.com`;
   const password = `${roleName.charAt(0).toUpperCase() + roleName.slice(1)}@123`;
@@ -104,9 +106,19 @@ async function createUser(roleName, orgId) {
   }
 
   const hashed = await bcrypt.hash(password, 10);
+  
+  // Assign branch to users that need it
+  const isBranchScoped = !['super admin', 'admin'].includes(roleName.toLowerCase());
+  let branchId = null;
+  if (isBranchScoped) {
+    const branch = await Branch.findOne({ organization_id: orgId });
+    if (branch) branchId = branch._id;
+  }
+
   await User.create({
     organization_id: orgId,
-    role_id: role._id,
+    branch_id: branchId,
+    role: roleName.toLowerCase().replace(/\s+/g, '_'),
     name,
     email,
     password: hashed,

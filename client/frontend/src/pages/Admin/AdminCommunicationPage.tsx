@@ -49,17 +49,20 @@ export default function AdminCommunicationPage() {
     }
   };
 
+  const currentUserId = user?._id || user?.userId;
+
   const markAllAsSeen = async () => {
     try {
       const orgId = user?.organization_id?._id || user?.organization_id;
       if (orgId) {
         await CommunicationAPI.markOrgSeen(orgId);
         setMessages((prev) =>
-          prev.map((m) =>
-            m.sender_id._id !== user?._id && m.status === "sent"
+          prev.map((m) => {
+            const senderIdStr = typeof m.sender_id === "object" ? m.sender_id?._id : m.sender_id;
+            return senderIdStr !== currentUserId && m.status === "sent"
               ? { ...m, status: "seen" as const }
-              : m
-          )
+              : m;
+          })
         );
       }
     } catch {}
@@ -99,8 +102,13 @@ export default function AdminCommunicationPage() {
     );
   }
 
+  const otherMessagesCount = messages.filter((m) => {
+    const senderIdStr = typeof m.sender_id === "object" ? m.sender_id?._id : m.sender_id;
+    return senderIdStr !== currentUserId;
+  }).length;
+
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] rounded-xl border dark:border-white/[0.06] overflow-hidden bg-card dark:bg-card/50">
+    <div className="flex flex-col h-[calc(100vh-8rem)] rounded-lg border dark:border-white/[0.06] overflow-hidden bg-card dark:bg-card/50">
       <div className="flex items-center gap-3 px-4 py-3 border-b dark:border-white/[0.06] bg-card">
         <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
           <MessageCircle size={18} className="text-primary" />
@@ -108,7 +116,7 @@ export default function AdminCommunicationPage() {
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-medium truncate">Super Admin Communication</h2>
           <p className="text-[11px] text-muted-foreground">
-            {messages.length > 0 ? `${messages.filter((m) => m.sender_id._id !== user?._id).length} messages from super admin` : "No messages"}
+            {messages.length > 0 ? `${otherMessagesCount} messages from super admin` : "No messages"}
           </p>
         </div>
       </div>
@@ -121,11 +129,13 @@ export default function AdminCommunicationPage() {
             <p className="text-xs text-muted-foreground/60">Super admin messages from your organization will appear here</p>
           </div>
         ) : (
-          messages.map((msg) => {
-            const isMine = msg.sender_id._id === user?._id;
+          messages.map((msg, idx) => {
+            const senderIdStr = typeof msg.sender_id === "object" ? msg.sender_id?._id : msg.sender_id;
+            const senderName = typeof msg.sender_id === "object" ? msg.sender_id?.name || "User" : "User";
+            const isMine = senderIdStr === currentUserId;
             const isSeen = msg.status === "seen";
             return (
-              <div key={msg._id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
+              <div key={msg._id || `${msg.created_at || ""}-${idx}`} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
                 <div
                   className={cn(
                     "max-w-[75%] rounded-xl px-4 py-2.5",
@@ -135,7 +145,7 @@ export default function AdminCommunicationPage() {
                   )}
                 >
                   {!isMine && (
-                    <p className="text-[11px] font-medium mb-0.5 opacity-70">{msg.sender_id.name}</p>
+                    <p className="text-[11px] font-medium mb-0.5 opacity-70">{senderName}</p>
                   )}
                   <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                   <div className={cn("flex items-center gap-1 mt-1", isMine ? "justify-end" : "justify-start")}>

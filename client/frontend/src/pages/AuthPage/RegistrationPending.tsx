@@ -97,10 +97,6 @@ export default function RegistrationPending() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-secondary/5">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-secondary/5 via-transparent to-transparent dark:from-secondary/10" />
-      <div className="absolute top-0 left-0 w-[500px] h-[500px] rounded-full bg-secondary/5 blur-3xl dark:bg-secondary/10 animate-pulse-glow" />
-      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10 animate-pulse-glow [animation-delay:1.5s]" />
-
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-10">
         <motion.div
           className="w-full max-w-lg"
@@ -177,7 +173,7 @@ export default function RegistrationPending() {
                 transition={{ delay: 0.5 }}
                 className="space-y-1"
               >
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                <p className="text-xs font-semibold uppercase  text-muted-foreground mb-3">
                   What happens next
                 </p>
                 <div className="relative">

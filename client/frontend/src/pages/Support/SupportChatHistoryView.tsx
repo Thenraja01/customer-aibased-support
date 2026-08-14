@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
-import type { RootState, AppDispatch } from "@/store/store";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "@/store/store";
+import { useAuthContext } from "@/context/AuthContext";
 import { Loader2, AlertCircle } from "lucide-react";
 import { useChat } from "@/hooks/useChat";
 import { useChatScroll } from "@/hooks/useChatScroll";
@@ -16,7 +17,7 @@ import TypingIndicator from "@/components/chat/TypingIndicator";
 export default function SupportChatHistoryView() {
   const { id } = useParams();
   const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.user);
+  const { user } = useAuthContext();
   const { socket } = useSocket();
 
   const {
@@ -154,9 +155,9 @@ export default function SupportChatHistoryView() {
           </div>
         ) : (
           <div className="py-2">
-            {messages.map((msg) => (
+            {messages.map((msg: any, idx: number) => (
               <ChatMessage
-                key={msg._id}
+                key={msg._id || `${msg.created_at || ""}-${idx}`}
                 message={msg}
                 isOwn={msg.sender_id === user?._id}
               />
@@ -166,7 +167,7 @@ export default function SupportChatHistoryView() {
         )}
       </div>
 
-      <div className="border-t bg-white bg-background/80 backdrop-blur-xl shrink-0">
+      <div className="border-t bg-background/80 backdrop-blur-xl shrink-0">
         <ChatInput
           onSend={handleSend}
           disabled={sending || aiThinking}

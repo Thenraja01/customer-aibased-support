@@ -76,7 +76,7 @@ export default function SupportChatHistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Chat History</h1>
+        <h1 className="text-2xl font-bold ">Chat History</h1>
         <p className="text-sm text-muted-foreground mt-1">
           View all customer conversations across your organization.
         </p>
@@ -104,7 +104,7 @@ export default function SupportChatHistoryPage() {
         </select>
       </div>
 
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="rounded-lg border bg-card overflow-hidden">
         {chats.length === 0 ? (
           <div className="p-8 sm:p-12 text-center">
             <MessageSquare size={48} className="mx-auto text-muted-foreground/40 mb-4" />

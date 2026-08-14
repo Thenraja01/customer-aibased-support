@@ -4,10 +4,30 @@ export const logAction = async (data) => {
   return await AuditLog.create(data);
 };
 
-export const getAllLogs = async () => {
-  return await AuditLog.find()
+export const getAllLogs = async (query = {}) => {
+  return await AuditLog.find(query)
     .populate("user_id", "name email")
     .sort({ created_at: -1 });
+};
+
+export const getLogsByQuery = async (query = {}) => {
+  return await AuditLog.find(query)
+    .populate("user_id", "name email")
+    .sort({ created_at: -1 });
+};
+
+export const getLogsPaginated = async (page = 1, limit = 20, query = {}) => {
+  const total = await AuditLog.countDocuments(query);
+  const logs = await AuditLog.find(query)
+    .populate("user_id", "name email")
+    .sort({ created_at: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .lean();
+  return {
+    data: logs,
+    pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+  };
 };
 
 export const getLogsByUser = async (userId) => {
@@ -42,9 +62,10 @@ export const getLogsByDateRange = async (from, to) => {
     .sort({ created_at: -1 });
 };
 
-export const deleteOldLogs = async (days = 90) => {
+export const deleteOldLogs = async (days = 90, query = {}) => {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
-  const result = await AuditLog.deleteMany({ created_at: { $lt: cutoff } });
+  const combinedQuery = { ...query, created_at: { $lt: cutoff } };
+  const result = await AuditLog.deleteMany(combinedQuery);
   return { deleted: result.deletedCount };
 };

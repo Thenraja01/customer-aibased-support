@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, X, Upload } from "lucide-react";
+import { AlertCircle, X, Upload, Loader2 } from "lucide-react";
 
 interface FormErrors {
   title?: string;
@@ -13,17 +13,20 @@ interface FormErrors {
 export default function DocumentUploadForm({
   documentTypes,
   roles = [],
+  branches = [],
   onSubmit,
   onClose,
 }: {
   documentTypes: any[];
   roles?: any[];
+  branches?: any[];
   onSubmit: (formData: FormData) => Promise<any>;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [documentTypeId, setDocumentTypeId] = useState("");
   const [assignedRole, setAssignedRole] = useState("All");
+  const [branchId, setBranchId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -70,6 +73,13 @@ export default function DocumentUploadForm({
       const formData = new FormData();
       formData.append("title", title);
       formData.append("assigned_role", assignedRole);
+      if (branchId) {
+        formData.append("branch_id", branchId);
+        formData.append("visibility", "branch");
+      } else {
+        formData.append("branch_id", "all");
+        formData.append("visibility", "organization");
+      }
       formData.append("file", file!);
       if (documentTypeId) formData.append("document_type_id", documentTypeId);
       await onSubmit(formData);
@@ -131,12 +141,43 @@ export default function DocumentUploadForm({
               onChange={(e) => setAssignedRole(e.target.value)}
               className="select-field"
             >
-              <option value="All">All</option>
-              {roles.map((r) => (
-                <option key={r._id} value={r.role_name || r.role_name}>{r.role_name || r.name}</option>
-              ))}
+              <option value="All">All Roles</option>
+              {roles.length > 0 ? (
+                roles.map((r: any) => (
+                  <option key={r._id || r.role_name} value={r.role_name || r._id}>
+                    {r.role_name || r.name}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="admin">Org Admin</option>
+                  <option value="branch_admin">Branch Admin</option>
+                  <option value="support">Support Agent</option>
+                  <option value="customer">Customer</option>
+                </>
+              )}
             </select>
             <p className="text-xs text-muted-foreground">Documents are visible only to users with this role</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="doc-branch">Branch Scope</Label>
+            <select
+              id="doc-branch"
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              className="select-field"
+            >
+              <option value="">All Branches (Organization Wide)</option>
+              {branches.map((b) => (
+                <option key={b._id} value={b._id}>
+                  {b.name || b.branch_name || b._id}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Select "All Branches" for organization-wide visibility or pick a specific branch.
+            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -195,7 +236,14 @@ export default function DocumentUploadForm({
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
             <Button type="submit" disabled={submitting} className="flex-1">
-              {submitting ? "Uploading..." : "Upload"}
+              {submitting ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Loader2 size={14} className="animate-spin" />
+                  Uploading & Processing...
+                </span>
+              ) : (
+                "Upload"
+              )}
             </Button>
           </div>
         </form>

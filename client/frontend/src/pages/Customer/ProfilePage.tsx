@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -8,24 +8,19 @@ import {
   Phone,
   Save,
   Loader2,
-  CheckCircle2,
-  AlertCircle,
   Lock,
   KeyRound,
-  Ghost,
-  LockIcon,
   Shield,
-  ShieldCheckIcon,
+  Bot,
   Smartphone,
   Clock,
-  Bot,
-  UserCircle,
-  Activity,
-  Fingerprint,
+  CheckCircle2,
+  AlertCircle,
   Type,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { UsersAPI } from "@/api/user.api";
+import { getRoleName } from "@/lib/roles";
 import FontSettingsPanel from "@/components/FontSettingsPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,32 +30,34 @@ import { Switch } from "@/components/ui/switch";
 
 type Tab = "profile" | "security" | "appearance";
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08 },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 80, damping: 14 } },
+type UserData = {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  department?: string;
+  role?: string;
+  roleName?: string;
+  two_factor_enabled?: boolean;
+  status: string;
+  organization_id?: { name?: string; _id?: string } | string;
+  created_at?: string;
+  profileImage?: string;
 };
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, token, logout, setSession } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>("profile");
-
-  const [formData, setFormData] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-    phone: user?.phone || "",
-    department: user?.department || "Customer Experience",
-  });
+  const [profile, setProfile] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [pwStrength, setPwStrength] = useState(0);
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -68,94 +65,135 @@ export default function ProfilePage() {
     confirmPassword: "",
   });
 
-  const [saving, setSaving] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
-  const [passwordSuccess, setPasswordSuccess] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [pwStrength, setPwStrength] = useState(0);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [toggling2FA, setToggling2FA] = useState(false);
 
-  const [otpStep, setOtpStep] = useState<"request" | "verify">("request");
-  const [otpEmail, setOtpEmail] = useState(user?.email || "");
-  const [otp, setOtp] = useState("");
-  const [otpNewPassword, setOtpNewPassword] = useState("");
-  const [otpConfirmPassword, setOtpConfirmPassword] = useState("");
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpMessage, setOtpMessage] = useState("");
-  const [otpError, setOtpError] = useState("");
-  const [otpPwStrength, setOtpPwStrength] = useState(0);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.two_factor_enabled ?? true);
-  const [aiLoggingEnabled, setAiLoggingEnabled] = useState(user?.ai_session_logging ?? true);
-  const [togglingTwoFactor, setTogglingTwoFactor] = useState(false);
-  const [togglingAiLogging, setTogglingAiLogging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleToggleTwoFactor = useCallback(async (checked: boolean) => {
-    const previous = twoFactorEnabled;
-    setTwoFactorEnabled(checked);
-    setTogglingTwoFactor(true);
-    try {
-      await UsersAPI.updateProfile({ two_factor_enabled: checked });
-      toast.success("Success", "Two-factor authentication updated");
-    } catch {
-      setTwoFactorEnabled(previous);
-      toast.error("Error", "Failed to update two-factor authentication");
-    } finally {
-      setTogglingTwoFactor(false);
+  const getImageUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+    const base = backendUrl.replace(/\/+$/, "");
+    const path = url.replace(/^\/+/, "");
+    return `${base}/${path}`;
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Error", "File is too large. Max size is 5MB.");
+      return;
     }
-  }, [twoFactorEnabled, toast]);
 
-  const handleToggleAiLogging = useCallback(async (checked: boolean) => {
-    const previous = aiLoggingEnabled;
-    setAiLoggingEnabled(checked);
-    setTogglingAiLogging(true);
-    try {
-      await UsersAPI.updateProfile({ ai_session_logging: checked });
-      toast.success("Success", "AI session logging updated");
-    } catch {
-      setAiLoggingEnabled(previous);
-      toast.error("Error", "Failed to update AI session logging");
-    } finally {
-      setTogglingAiLogging(false);
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Error", "Only JPG, PNG, GIF, and WEBP images are allowed.");
+      return;
     }
-  }, [aiLoggingEnabled, toast]);
 
-  // Sync form if user loads after mount
+    const localUrl = URL.createObjectURL(file);
+    setPreviewUrl(localUrl);
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    try {
+      const res = await UsersAPI.updateAvatar(formData);
+      if (res.data?.success) {
+        toast.success("Success", "Profile avatar updated successfully");
+        const newUrl = res.data.data.profileImage;
+        setProfile((prev) => prev ? { ...prev, profileImage: newUrl } : prev);
+        
+        setSession({
+          token,
+          user: {
+            ...user,
+            profileImage: newUrl
+          }
+        });
+      }
+    } catch (err: any) {
+      toast.error("Error", err.response?.data?.message || "Failed to upload avatar");
+      setPreviewUrl(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const fetchProfile = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await UsersAPI.getProfile();
+      if (res?.data?.success) {
+        setProfile(res.data.data);
+        setTwoFactorEnabled(res.data.data.two_factor_enabled ?? false);
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || "Failed to load profile";
+      toast.error("Error", msg);
+      if (err.response?.status === 401) {
+        logout();
+        navigate("/login");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, navigate, logout]);
+
   useEffect(() => {
-    if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        name: user.name || prev.name,
-        email: user.email || prev.email,
-        phone: user.phone || prev.phone,
-        department: user.department || prev.department,
-      }));
+    if (!isAuthenticated || !token) {
+      navigate("/login");
+      return;
     }
-  }, [user]);
+    fetchProfile();
+  }, [isAuthenticated, token, fetchProfile, navigate]);
 
-  const roleName =
-    typeof user?.role_id === "object" ? user?.role_id?.role_name : user?.role_id;
+  const roleName = getRoleName(profile || user);
   const orgName =
-    typeof user?.organization_id === "object"
-      ? user?.organization_id?.name
-      : user?.organization_id;
+    typeof (profile || user)?.organization_id === "object"
+      ? (profile || user)?.organization_id?.name
+      : undefined;
 
-  const displayRole = roleName?.replace("_", " ") || "Support Agent";
-  const initials = formData.name
+  const displayRole = roleName?.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase()) || "Customer";
+  const displayName = profile?.name || user?.name || "—";
+  const displayEmail = profile?.email || user?.email || "—";
+
+  const initials = displayName
     .split(" ")
-    .map((n: any) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .slice(0, 2)
     .toUpperCase() || "U";
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profile) return;
     setSaving(true);
-
     try {
-      await UsersAPI.updateProfile({
-        name: formData.name,
-        phone: formData.phone,
+      const res = await UsersAPI.updateProfile({
+        name: profile.name,
+        phone: profile.phone || "",
       });
-      toast.success("Success", "Profile updated successfully");
+      if (res?.data?.success) {
+        toast.success("Success", "Profile updated successfully");
+        setSession({
+          token,
+          user: {
+            ...user,
+            name: profile.name,
+            phone: profile.phone || "",
+          }
+        });
+        await fetchProfile();
+      } else {
+        toast.error("Error", res?.data?.message || "Failed to update profile");
+      }
     } catch (err: any) {
       toast.error("Error", err.response?.data?.message || "Failed to update profile");
     } finally {
@@ -206,269 +244,142 @@ export default function ProfilePage() {
     }
   };
 
-  const strengthColors = ["#ef4444", "#f59e0b", "#22c55e", "#0ea5e9"];
-  const strengthLabels = ["Weak", "Fair", "Strong", "Very strong"];
-
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpLoading(true);
-    setOtpError("");
-    setOtpMessage("");
+  const handleToggleTwoFactor = useCallback(async (checked: boolean) => {
+    const previous = twoFactorEnabled;
+    setTwoFactorEnabled(checked);
+    setToggling2FA(true);
     try {
-      const res = await UsersAPI.requestOtp(otpEmail);
-      setOtpMessage(res.data.message);
-      setOtpStep("verify");
-      toast.success("OTP Sent", "Check your email for the verification code");
+      if (checked) {
+        await UsersAPI.enable2FA();
+      } else {
+        await UsersAPI.disable2FA();
+      }
+      toast.success("Success", `Two-factor authentication ${checked ? "enabled" : "disabled"}`);
+      setSession({
+        token,
+        user: {
+          ...user,
+          two_factor_enabled: checked
+        }
+      });
     } catch (err: any) {
-      setOtpError(err.response?.data?.message || "Failed to send OTP");
-      toast.error("Error", err.response?.data?.message || "Failed to send OTP");
+      setTwoFactorEnabled(previous);
+      toast.error("Error", err.response?.data?.message || "Failed to update two-factor authentication");
     } finally {
-      setOtpLoading(false);
+      setToggling2FA(false);
     }
-  };
-
-  const handleVerifyOtpAndPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpLoading(true);
-    setOtpError("");
-    setOtpMessage("");
-
-    if (otpNewPassword !== otpConfirmPassword) {
-      setOtpError("Passwords do not match");
-      setOtpLoading(false);
-      return;
-    }
-    if (otpNewPassword.length < 8) {
-      setOtpError("Password must be at least 8 characters");
-      setOtpLoading(false);
-      return;
-    }
-
-    try {
-      await UsersAPI.verifyOtp(otpEmail, otp);
-      await UsersAPI.resetPasswordWithOtp(otpEmail, otp, otpNewPassword);
-      toast.success("Success", "Password changed successfully");
-      setOtpStep("request");
-      setOtp("");
-      setOtpNewPassword("");
-      setOtpConfirmPassword("");
-      setOtpPwStrength(0);
-    } catch (err: any) {
-      setOtpError(err.response?.data?.message || "Failed to change password");
-      toast.error("Error", err.response?.data?.message || "Failed to change password");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const checkOtpPwStrength = (val: string) => {
-    let score = 0;
-    if (val.length >= 6) score++;
-    if (val.length >= 10) score++;
-    if (/[A-Z]/.test(val) && /[0-9]/.test(val)) score++;
-    if (/[^a-zA-Z0-9]/.test(val)) score++;
-    setOtpPwStrength(score);
-  };
+  }, [twoFactorEnabled, toast, user, token, setSession]);
 
   const goBack = () => {
-    if (roleName === "super_admin") {
-      navigate("/superadmin/dashboard");
-    } else if (roleName === "admin") {
-      navigate("/admin/dashboard");
-    } else if (roleName === "support") {
-      navigate("/support/dashboard");
-    } else {
-      navigate("/dashboard");
-    }
+    if (roleName === "super_admin") return navigate("/superadmin/dashboard");
+    if (roleName === "admin") return navigate("/admin/dashboard");
+    if (roleName === "support") return navigate("/support/dashboard");
+    navigate("/dashboard");
   };
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <motion.div
-      className="max-w-2xl mx-auto pb-8"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Back nav */}
-      <motion.div variants={itemVariants} className="flex items-center gap-3 mb-6">
-        <button
-          onClick={goBack}
-          className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
-        >
-          <ArrowLeft size={14} />
-          Back to dashboard
-        </button>
-      </motion.div>
-
-      {/* Banner */}
-      <motion.div
-        variants={itemVariants}
-        className="relative overflow-hidden rounded-2xl border bg-card p-6 mb-4"
+    <div className="max-w-3xl mx-auto pb-8">
+      {/* Back */}
+      <motion.button
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        onClick={goBack}
+        className="mb-6 flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
       >
-        {/* Grid background */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            backgroundImage: `linear-gradient(hsl(var(--border)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px)`,
-            backgroundSize: "32px 32px",
-          }}
-        />
-        {/* Glows */}
-        <div
-          className="pointer-events-none absolute -top-10 right-14 h-40 w-52 opacity-60"
-          style={{
-            background: "radial-gradient(ellipse, rgba(99,102,241,0.22) 0%, transparent 70%)",
-          }}
-        />
-        <div
-          className="pointer-events-none absolute -bottom-8 left-10 h-32 w-40 opacity-50"
-          style={{
-            background: "radial-gradient(ellipse, rgba(14,165,233,0.15) 0%, transparent 70%)",
-          }}
-        />
+        <ArrowLeft size={14} />
+        Back to dashboard
+      </motion.button>
 
-        <div className="relative flex items-center gap-5">
-          {/* Avatar with animated ring */}
+      {/* Header Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="rounded-lg border bg-card p-6 mb-6"
+      >
+        <div className="flex items-center gap-5">
           <div className="relative flex-shrink-0">
-            <motion.svg
-              className="absolute -inset-1.5"
-              viewBox="0 0 74 74"
-              fill="none"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+            {(uploading || saving) && (
+              <div className="absolute -inset-1 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin z-10" />
+            )}
+            <div
+              onClick={() => !uploading && !saving && fileInputRef.current?.click()}
+              className="relative h-16 w-16 rounded-full overflow-hidden bg-gradient-to-br from-indigo-500 to-sky-500 text-xl font-semibold text-white flex items-center justify-center cursor-pointer group border border-white/[0.06] shadow-md transition-all duration-200"
             >
-              <circle
-                cx="37"
-                cy="37"
-                r="34"
-                stroke="url(#ringGrad)"
-                strokeWidth="1.5"
-                strokeDasharray="6 4"
-                strokeLinecap="round"
-              />
-              <defs>
-                <linearGradient id="ringGrad" x1="0" y1="0" x2="74" y2="74">
-                  <stop offset="0%" stopColor="#6366f1" />
-                  <stop offset="50%" stopColor="#0ea5e9" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
-                </linearGradient>
-              </defs>
-            </motion.svg>
-            <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-500 text-lg font-semibold text-white shadow-[0_0_0_3px_hsl(var(--card))]">
-              {initials}
-            </div>
-            <span className="absolute bottom-0.5 right-0.5 z-20 h-3.5 w-3.5 rounded-full border-[2px] border-card bg-green-500">
-              <span className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-40" />
-            </span>
-          </div>
-
-          {/* Info */}
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold tracking-tight">{formData.name || "—"}</h2>
-            <p className="text-sm text-muted-foreground">{formData.email || "—"}</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full border bg-accent/10 px-2.5 py-0.5 text-[11px] font-medium text-accent-foreground">
-                <span className="h-1 w-1 rounded-full bg-current opacity-70" />
-                {displayRole}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-purple-500/25 bg-purple-500/10 px-2.5 py-0.5 text-[11px] font-medium text-purple-600 dark:text-purple-400">
-                <Bot size={10} />
-                AI-assisted
-              </span>
-              {orgName && (
-                <span className="text-[11px] text-muted-foreground px-2 py-0.5">
-                  {orgName}
-                </span>
+              {previewUrl ? (
+                <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
+              ) : profile?.profileImage ? (
+                <img src={getImageUrl(profile.profileImage)} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                <span>{initials}</span>
               )}
-            </div>
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div className="relative mt-5 grid grid-cols-3 gap-2">
-          {[
-            { label: "Role", value: displayRole, raw: true },
-            { label: "Department", value: formData.department, raw: true },
-            { label: "Status", value: "Active", raw: true },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 + i * 0.15 }}
-              className="rounded-xl border bg-muted/40 p-3 text-center transition-colors hover:border-accent hover:bg-muted/60"
-            >
-              <div className="text-sm font-semibold truncate">
-                {stat.value}
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
               </div>
-              <div className="text-[11px] text-muted-foreground">{stat.label}</div>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* AI Assistant Chip */}
-      <motion.div
-        variants={itemVariants}
-        className="mb-4 flex items-center gap-3 rounded-xl border bg-card p-3"
-      >
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-500 text-xs">
-          <Ghost size={16} />
-        </div>
-        <p className="flex-1 text-xs leading-relaxed text-muted-foreground">
-          <strong className="text-foreground font-medium">AI assistant active.</strong> Your profile is synced with the support knowledge base. Response suggestions are enabled.
-        </p>
-        <div className="flex gap-1">
-          {[0, 1, 2].map((i) => (
-            <motion.span
-              key={i}
-              className="block h-1 w-1 rounded-full bg-accent"
-              animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              className="hidden"
             />
-          ))}
+            <span className="absolute bottom-0.5 right-0.5 z-20 h-3.5 w-3.5 rounded-full border-[2px] border-card bg-green-500" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold truncate">{displayName}</h2>
+            <p className="text-sm text-muted-foreground truncate">{displayEmail}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {displayRole}
+              {orgName && ` at ${orgName}`}
+            </p>
+          </div>
         </div>
       </motion.div>
 
       {/* Tabs */}
       <motion.div
-        variants={itemVariants}
-        className="mb-4 flex gap-1 rounded-xl border bg-card p-1"
-        role="tablist"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="mb-6 flex gap-1 rounded-lg border bg-card p-1"
       >
-        {([
+        {[
           { id: "profile", label: "Profile", icon: User },
           { id: "security", label: "Security", icon: Lock },
           { id: "appearance", label: "Appearance", icon: Type },
-        ] as const).map((tab) => {
+        ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              role="tab"
-              aria-selected={isActive}
+              onClick={() => setActiveTab(tab.id as Tab)}
               className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-colors ${
-                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                isActive
+                  ? "bg-muted text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {isActive && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute inset-0 rounded-lg bg-muted shadow-sm"
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                <Icon size={14} />
-                {tab.label}
-              </span>
+              <Icon size={14} />
+              {tab.label}
             </button>
           );
         })}
       </motion.div>
 
+      {/* Tab Content */}
       <AnimatePresence mode="wait">
         {activeTab === "profile" && (
           <motion.div
@@ -478,82 +389,64 @@ export default function ProfilePage() {
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25 }}
           >
-            <div className="rounded-2xl border bg-card p-6">
-              <div className="mb-5 flex items-center gap-2 border-b pb-3 text-sm font-semibold">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400">
-                  <UserCircle size={14} />
-                </span>
-                Personal information
-              </div>
+            <form onSubmit={handleProfileUpdate} className="space-y-6">
+              <div className="rounded-lg border bg-card p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                    <User size={14} />
+                  </span>
+                  Personal information
+                </h3>
 
-              <form onSubmit={handleProfileUpdate} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => {
-                        setFormData({ ...formData, name: e.target.value });
-                      }}
-                      className="pl-10"
-                      required
-                    />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full name</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="name"
+                        value={profile?.name || ""}
+                        onChange={(e) => setProfile((p) => p ? { ...p, name: e.target.value } : p)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        value={profile?.email || ""}
+                        disabled
+                        className="pl-10 opacity-60"
+                      />
+                    </div>
+                    <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <AlertCircle size={11} /> Email is managed by your organization
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone number</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={profile?.phone || ""}
+                        onChange={(e) => setProfile((p) => p ? { ...p, phone: e.target.value } : p)}
+                        placeholder="+1 (555) 000-0000"
+                        className="pl-10"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      disabled
-                      className="pl-10 opacity-60"
-                    />
-                  </div>
-                  <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <AlertCircle size={11} />
-                    Email is managed by your organization
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone number</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                      placeholder="+1 (555) 000-0000"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dept">Department</Label>
-                  <div className="relative">
-                    <Activity className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="dept"
-                      value={formData.department}
-                      onChange={(e) =>
-                        setFormData({ ...formData, department: e.target.value })
-                      }
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" disabled={saving} className="w-full">
+                <Button type="submit" disabled={saving} className="mt-6 w-full">
                   {saving ? (
                     <Loader2 size={16} className="mr-2 animate-spin" />
                   ) : (
@@ -561,8 +454,8 @@ export default function ProfilePage() {
                   )}
                   Save changes
                 </Button>
-              </form>
-            </div>
+              </div>
+            </form>
           </motion.div>
         )}
 
@@ -573,114 +466,95 @@ export default function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25 }}
-            className="space-y-4"
+            className="space-y-6"
           >
             {/* Change Password */}
-            <div className="rounded-2xl border bg-card p-6">
-              <div className="mb-5 flex items-center gap-2 border-b pb-3 text-sm font-semibold">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                  <ShieldCheckIcon size={14} />
-                </span>
-                Change password
-              </div>
+            <form onSubmit={handlePasswordChange} className="space-y-6">
+              <div className="rounded-lg border bg-card p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                    <KeyRound size={14} />
+                  </span>
+                  Change password
+                </h3>
 
-              <form onSubmit={handlePasswordChange} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="currentPassword"
-                      type="password"
-                      value={passwordData.currentPassword}
-                      onChange={(e) =>
-                        setPasswordData({
-                          ...passwordData,
-                          currentPassword: e.target.value,
-                        })
-                      }
-                      placeholder="Enter current password"
-                      className="pl-10"
-                      required
-                    />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="currentPassword">Current password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={(e) =>
+                          setPasswordData({ ...passwordData, currentPassword: e.target.value })
+                        }
+                        placeholder="Enter current password"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New password</Label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      value={passwordData.newPassword}
-                      onChange={(e) => {
-                        setPasswordData({
-                          ...passwordData,
-                          newPassword: e.target.value,
-                        });
-                        checkPwStrength(e.target.value);
-                      }}
-                      placeholder="At least 6 characters"
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                  {passwordData.newPassword && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="space-y-1"
-                    >
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4].map((i) => (
-                          <div
-                            key={i}
-                            className="h-0.5 flex-1 rounded-full transition-colors duration-300"
-                            style={{
-                              background:
-                                i <= pwStrength
-                                  ? strengthColors[Math.max(pwStrength - 1, 0)]
-                                  : "hsl(var(--border))",
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <p
-                        className="text-[11px] font-medium"
-                        style={{
-                          color:
-                            pwStrength > 0
-                              ? strengthColors[Math.max(pwStrength - 1, 0)]
-                              : "hsl(var(--muted-foreground))",
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword">New password</Label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={passwordData.newPassword}
+                        onChange={(e) => {
+                          setPasswordData({ ...passwordData, newPassword: e.target.value });
+                          checkPwStrength(e.target.value);
                         }}
-                      >
-                        {pwStrength > 0
-                          ? strengthLabels[Math.min(pwStrength - 1, 3)]
-                          : ""}
-                      </p>
-                    </motion.div>
-                  )}
-                </div>
+                        placeholder="At least 6 characters"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                    {passwordData.newPassword && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4].map((i) => (
+                            <div
+                              key={i}
+                              className="h-1 w-6 rounded-full transition-colors"
+                              style={{
+                                background:
+                                  i <= pwStrength
+                                    ? ["#ef4444", "#f59e0b", "#22c55e", "#0ea5e9"][
+                                        Math.max(pwStrength - 1, 0)
+                                      ]
+                                    : "hsl(var(--border))",
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">
+                          {["", "Weak", "Fair", "Strong", "Very strong"][pwStrength] || ""}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm new password</Label>
-                  <div className="relative">
-                    <LockIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) =>
-                        setPasswordData({
-                          ...passwordData,
-                          confirmPassword: e.target.value,
-                        })
-                      }
-                      placeholder="Repeat new password"
-                      className="pl-10"
-                      required
-                    />
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm new password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) =>
+                          setPasswordData({ ...passwordData, confirmPassword: e.target.value })
+                        }
+                        placeholder="Repeat new password"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -690,7 +564,7 @@ export default function ProfilePage() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-2 overflow-hidden rounded-lg bg-green-500/10 px-3 py-2 text-xs text-green-600 dark:text-green-400"
+                      className="mt-4 flex items-center gap-2 rounded-lg bg-green-500/10 px-3 py-2 text-xs text-green-600 dark:text-green-400"
                     >
                       <CheckCircle2 size={14} />
                       {passwordSuccess}
@@ -701,7 +575,7 @@ export default function ProfilePage() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-2 overflow-hidden rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                      className="mt-4 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
                     >
                       <AlertCircle size={14} />
                       {passwordError}
@@ -713,203 +587,24 @@ export default function ProfilePage() {
                   type="submit"
                   disabled={savingPassword}
                   variant="outline"
-                  className="w-full"
+                  className="mt-6 w-full"
                 >
-                  {savingPassword && (
-                    <Loader2 size={16} className="mr-2 animate-spin" />
-                  )}
+                  {savingPassword && <Loader2 size={16} className="mr-2 animate-spin" />}
                   Update password
                 </Button>
-              </form>
-            </div>
-
-            {/* Change Password with OTP */}
-            <div className="rounded-2xl border bg-card p-6">
-              <div className="mb-5 flex items-center gap-2 border-b pb-3 text-sm font-semibold">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                  <Fingerprint size={14} />
-                </span>
-                Change password with OTP
               </div>
+            </form>
 
-              {otpStep === "request" ? (
-                <form onSubmit={handleRequestOtp} className="space-y-4">
-                  <p className="text-xs text-muted-foreground">
-                    We'll send a one-time password to your email to verify your identity before changing your password.
-                  </p>
-                  <div className="space-y-2">
-                    <Label htmlFor="otpEmail">Email address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="otpEmail"
-                        type="email"
-                        value={otpEmail}
-                        onChange={(e) => setOtpEmail(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {otpError && (
-                    <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                      <AlertCircle size={14} />
-                      {otpError}
-                    </div>
-                  )}
-
-                  <Button type="submit" disabled={otpLoading} variant="outline" className="w-full">
-                    {otpLoading ? (
-                      <Loader2 size={16} className="mr-2 animate-spin" />
-                    ) : (
-                      <Mail size={16} className="mr-2" />
-                    )}
-                    Send OTP
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtpAndPassword} className="space-y-4">
-                  {otpMessage && (
-                    <div className="flex items-center gap-2 rounded-lg bg-green-500/10 px-3 py-2 text-xs text-green-600 dark:text-green-400">
-                      <CheckCircle2 size={14} />
-                      {otpMessage}
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="otp">Enter OTP</Label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="otp"
-                        type="text"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        placeholder="6-digit code"
-                        className="pl-10 tracking-[0.5em] text-center"
-                        maxLength={6}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="otpNewPassword">New password</Label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="otpNewPassword"
-                        type="password"
-                        value={otpNewPassword}
-                        onChange={(e) => {
-                          setOtpNewPassword(e.target.value);
-                          checkOtpPwStrength(e.target.value);
-                        }}
-                        placeholder="At least 8 characters"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                    {otpNewPassword && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="space-y-1"
-                      >
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div
-                              key={i}
-                              className="h-0.5 flex-1 rounded-full transition-colors duration-300"
-                              style={{
-                                background:
-                                  i <= otpPwStrength
-                                    ? strengthColors[Math.max(otpPwStrength - 1, 0)]
-                                    : "hsl(var(--border))",
-                              }}
-                            />
-                          ))}
-                        </div>
-                        <p
-                          className="text-[11px] font-medium"
-                          style={{
-                            color:
-                              otpPwStrength > 0
-                                ? strengthColors[Math.max(otpPwStrength - 1, 0)]
-                                : "hsl(var(--muted-foreground))",
-                          }}
-                        >
-                          {otpPwStrength > 0
-                            ? strengthLabels[Math.min(otpPwStrength - 1, 3)]
-                            : ""}
-                        </p>
-                      </motion.div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="otpConfirmPassword">Confirm new password</Label>
-                    <div className="relative">
-                      <LockIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="otpConfirmPassword"
-                        type="password"
-                        value={otpConfirmPassword}
-                        onChange={(e) => setOtpConfirmPassword(e.target.value)}
-                        placeholder="Repeat new password"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {otpError && (
-                    <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                      <AlertCircle size={14} />
-                      {otpError}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => {
-                        setOtpStep("request");
-                        setOtp("");
-                        setOtpNewPassword("");
-                        setOtpConfirmPassword("");
-                        setOtpError("");
-                        setOtpMessage("");
-                        setOtpPwStrength(0);
-                      }}
-                      className="flex-1"
-                    >
-                      Back
-                    </Button>
-                    <Button type="submit" disabled={otpLoading} className="flex-1">
-                      {otpLoading ? (
-                        <Loader2 size={16} className="mr-2 animate-spin" />
-                      ) : (
-                        <ShieldCheckIcon size={16} className="mr-2" />
-                      )}
-                      Verify & Change
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </div>
-
-            {/* Security Status */}
-            <div className="rounded-2xl border bg-card p-6">
-              <div className="mb-5 flex items-center gap-2 border-b pb-3 text-sm font-semibold">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500/10 text-green-600 dark:text-green-400">
+            {/* Security Settings */}
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-green-500/10 text-green-600 dark:text-green-400">
                   <Shield size={14} />
                 </span>
-                Security status
-              </div>
-              <div className="flex flex-col gap-3">
+                Security settings
+              </h3>
+
+              <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
                     <Smartphone size={15} className="text-muted-foreground shrink-0" />
@@ -918,11 +613,12 @@ export default function ProfilePage() {
                   <Switch
                     checked={twoFactorEnabled}
                     onCheckedChange={handleToggleTwoFactor}
-                    loading={togglingTwoFactor}
-                    disabled={togglingTwoFactor}
+                    loading={toggling2FA}
+                    disabled={toggling2FA}
                     aria-label="Toggle two-factor authentication"
                   />
                 </div>
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
                     <Clock size={15} className="text-muted-foreground shrink-0" />
@@ -930,18 +626,15 @@ export default function ProfilePage() {
                   </div>
                   <span className="text-xs text-muted-foreground">30 minutes</span>
                 </div>
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
                     <Bot size={15} className="text-muted-foreground shrink-0" />
                     <span>AI session logging</span>
                   </div>
-                  <Switch
-                    checked={aiLoggingEnabled}
-                    onCheckedChange={handleToggleAiLogging}
-                    loading={togglingAiLogging}
-                    disabled={togglingAiLogging}
-                    aria-label="Toggle AI session logging"
-                  />
+                  <span className="text-xs text-muted-foreground">
+                    Enabled
+                  </span>
                 </div>
               </div>
             </div>
@@ -956,12 +649,12 @@ export default function ProfilePage() {
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25 }}
           >
-            <div className="rounded-2xl border bg-card p-6">
+            <div className="rounded-lg border bg-card p-6">
               <FontSettingsPanel />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

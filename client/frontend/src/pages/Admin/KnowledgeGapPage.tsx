@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StatsCard from "@/components/admin/StatsCard";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import GapDetailDrawer from "@/components/admin/knowledge-base/GapDetailDrawer";
 
 interface KnowledgeGap {
   _id: string;
@@ -23,7 +24,7 @@ interface KnowledgeGap {
   matched_chunks: number;
   keywords: string[];
   topic: string;
-  status: "unresolved" | "reviewed" | "resolved" | "dismissed";
+  status: "open" | "reviewing" | "resolved" | "ignored";
   resolution_note: string;
   resolved_by?: { _id: string; name: string; email: string } | null;
   resolved_at?: string | null;
@@ -35,9 +36,9 @@ interface KnowledgeGap {
 interface GapStats {
   summary: {
     totalGaps: number;
-    unresolvedGaps: number;
+    openGaps: number;
     resolvedGaps: number;
-    dismissedGaps: number;
+    ignoredGaps: number;
     resolutionRate: number;
     totalDocuments: number;
     totalChunks: number;
@@ -48,13 +49,13 @@ interface GapStats {
   topFrequentGaps: KnowledgeGap[];
 }
 
-const STATUS_TABS = ["", "unresolved", "reviewed", "resolved", "dismissed"] as const;
+const STATUS_TABS = ["", "open", "reviewing", "resolved", "ignored"] as const;
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  unresolved: { label: "Unresolved", color: "bg-red-500/10 text-red-600", icon: <AlertTriangle size={12} /> },
-  reviewed: { label: "Reviewed", color: "bg-amber-500/10 text-amber-600", icon: <Eye size={12} /> },
+  open: { label: "Unresolved", color: "bg-red-500/10 text-red-600", icon: <AlertTriangle size={12} /> },
+  reviewing: { label: "Reviewed", color: "bg-amber-500/10 text-amber-600", icon: <Eye size={12} /> },
   resolved: { label: "Resolved", color: "bg-green-500/10 text-green-600", icon: <CheckCircle size={12} /> },
-  dismissed: { label: "Dismissed", color: "bg-muted text-muted-foreground", icon: <XCircle size={12} /> },
+  ignored: { label: "Dismissed", color: "bg-muted text-muted-foreground", icon: <XCircle size={12} /> },
 };
 
 const severityColor = (score: number) => {
@@ -100,6 +101,8 @@ export default function KnowledgeGapPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+  const [drawerGap, setDrawerGap] = useState<KnowledgeGap | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const fetchGaps = useCallback(async () => {
     setLoading(true);
@@ -194,7 +197,7 @@ export default function KnowledgeGapPage() {
   const handleReview = async (gap: KnowledgeGap) => {
     setActionLoading(true);
     try {
-      await KnowledgeGapAPI.updateStatus(gap._id, { status: "reviewed" });
+      await KnowledgeGapAPI.updateStatus(gap._id, { status: "reviewing" });
       fetchGaps();
       fetchStats();
     } catch (err: any) {
@@ -209,7 +212,7 @@ export default function KnowledgeGapPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 dark:border-white/[0.06]">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-3xl font-bold  flex items-center gap-2">
             <AlertTriangle className="text-primary" size={28} />
             Knowledge Gaps
           </h1>
@@ -234,7 +237,7 @@ export default function KnowledgeGapPage() {
         />
         <StatsCard
           title="Unresolved"
-          value={loadingStats ? "..." : stats?.summary.unresolvedGaps ?? 0}
+          value={loadingStats ? "..." : stats?.summary.openGaps ?? 0}
           icon={<Clock size={20} />}
           description="Awaiting resolution"
           className="border-red-500/20 bg-red-500/5"
@@ -343,7 +346,10 @@ export default function KnowledgeGapPage() {
           {gaps.map((gap) => (
             <div key={gap._id} className="rounded-xl border bg-card p-4 sm:p-5 space-y-3 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
+                <button
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => { setDrawerGap(gap); setDrawerOpen(true); }}
+                >
                   {/* Status + Topic + Score */}
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1 ${statusConfig[gap.status]?.color}`}>
@@ -388,11 +394,11 @@ export default function KnowledgeGapPage() {
                       <strong>Note:</strong> {gap.resolution_note}
                     </div>
                   )}
-                </div>
+                </button>
 
                 {/* Actions */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {gap.status === "unresolved" && (
+                  {gap.status === "open" && (
                     <button
                       onClick={() => handleReview(gap)}
                       className="p-1.5 rounded-lg hover:bg-amber-500/10 text-amber-600"
@@ -401,7 +407,7 @@ export default function KnowledgeGapPage() {
                       <Eye size={14} />
                     </button>
                   )}
-                  {(gap.status === "unresolved" || gap.status === "reviewed") && (
+                  {(gap.status === "open" || gap.status === "reviewing") && (
                     <>
                       <button
                         onClick={() => { setSelectedGap(gap); setShowResolveModal(true); }}
@@ -505,6 +511,12 @@ export default function KnowledgeGapPage() {
         variant="danger"
         onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
         onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
+      <GapDetailDrawer
+        gap={drawerGap}
+        open={drawerOpen}
+        onOpenChange={(open) => { setDrawerOpen(open); if (!open) setDrawerGap(null); }}
+        onResolved={() => { setDrawerOpen(false); setDrawerGap(null); fetchGaps(); fetchStats(); }}
       />
     </div>
   );

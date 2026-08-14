@@ -1,88 +1,131 @@
 import express from "express";
-import { protect, access, anyAccess } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
+import { attachScope } from "../../middleware/branchScope.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { createDocumentTypeSchema, updateDocumentTypeSchema } from "../../validation/documentType.validation.js";
 import { createRoleSchema, updateRoleSchema } from "../../validation/role.validation.js";
 import { updateOrganizationSettingsSchema } from "../../validation/organizationSettings.validation.js";
 import { updateGlobalSettingsSchema } from "../../validation/globalSetting.validation.js";
 import * as adminController from "./admin.controller.js";
+import * as aiConfigController from "../ai/aiConfig.controller.js";
+import * as billingController from "../billing/billing.controller.js";
+import * as analyticsController from "../analytics/analytics.controller.js";
+
+// RBAC: every route below is gated purely by role.
+//   super_admin      → always allowed (bypasses checkRole)
+//   admin / branch_admin → organization-level access
+const ADMIN = ["admin", "branch_admin"];
 
 const router = express.Router();
 
 router.use(protect);
+router.use(attachScope);
 
-router.get("/dashboard/stats", access("report.view_dashboard"), adminController.dashboardStats);
+router.get("/dashboard/stats", checkRole(...ADMIN), adminController.dashboardStats);
 
-router.get("/organizations", access("org.view"), adminController.getOrganizations);
-router.post("/organizations", access("*"), adminController.createOrg);
-router.put("/organizations/:id", access("*"), adminController.updateOrg);
-router.delete("/organizations/:id", access("*"), adminController.deleteOrg);
-router.get("/organizations/:id/users", access("user.view"), adminController.getOrganizationUsers);
+router.get("/organizations", checkRole("admin"), adminController.getOrganizations);
+router.get("/organizations/:id/users", checkRole(...ADMIN), adminController.getOrganizationUsers);
 
-router.get("/users", access("user.view"), adminController.getUsers);
-router.post("/users", access("user.invite"), adminController.addUser);
-router.put("/users/:id", anyAccess("user.update", "user.invite"), adminController.editUser);
-router.patch("/users/:id/status", access("user.disable"), adminController.patchUserStatus);
-router.delete("/users/:id", anyAccess("user.update", "user.disable"), adminController.removeUser);
+// Organization management — Super Admin only (RBAC)
+router.post("/organizations", checkRole("super_admin"), adminController.createOrg);
+router.put("/organizations/:id", checkRole("super_admin"), adminController.updateOrg);
+router.delete("/organizations/:id", checkRole("super_admin"), adminController.deleteOrg);
 
-router.get("/roles", access("role.view"), adminController.getRoles);
-router.post("/roles", access("role.create"), validate(createRoleSchema), adminController.addRole);
-router.put("/roles/:id", access("role.create"), validate(updateRoleSchema), adminController.editRole);
-router.delete("/roles/:id", access("role.delete"), adminController.removeRole);
+router.get("/users", checkRole(...ADMIN), adminController.getUsers);
+router.post("/users", checkRole("admin"), adminController.addUser);
+router.put("/users/:id", checkRole("admin"), adminController.editUser);
+router.patch("/users/:id/status", checkRole("admin"), adminController.patchUserStatus);
+router.delete("/users/:id", checkRole("admin"), adminController.removeUser);
 
-router.get("/audit-logs", access("report.view"), adminController.getAuditLogs);
+router.get("/roles", checkRole("admin"), adminController.getRoles);
+router.post("/roles", checkRole("admin"), validate(createRoleSchema), adminController.addRole);
+router.put("/roles/:id", checkRole("admin"), validate(updateRoleSchema), adminController.editRole);
+router.delete("/roles/:id", checkRole("admin"), adminController.removeRole);
+router.get("/permissions/categories", checkRole("admin"), adminController.getPermissionCategories);
 
-router.get("/documents", access("document.view_all"), adminController.getDocuments);
-router.get("/documents/:id", access("document.view_all"), adminController.getDocumentById);
-router.get("/documents/:id/chunks", access("document.view_all"), adminController.getDocumentChunks);
+router.get("/audit-logs", checkRole(...ADMIN), adminController.getAuditLogs);
+router.get("/audit-logs/export", checkRole(...ADMIN), adminController.exportAuditLogs);
 
-router.get("/document-verifications", access("document.view_all"), adminController.getDocumentVerifications);
-router.patch("/document-verifications/:id/approve", access("document.approve"), adminController.approveDocument);
-router.patch("/document-verifications/:id/reject", access("document.approve"), adminController.rejectDocument);
+router.get("/documents", checkRole(...ADMIN), adminController.getDocuments);
+router.get("/documents/:id", checkRole(...ADMIN), adminController.getDocumentById);
+router.get("/documents/:id/chunks", checkRole(...ADMIN), adminController.getDocumentChunks);
 
-router.get("/rag-stats", access("report.view"), adminController.getRAGStats);
+router.get("/document-verifications", checkRole(...ADMIN), adminController.getDocumentVerifications);
+router.patch("/document-verifications/:id/approve", checkRole("admin"), adminController.approveDocument);
+router.patch("/document-verifications/:id/reject", checkRole("admin"), adminController.rejectDocument);
 
-router.get("/document-types", access("*"), adminController.getDocumentTypes);
-router.post("/document-types", access("*"), validate(createDocumentTypeSchema), adminController.createDocumentType);
-router.put("/document-types/:id", access("*"), validate(updateDocumentTypeSchema), adminController.updateDocumentType);
-router.delete("/document-types/:id", access("*"), adminController.deleteDocumentType);
+router.get("/rag-stats", checkRole("admin"), adminController.getRAGStats);
 
+router.get("/document-types", checkRole(...ADMIN), adminController.getDocumentTypes);
+router.post("/document-types", checkRole("admin"), validate(createDocumentTypeSchema), adminController.createDocumentType);
+router.put("/document-types/:id", checkRole("admin"), validate(updateDocumentTypeSchema), adminController.updateDocumentType);
+router.delete("/document-types/:id", checkRole("admin"), adminController.deleteDocumentType);
+
+// Own-org settings — readable by any org member (used for branding), writable by org admins
 router.get("/organization/settings", adminController.getOrgSettings);
-router.put("/organization/settings", access("org.manage"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
+router.put("/organization/settings", checkRole("admin"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
 
-router.get("/organizations/:orgId/settings", access("*"), adminController.getOrgSettings);
-router.put("/organizations/:orgId/settings", access("*"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
+// AI configs management
+router.get("/ai-configs", checkRole("admin"), aiConfigController.getAIConfigs);
+router.post("/ai-configs", checkRole("admin"), aiConfigController.createAIConfig);
+router.put("/ai-configs/:id", checkRole("admin"), aiConfigController.updateAIConfig);
+router.delete("/ai-configs/:id", checkRole("admin"), aiConfigController.deleteAIConfig);
+router.post("/ai-configs/:id/test", checkRole("admin"), aiConfigController.testAIConfig);
 
-router.patch("/organizations/:id/suspend", access("*"), adminController.suspendOrg);
-router.patch("/organizations/:id/activate", access("*"), adminController.activateOrg);
-router.get("/usage/stats", access("*"), adminController.getUsageStats);
-router.post("/organizations/:id/api-keys", access("*"), adminController.createOrgApiKey);
-router.delete("/organizations/:id/api-keys/:keyId", access("*"), adminController.revokeOrgApiKey);
+// Billing (own-org)
+router.get("/billing", checkRole(...ADMIN), billingController.getBilling);
+router.get("/billing/invoices", checkRole(...ADMIN), billingController.getInvoices);
+router.post("/billing/change-plan", checkRole("admin"), billingController.changePlan);
 
-router.get("/users/basic", access("user.view"), adminController.getUsersBasic);
+// Analytics (own-org)
+router.get("/analytics/overview", checkRole(...ADMIN), analyticsController.getOverview);
+router.get("/analytics/ai-usage", checkRole(...ADMIN), analyticsController.getAIUsage);
 
-router.get("/chats", access("chat.view"), adminController.getChats);
-router.delete("/chats", access("chat.delete"), adminController.deleteAllChats);
-router.get("/chats/export", access("chat.view"), adminController.exportChats);
-router.get("/chats/:id", access("chat.view"), adminController.getChatDetail);
-router.patch("/chats/:id/status", access("chat.end"), adminController.updateChatStatus);
-router.delete("/chats/:id", access("chat.delete"), adminController.deleteChat);
+// Org self-service API keys (own-org, admin)
+router.get("/organization/api-keys", checkRole(...ADMIN), adminController.getMyOrgApiKeys);
+router.post("/organization/api-keys", checkRole("admin"), adminController.createMyOrgApiKey);
+router.delete("/organization/api-keys/:keyId", checkRole("admin"), adminController.revokeMyOrgApiKey);
+
+// Other org's settings — Super Admin only
+router.get("/organizations/:orgId/settings", checkRole("super_admin"), adminController.getOrgSettings);
+router.put("/organizations/:orgId/settings", checkRole("super_admin"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
+
+// Suspend / activate / usage — Super Admin only
+router.patch("/organizations/:id/suspend", checkRole("super_admin"), adminController.suspendOrg);
+router.patch("/organizations/:id/activate", checkRole("super_admin"), adminController.activateOrg);
+router.get("/usage/stats", checkRole("super_admin"), adminController.getUsageStats);
+router.post("/organizations/:id/api-keys", checkRole("super_admin"), adminController.createOrgApiKey);
+router.delete("/organizations/:id/api-keys/:keyId", checkRole("super_admin"), adminController.revokeOrgApiKey);
+
+router.get("/users/basic", checkRole(...ADMIN), adminController.getUsersBasic);
+
+router.get("/chats", checkRole(...ADMIN), adminController.getChats);
+router.get("/chats/export", checkRole(...ADMIN), adminController.exportChats);
+router.get("/chats/:id", checkRole(...ADMIN), adminController.getChatDetail);
+router.patch("/chats/:id/status", checkRole(...ADMIN), adminController.updateChatStatus);
+router.delete("/chats/:id", checkRole("admin"), adminController.deleteChat);
+
+// Bulk chat delete — org-scoped for admin/branch_admin; global for Super Admin
+router.delete("/chats", checkRole(...ADMIN), adminController.deleteAllChats);
+
+router.get("/knowledge-graph-stats", checkRole("super_admin"), adminController.getKnowledgeGraphStats);
 
 // Command Center (Super Admin Only)
-router.get("/command-center/status", access("*"), adminController.getCommandCenterStatus);
-router.post("/command-center/toggle-maintenance", access("*"), adminController.toggleMaintenanceMode);
-router.post("/command-center/global-notification", access("*"), adminController.sendGlobalNotification);
-router.post("/command-center/impersonate", access("*"), adminController.impersonateOrg);
-router.post("/command-center/clear-cache", access("*"), adminController.clearSystemCache);
-router.post("/command-center/restart-jobs", access("*"), adminController.restartBackgroundJobs);
-router.post("/command-center/backup-db", access("*"), adminController.backupDatabase);
+router.get("/command-center/status", checkRole("super_admin"), adminController.getCommandCenterStatus);
+router.post("/command-center/toggle-maintenance", checkRole("super_admin"), adminController.toggleMaintenanceMode);
+router.post("/command-center/global-notification", checkRole("super_admin"), adminController.sendGlobalNotification);
+router.post("/command-center/impersonate", checkRole("super_admin"), adminController.impersonateOrg);
+router.post("/command-center/clear-cache", checkRole("super_admin"), adminController.clearSystemCache);
+router.post("/command-center/restart-jobs", checkRole("super_admin"), adminController.restartBackgroundJobs);
+router.post("/command-center/backup-db", checkRole("super_admin"), adminController.backupDatabase);
 
 // Global Application Settings (Super Admin Only)
-router.get("/global-settings", access("*"), adminController.getGlobalSettings);
-router.put("/global-settings", access("*"), validate(updateGlobalSettingsSchema), adminController.updateGlobalSettings);
+router.get("/global-settings", checkRole("super_admin"), adminController.getGlobalSettings);
+router.put("/global-settings", checkRole("super_admin"), validate(updateGlobalSettingsSchema), adminController.updateGlobalSettings);
 
 // Organization Full Details & Analytics
-router.get("/organizations/:id/full-details", access("org.view"), adminController.getOrgFullDetails);
-router.get("/organizations/:id/analytics", access("report.view"), adminController.getOrgAnalytics);
+router.get("/organizations/:id/full-details", checkRole("admin"), adminController.getOrgFullDetails);
+router.get("/organizations/:id/analytics", checkRole("admin"), adminController.getOrgAnalytics);
 
 export default router;

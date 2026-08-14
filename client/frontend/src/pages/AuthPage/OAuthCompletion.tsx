@@ -191,7 +191,6 @@ export default function OAuthCompletion() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-primary/5 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent dark:from-primary/10" />
       <div className="relative z-10 w-full max-w-lg">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -221,7 +220,7 @@ export default function OAuthCompletion() {
               {/* Identity banner (read-only OAuth attributes) */}
               <div className="flex items-center gap-4 rounded-xl border border-primary/20 bg-primary/5 dark:border-primary/10 p-4">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Identity verified via {providerLabel}</p>
+                  <p className="text-xs uppercase  text-muted-foreground">Identity verified via {providerLabel}</p>
                   <p className="text-base font-semibold text-foreground truncate">{identity.oauthName}</p>
                   <div className="flex items-center gap-1.5 mt-0.5 text-sm text-muted-foreground">
                     <Mail className="h-3.5 w-3.5" />

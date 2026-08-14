@@ -11,7 +11,13 @@ const chatSchema = new mongoose.Schema(
     organization_id: {
       type: Schema.Types.ObjectId,
       ref: "Organization",
-      required: true,
+      default: null,
+      index: true,
+    },
+    branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
       index: true,
     },
     assigned_to: {
@@ -34,6 +40,10 @@ const chatSchema = new mongoose.Schema(
     last_message_at: {
       type: Date,
       default: Date.now,
+    },
+    is_copilot: {
+      type: Boolean,
+      default: false,
     },
   },
   {

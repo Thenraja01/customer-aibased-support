@@ -6,6 +6,7 @@ import AdminUsersPage from "@/pages/Admin/AdminUsersPage";
 import BranchesPage from "@/pages/Admin/BranchesPage";
 import RolesPage from "@/pages/Admin/RolesPage";
 import DocumentsPage from "@/pages/Admin/DocumentsManagementPage";
+import TopicManagementPage from "@/pages/Admin/TopicManagementPage";
 import VerificationsPage from "@/pages/Admin/OrgDocumentVerificationsPage";
 import DocumentTypesPage from "@/pages/Admin/DocumentTypesPage";
 import FAQPage from "@/pages/Admin/FAQPage";
@@ -20,8 +21,10 @@ import NotificationsPage from "@/pages/Admin/NotificationsPage";
 import SendNotificationPage from "@/pages/Admin/SendNotificationPage";
 import KnowledgeGapPage from "@/pages/Admin/KnowledgeGapPage";
 import PendingApprovalsPage from "@/pages/Admin/PendingApprovalsPage";
-import RolePermissionsPage from "@/pages/Admin/RolePermissionsPage";
 import AdminCommunicationPage from "@/pages/Admin/AdminCommunicationPage";
+import BusinessAICopilotPage from "@/pages/Admin/BusinessAICopilotPage";
+import AuditLogsPage from "@/pages/Admin/AuditLogsPage";
+import ModelHealthPage from "@/pages/Admin/ModelHealthPage";
 
 export const adminRoutes = (
   <Route
@@ -33,9 +36,9 @@ export const adminRoutes = (
     <Route path="branches" element={<BranchesPage />} />
     <Route path="team" element={<TeamPage />} />
     <Route path="roles" element={<RolesPage />} />
-    <Route path="roles/:id/permissions" element={<RolePermissionsPage />} />
-    <Route path="permissions" element={<RolePermissionsPage />} />
+
     <Route path="documents" element={<DocumentsPage />} />
+    <Route path="topics" element={<TopicManagementPage />} />
     <Route path="verifications" element={<VerificationsPage />} />
     <Route path="document-types" element={<DocumentTypesPage />} />
     <Route path="faq" element={<FAQPage />} />
@@ -43,6 +46,7 @@ export const adminRoutes = (
     <Route path="settings" element={<OrganizationSettingsPage />} />
     <Route path="queue" element={<QueueManagementPage />} />
     <Route path="chatbot" element={<ChatPage />} />
+    <Route path="copilot" element={<BusinessAICopilotPage />} />
     <Route path="profile" element={<ProfilePage />} />
     <Route path="chat-history" element={<ChatHistoryPage />} />
     <Route path="chat-history/:chatId" element={<AdminChatHistoryView />} />
@@ -51,5 +55,7 @@ export const adminRoutes = (
     <Route path="knowledge-gaps" element={<KnowledgeGapPage />} />
     <Route path="pending-approvals" element={<PendingApprovalsPage />} />
     <Route path="communication" element={<AdminCommunicationPage />} />
+    <Route path="audit-logs" element={<AuditLogsPage />} />
+    <Route path="model-health" element={<ModelHealthPage />} />
   </Route>
 );

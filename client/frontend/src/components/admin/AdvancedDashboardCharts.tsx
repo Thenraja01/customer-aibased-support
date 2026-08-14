@@ -36,7 +36,7 @@ function ChartCardWrapper({ title, subtitle, children }: ChartWrapperProps) {
   return (
     <div className="rounded-xl border bg-card p-4 space-y-2 dark:border-white/[0.06] shadow-xs">
       <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</p>
+        <p className="text-xs font-bold uppercase  text-muted-foreground">{title}</p>
         {subtitle && <p className="text-[11px] text-muted-foreground/80">{subtitle}</p>}
       </div>
       <div className="h-52 w-full">{children}</div>

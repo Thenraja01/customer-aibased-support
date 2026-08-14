@@ -1,23 +1,22 @@
 import Ticket from "./ticket.schema.js";
 import User from "../user/user.schema.js";
-import Role from "../role/role.schema.js";
 import Chat from "../chat/chat.schema.js";
 import Message from "../message/message.schema.js";
 import { getNextIndex } from "../../utils/roundRobin.js";
 
-export const getNextAgent = async (organizationId) => {
-  const supportRole = await Role.findOne({ role_name: /support/i });
-  if (!supportRole) return null;
-  const agents = await User.find({ role_id: supportRole._id, organization_id: organizationId, status: "active" }).select("_id name email");
+export const getNextAgent = async (organizationId, branchId = null) => {
+  const filter = { role: "support", organization_id: organizationId, status: "active" };
+  if (branchId) filter.branch_id = branchId;
+  const agents = await User.find(filter).select("_id name email");
   if (agents.length === 0) return null;
   const index = getNextIndex(organizationId, agents.length);
   return agents[index];
 };
 
-export const createTicket = async (data, organizationId) => {
-  const ticket = await Ticket.create(data);
+export const createTicket = async (data, organizationId, branchId = null) => {
+  const ticket = await Ticket.create({ ...data, branch_id: data.branch_id || branchId });
   if (organizationId && !ticket.assigned_to) {
-    const agent = await getNextAgent(organizationId);
+    const agent = await getNextAgent(organizationId, ticket.branch_id);
     if (agent) {
       return await Ticket.findByIdAndUpdate(
         ticket._id,
@@ -29,7 +28,7 @@ export const createTicket = async (data, organizationId) => {
   return ticket;
 };
 
-export const escalateFromChat = async ({ chatId, subject, description, userId, organizationId }) => {
+export const escalateFromChat = async ({ chatId, subject, description, userId, organizationId, branchId }) => {
   const chat = await Chat.findById(chatId);
   if (!chat) throw new Error("Chat not found");
 
@@ -46,6 +45,7 @@ export const escalateFromChat = async ({ chatId, subject, description, userId, o
   const ticket = await Ticket.create({
     user_id: userId,
     organization_id: organizationId,
+    branch_id: branchId,
     subject: subject || `Escalated from chat: ${chat.topic || "Support Chat"}`,
     description: description || "Customer requested escalation from AI chat.",
     category: "question",
@@ -57,7 +57,7 @@ export const escalateFromChat = async ({ chatId, subject, description, userId, o
     },
   });
 
-  const agent = await getNextAgent(organizationId);
+  const agent = await getNextAgent(organizationId, branchId);
   if (agent) {
     return await Ticket.findByIdAndUpdate(
       ticket._id,
@@ -69,17 +69,21 @@ export const escalateFromChat = async ({ chatId, subject, description, userId, o
   return ticket;
 };
 
-export const getAllTickets = async (organizationId = null) => {
+export const getAllTickets = async (organizationId = null, branchId = null) => {
   const filter = {};
   if (organizationId) filter.organization_id = organizationId;
+  if (branchId) filter.branch_id = branchId;
   return await Ticket.find(filter)
     .populate("user_id", "name email")
     .populate("assigned_to", "name email")
     .sort({ created_at: -1 });
 };
 
-export const getTicketById = async (id) => {
-  const ticket = await Ticket.findById(id)
+export const getTicketById = async (id, organizationId = null, branchId = null) => {
+  const filter = { _id: id };
+  if (organizationId) filter.organization_id = organizationId;
+  if (branchId) filter.branch_id = branchId;
+  const ticket = await Ticket.findOne(filter)
     .populate("user_id", "name email")
     .populate("assigned_to", "name email")
     .populate("resolved_by", "name email")
@@ -88,25 +92,28 @@ export const getTicketById = async (id) => {
   return ticket;
 };
 
-export const getTicketsByUser = async (userId, organizationId = null) => {
+export const getTicketsByUser = async (userId, organizationId = null, branchId = null) => {
   const filter = { user_id: userId };
   if (organizationId) filter.organization_id = organizationId;
+  if (branchId) filter.branch_id = branchId;
   return await Ticket.find(filter)
     .populate("assigned_to", "name email")
     .sort({ created_at: -1 });
 };
 
-export const getTicketsBySupport = async (supportId, organizationId = null) => {
+export const getTicketsBySupport = async (supportId, organizationId = null, branchId = null) => {
   const filter = { assigned_to: supportId };
   if (organizationId) filter.organization_id = organizationId;
+  if (branchId) filter.branch_id = branchId;
   return await Ticket.find(filter)
     .populate("user_id", "name email")
     .sort({ created_at: -1 });
 };
 
-export const getTicketsByStatus = async (status, organizationId = null) => {
+export const getTicketsByStatus = async (status, organizationId = null, branchId = null) => {
   const filter = { status };
   if (organizationId) filter.organization_id = organizationId;
+  if (branchId) filter.branch_id = branchId;
   return await Ticket.find(filter)
     .populate("user_id", "name email")
     .populate("assigned_to", "name email")
@@ -181,12 +188,15 @@ export const deleteTicket = async (id) => {
   return { message: "Ticket deleted" };
 };
 
-export const getQueue = async (organizationId) => {
+export const getQueue = async (organizationId, branchId = null) => {
   const priorityOrder = { critical: 1, high: 2, medium: 3, low: 4 };
-  const tickets = await Ticket.find({
+  const filter = {
     organization_id: organizationId,
     status: { $in: ["open", "assigned", "pending"] },
-  })
+  };
+  if (branchId) filter.branch_id = branchId;
+
+  const tickets = await Ticket.find(filter)
     .populate("user_id", "name email")
     .populate("assigned_to", "name email")
     .lean();
@@ -201,18 +211,17 @@ export const getQueue = async (organizationId) => {
   return tickets;
 };
 
-export const getSupportUserIds = async (organizationId) => {
-  const supportRole = await Role.findOne({ role_name: /support/i });
-  if (!supportRole) return [];
-  const agents = await User.find({ role_id: supportRole._id, organization_id: organizationId }).select("_id");
+export const getSupportUserIds = async (organizationId, branchId = null) => {
+  const filter = { role: "support", organization_id: organizationId };
+  if (branchId) filter.branch_id = branchId;
+  const agents = await User.find(filter).select("_id");
   return agents.map((a) => a._id);
 };
 
-export const getAgentWorkload = async (organizationId) => {
-  const supportRole = await Role.findOne({ role_name: /support/i });
-  if (!supportRole) return [];
-
-  const agents = await User.find({ role_id: supportRole._id, organization_id: organizationId }).select("_id name email");
+export const getAgentWorkload = async (organizationId, branchId = null) => {
+  const filter = { role: "support", organization_id: organizationId };
+  if (branchId) filter.branch_id = branchId;
+  const agents = await User.find(filter).select("_id name email");
   const workload = await Promise.all(
     agents.map(async (agent) => {
       const openCount = await Ticket.countDocuments({
@@ -242,8 +251,10 @@ export const smartAssign = async (ticketId, organizationId) => {
   return { ticket: updated, assignedTo: leastBusy };
 };
 
-export const getTicketStats = async (organizationId = null) => {
-  const query = organizationId ? { organization_id: organizationId } : {};
+export const getTicketStats = async (organizationId = null, branchId = null) => {
+  const query = {};
+  if (organizationId) query.organization_id = organizationId;
+  if (branchId) query.branch_id = branchId;
   const [open, assigned, inProgress, waitingForCustomer, pending, resolved, closed] = await Promise.all([
     Ticket.countDocuments({ ...query, status: "open" }),
     Ticket.countDocuments({ ...query, status: "assigned" }),

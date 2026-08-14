@@ -196,7 +196,7 @@ export default function AIControlCenterPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-bold  flex items-center gap-3">
           <Bot className="text-primary" size={28} />
           AI Control Center
         </h1>
@@ -347,7 +347,7 @@ export default function AIControlCenterPage() {
               </div>
 
               <div className="space-y-3">
-                <Label>Similarity Threshold ({aiSettings.similarity_threshold})</Label>
+                <Label>Retrieval Threshold ({aiSettings.similarity_threshold})</Label>
                 <input
                   type="range"
                   min="0"
@@ -379,19 +379,35 @@ export default function AIControlCenterPage() {
                   <span>Long (8192)</span>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label>Response Style</Label>
-              <select
-                value={aiSettings.response_style}
-                onChange={(e) => setAiSettings({ ...aiSettings, response_style: e.target.value })}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/[0.06]"
-              >
-                <option value="concise">Concise — Short, direct answers</option>
-                <option value="balanced">Balanced — Moderate detail</option>
-                <option value="detailed">Detailed — Comprehensive explanations</option>
-              </select>
+              <div className="space-y-1.5 flex flex-col justify-center">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="reranking"
+                    checked={aiSettings.reranking ?? false}
+                    onChange={(e) => setAiSettings({ ...aiSettings, reranking: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="reranking">Enable Semantic Re-ranking</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 ml-7">
+                  Re-rank retrieved chunks before sending to the LLM for better context accuracy.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Response Style</Label>
+                <select
+                  value={aiSettings.response_style}
+                  onChange={(e) => setAiSettings({ ...aiSettings, response_style: e.target.value })}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/[0.06]"
+                >
+                  <option value="concise">Concise — Short, direct answers</option>
+                  <option value="balanced">Balanced — Moderate detail</option>
+                  <option value="detailed">Detailed — Comprehensive explanations</option>
+                </select>
+              </div>
             </div>
 
             <div className="space-y-1.5">

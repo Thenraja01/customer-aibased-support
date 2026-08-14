@@ -88,7 +88,7 @@ export default function OrganizationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Organizations</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold ">Organizations</h1>
           <p className="text-muted-foreground text-sm">Manage multi-tenant organizations. Suspend or activate organizations as needed.</p>
         </div>
         <Button onClick={() => { setEditingOrg(null); setShowForm(true); }}>
@@ -112,11 +112,11 @@ export default function OrganizationsPage() {
       {actionError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2" role="alert">
           <span>{actionError}</span>
-          <button onClick={() => setActionError("")} className="ml-auto"><X size={14} /></button>
+          <button onClick={() => setActionError("")} className="ml-auto" title="Dismiss"><X size={14} /></button>
         </div>
       )}
 
-      <div className="rounded-xl border bg-card">
+      <div className="rounded-lg border bg-card">
         <OrganizationTable
           organizations={organizations}
           onEdit={(org) => { setEditingOrg(org); setShowForm(true); }}
@@ -152,14 +152,14 @@ export default function OrganizationsPage() {
           <div className="bg-card rounded-xl shadow-2xl border max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Users in {viewingOrgUsers.name}</h2>
-              <button onClick={() => setViewingOrgUsers(null)} className="p-1 rounded hover:bg-muted"><X size={18} /></button>
+              <button onClick={() => setViewingOrgUsers(null)} className="p-1 rounded hover:bg-muted" title="Close"><X size={18} /></button>
             </div>
             {orgUsers.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No users in this organization.</p>
             ) : (
               <div className="space-y-2">
                 {orgUsers.map((user: any) => (
-                  <div key={user._id} className="flex items-center justify-between p-3 rounded-lg border dark:border-white/[0.06]">
+                  <div key={user._id} className="flex items-center justify-between p-3">
                     <div>
                       <p className="font-medium">{user.name}</p>
                       <p className="text-sm text-muted-foreground">{user.email}</p>

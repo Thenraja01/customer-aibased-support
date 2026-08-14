@@ -4,7 +4,7 @@ import StatsCard from "@/components/admin/StatsCard";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
+import { AdminAPI } from "@/api/admin.api";
 import {
   HeatmapWidget, HistogramWidget, AreaChartWidget
 } from "@/components/admin/AdvancedDashboardCharts";
@@ -23,7 +23,7 @@ export default function SuperAdminDashboard() {
       .catch(() => {});
   }, []);
 
-  const stats = dashboardStats;
+  const stats = dashboardStats as any;
 
   if (loading && !dashboardStats) {
     return <div className="flex items-center justify-center py-20 text-muted-foreground">Loading dashboard...</div>;
@@ -33,7 +33,7 @@ export default function SuperAdminDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 dark:border-white/[0.06]">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-3xl font-bold  flex items-center gap-2">
             <Sparkles className="text-primary" size={28} />
             Super Admin Dashboard
           </h1>
@@ -123,7 +123,7 @@ export default function SuperAdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.orgStats.map((org) => (
+                  {stats.orgStats.map((org: any) => (
                     <tr key={org.organizationId} className="border-b dark:border-white/[0.06] hover:bg-muted/50">
                       <td className="py-3 px-4 font-medium">{org.name}</td>
                       <td className="py-3 px-4 text-muted-foreground font-mono">{org.organization_id}</td>

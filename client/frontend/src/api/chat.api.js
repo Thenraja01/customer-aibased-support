@@ -13,6 +13,7 @@ export const ChatAPI = {
   closeAll: () => AxiosInstance.patch("/chats/close-all"),
   reopen: (id) => AxiosInstance.patch(`/chats/${id}/reopen`),
   delete: (id) => AxiosInstance.delete(`/chats/${id}`),
-  sendAI: (chatId, message) =>
-    AxiosInstance.post("/chats/ai", { chatId, message }),
+  getQuickActions: () => AxiosInstance.get("/chats/quick-actions"),
+  sendAI: (chatId, message, model, actionConfirm) =>
+    AxiosInstance.post("/chats/ai", { chatId, message, model, actionConfirm }, { timeout: 180000 }),
 };

@@ -1,7 +1,9 @@
 import * as adminService from "./admin.service.js";
 import * as orgService from "../organization/organization.service.js";
 import * as userService from "../user/user.service.js";
-import * as roleService from "../role/role.service.js";
+import { getGraphStats as getKnowledgeGraphStats } from "../chat/quickAction.controller.js";
+import { PERMISSION_CATEGORIES } from "../../utils/permissions.js";
+
 
 export const dashboardStats = async (req, res) => {
   try {
@@ -61,8 +63,27 @@ export const deleteOrg = async (req, res) => {
 
 export const getOrganizationUsers = async (req, res) => {
   try {
-    const { page, limit } = req.query;
-    const result = await adminService.getOrgUsers(req.params.id, Number(page) || 1, Number(limit) || 10);
+    const { page, limit, search, branchId } = req.query;
+
+    // Tenancy check: non-super-admins may only browse their own org
+    if (req.scope && !req.scope.isSuperAdmin && req.params.id !== req.scope.organizationId) {
+      return res.status(403).json({ success: false, message: "Forbidden: Cannot access another organization's users" });
+    }
+
+    // Branch admins are locked to their own branch; org admins/super admins
+    // may optionally filter by a specific branch.
+    const effectiveBranchId =
+      req.scope?.isBranchAdmin
+        ? req.scope.branchId
+        : (branchId || null);
+
+    const result = await adminService.getOrgUsers(
+      req.params.id,
+      Number(page) || 1,
+      Number(limit) || 10,
+      effectiveBranchId,
+      search || ""
+    );
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -71,14 +92,19 @@ export const getOrganizationUsers = async (req, res) => {
 
 export const getUsers = async (req, res) => {
   try {
-    const { page, limit, search, status } = req.query;
+    const { page, limit, search, status, branchId } = req.query;
     const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
+    const effectiveBranchId =
+      req.scope?.isBranchAdmin
+        ? req.scope.branchId
+        : (branchId || null);
     const result = await adminService.getAllUsersPaginated(
       Number(page) || 1,
       Number(limit) || 10,
       search || "",
       status || "",
-      isSuperAdmin ? null : req.user?.organizationId
+      isSuperAdmin ? null : req.user?.organizationId,
+      effectiveBranchId
     );
     res.status(200).json({ success: true, ...result });
   } catch (error) {
@@ -88,39 +114,40 @@ export const getUsers = async (req, res) => {
 
 export const addUser = async (req, res) => {
   try {
-    const user = await userService.createUser(req.body);
+    const user = await userService.createUser(req.body, req.user);
     res.status(201).json({ success: true, message: "User created", data: user });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    const status = error.message.startsWith("Forbidden") ? 403 : 400;
+    res.status(status).json({ success: false, message: error.message });
   }
 };
 
 export const editUser = async (req, res) => {
   try {
-    const user = await userService.updateUser(req.params.id, req.body);
+    const user = await userService.updateUser(req.params.id, req.body, req.scope || null);
     res.status(200).json({ success: true, data: user });
   } catch (error) {
-    const status = error.message === "User not found" ? 404 : 400;
+    const status = error.message === "User not found" ? 404 : error.message.startsWith("Forbidden") ? 403 : 400;
     res.status(status).json({ success: false, message: error.message });
   }
 };
 
 export const patchUserStatus = async (req, res) => {
   try {
-    const user = await userService.updateUserStatus(req.params.id, req.body.status);
+    const user = await userService.updateUserStatus(req.params.id, req.body.status, req.scope || null);
     res.status(200).json({ success: true, data: user });
   } catch (error) {
-    const status = error.message === "User not found" ? 404 : 400;
+    const status = error.message === "User not found" ? 404 : error.message.startsWith("Forbidden") ? 403 : 400;
     res.status(status).json({ success: false, message: error.message });
   }
 };
 
 export const removeUser = async (req, res) => {
   try {
-    const result = await userService.deleteUser(req.params.id);
+    const result = await userService.deleteUser(req.params.id, req.scope || null);
     res.status(200).json({ success: true, message: result.message });
   } catch (error) {
-    const status = error.message === "User not found" ? 404 : 500;
+    const status = error.message === "User not found" ? 404 : error.message.startsWith("Forbidden") ? 403 : 500;
     res.status(status).json({ success: false, message: error.message });
   }
 };
@@ -138,43 +165,26 @@ export const getRoles = async (req, res) => {
 };
 
 export const addRole = async (req, res) => {
-  try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
-    const roleData = { ...req.body };
-    if (!isSuperAdmin) {
-      roleData.organization_id = req.user?.organizationId;
-    }
-    const role = await roleService.createRole(roleData);
-    res.status(201).json({ success: true, data: role });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
+  res.status(400).json({ success: false, message: "Dynamic roles are not supported. Only static roles are available." });
 };
 
 export const editRole = async (req, res) => {
-  try {
-    const role = await roleService.updateRole(req.params.id, req.body);
-    res.status(200).json({ success: true, data: role });
-  } catch (error) {
-    const status = error.message === "Role not found" ? 404 : 400;
-    res.status(status).json({ success: false, message: error.message });
-  }
+  res.status(400).json({ success: false, message: "Dynamic roles are not supported. Only static roles are available." });
 };
 
 export const removeRole = async (req, res) => {
-  try {
-    const result = await roleService.deleteRole(req.params.id);
-    res.status(200).json({ success: true, message: result.message });
-  } catch (error) {
-    const status = error.message === "Role not found" ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
-  }
+  res.status(400).json({ success: false, message: "Dynamic roles are not supported. Only static roles are available." });
 };
 
 export const getAuditLogs = async (req, res) => {
   try {
     const { page, limit, userId, action, tableName, from, to } = req.query;
-    const result = await adminService.getAuditLogsPaginated(Number(page) || 1, Number(limit) || 20, { userId, action, tableName, from, to });
+    const result = await adminService.getAuditLogsPaginated(
+      Number(page) || 1,
+      Number(limit) || 20,
+      { userId, action, tableName, from, to },
+      req.scope || {}
+    );
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -354,6 +364,45 @@ export const revokeOrgApiKey = async (req, res) => {
     res.status(200).json({ success: true, message: result.message });
   } catch (error) {
     const status = error.message === "Organization not found" ? 404 : 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+// ── Org self-service API keys (own-org, admin) ───────────────────────
+
+export const getMyOrgApiKeys = async (req, res) => {
+  try {
+    const orgId = req.scope?.organizationId || req.user?.organizationId;
+    if (!orgId) return res.status(400).json({ success: false, message: "Organization ID is required" });
+    const keys = await adminService.getMyOrgApiKeys(orgId);
+    res.status(200).json({ success: true, data: keys });
+  } catch (error) {
+    const status = error.message === "Organization not found" ? 404 : 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const createMyOrgApiKey = async (req, res) => {
+  try {
+    const orgId = req.scope?.organizationId || req.user?.organizationId;
+    if (!orgId) return res.status(400).json({ success: false, message: "Organization ID is required" });
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: "name is required" });
+    const result = await adminService.createMyOrgApiKey(orgId, name, req.user?.userId || req.user?._id);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const revokeMyOrgApiKey = async (req, res) => {
+  try {
+    const orgId = req.scope?.organizationId || req.user?.organizationId;
+    if (!orgId) return res.status(400).json({ success: false, message: "Organization ID is required" });
+    const result = await adminService.revokeMyOrgApiKey(orgId, req.params.keyId, req.user?.userId || req.user?._id);
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    const status = error.message === "Organization or API key not found" ? 404 : 500;
     res.status(status).json({ success: false, message: error.message });
   }
 };
@@ -570,4 +619,43 @@ export const getOrgAnalytics = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const exportAuditLogs = async (req, res) => {
+  try {
+    const { userId, action, tableName, from, to, search } = req.query;
+    const result = await adminService.exportAuditLogs({ userId, action, tableName, from, to, search }, req.scope || {});
+    const filename = `audit-logs-export-${Date.now()}.csv`;
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(result);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getPermissionCategories = async (req, res) => {
+  try {
+    const categories = Object.entries(PERMISSION_CATEGORIES).map(([moduleName, keys]) => {
+      const permissions = keys.map(key => {
+        const [resource, action] = key.split(".");
+        const capitalizedAction = action ? action.charAt(0).toUpperCase() + action.slice(1) : "";
+        const capitalizedResource = resource ? resource.charAt(0).toUpperCase() + resource.slice(1) : "";
+        return {
+          key,
+          description: `${capitalizedAction} ${capitalizedResource}`
+        };
+      });
+      return {
+        module: moduleName,
+        count: permissions.length,
+        permissions
+      };
+    });
+    res.status(200).json({ success: true, data: categories });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export { getKnowledgeGraphStats };
 

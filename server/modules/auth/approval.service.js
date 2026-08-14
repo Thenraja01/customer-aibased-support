@@ -3,7 +3,6 @@ import RegistrationRequest from "../registration-request/registrationRequest.sch
 import { logAction } from "../audit-log/auditLog.service.js";
 import { createNotification } from "../notification/notification.service.js";
 import { sendEmail } from "../../utils/email.js";
-import { assignRole, invalidatePermissionCache } from "../user-role/userRole.service.js";
 import { invalidateUserCache } from "../../middleware/auth.middleware.js";
 
 const audit = (data) => logAction(data).catch(() => {});
@@ -51,23 +50,10 @@ export const getPendingRegistrations = async (organizationId, includeRoles = fal
   // Include available roles if requested. Super Admin / wildcard roles are
   // never offered for assignment.
   if (includeRoles && organizationId) {
-    const Role = (await import("../role/role.schema.js")).default;
-    const roles = await Role.find({
-      $or: [
-        { organization_id: organizationId },
-        { organization_id: null }
-      ],
-      status: "active",
-      permissions: { $ne: "*" },
-      role_name: { $nin: [/^super[\s_]?admin$/i] },
-    }).select("_id role_name description isSystemRole").sort({ role_name: 1 });
-
-    result.availableRoles = roles.map(r => ({
-      _id: r._id,
-      role_name: r.role_name,
-      description: r.description,
-      isSystemRole: r.isSystemRole
-    }));
+    result.availableRoles = [
+      { _id: "support", role_name: "support", description: "Support Agent" },
+      { _id: "customer", role_name: "customer", description: "Customer" },
+    ];
   }
 
   return result;
@@ -89,32 +75,14 @@ export const approveRegistration = async (requestId, adminId, { roleId = null } 
   if (!user) throw new Error("User not found");
   if (user.status === "active") throw new Error("User is already active");
 
-  // Use provided role or fall back to requested role
-  const finalRoleId = roleId || registration.requested_role_id;
-  if (!finalRoleId) throw new Error("No role to assign — specify a role_id");
-
-  // Verify the role exists and belongs to the organization
-  const Role = (await import("../role/role.schema.js")).default;
-  const role = await Role.findById(finalRoleId);
-  if (!role) throw new Error("Selected role not found");
-  if (role.organization_id && role.organization_id.toString() !== registration.organization_id.toString()) {
-    throw new Error("Selected role does not belong to this organization");
-  }
-  // Never allow approving a registration into a super-admin (wildcard) role.
-  if (Array.isArray(role.permissions) && role.permissions.includes("*")) {
-    throw new Error("Cannot assign super admin role");
+  const finalRole = String(roleId || registration.requested_role_id || "customer").toLowerCase().trim();
+  const ALLOWED_ROLES = ["super_admin", "admin", "branch_admin", "support", "customer"];
+  if (!ALLOWED_ROLES.includes(finalRole)) {
+    throw new Error(`Invalid role: ${finalRole}`);
   }
 
-  // Assign the role in the request's organization.
-  await assignRole({
-    userId: user._id,
-    roleId: finalRoleId,
-    organizationId: registration.organization_id,
-    assignedBy: adminId,
-  });
-
-  // Update user's role_id for quick access
-  user.role_id = finalRoleId;
+  // Update user's role
+  user.role = finalRole;
   user.status = "active";
   user.email_verified = true;
   user.email_verified_at = new Date();
@@ -129,16 +97,13 @@ export const approveRegistration = async (requestId, adminId, { roleId = null } 
   registration.rejection_reason = null;
   await registration.save();
 
-  await Promise.all([
-    invalidateUserCache(user._id.toString()),
-    invalidatePermissionCache(user._id.toString(), registration.organization_id.toString()),
-  ]);
+  await invalidateUserCache(user._id.toString());
 
   await createNotification({
     user_id: user._id,
     organization_id: registration.organization_id,
     title: "Registration approved",
-    message: `Your account has been approved with the ${role.role_name} role. You can now log in.`,
+    message: `Your account has been approved with the ${finalRole} role. You can now log in.`,
     type: "success",
     link: "/login",
   });
@@ -151,10 +116,10 @@ export const approveRegistration = async (requestId, adminId, { roleId = null } 
     table_name: "registration_requests",
     record_id: registration._id.toString(),
     old_value: { status: "pending" },
-    new_value: { status: "approved", user_status: "active", assigned_role: role.role_name },
+    new_value: { status: "approved", user_status: "active", assigned_role: finalRole },
   });
 
-  return { message: "User approved and activated", data: { userId: user._id, status: user.status, roleName: role.role_name } };
+  return { message: "User approved and activated", data: { userId: user._id, status: user.status, roleName: finalRole } };
 };
 
 /**

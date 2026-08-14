@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { useDispatch } from "react-redux";
-import { addNotification } from "@/store/notificationSlice";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthContext } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/toast";
 import { onForegroundMessage } from "@/config/firebase";
+import { useFreshToken } from "@/hooks/useFreshToken";
 
 interface SocketContextValue {
   socket: Socket | null;
@@ -21,25 +21,50 @@ export function useSocket() {
 }
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
-  const dispatch = useDispatch();
-  const { user, token } = useAuthContext();
+  const queryClient = useQueryClient();
+  const { user } = useAuthContext();
   const toast = useToast();
   const socketRef = useRef<Socket | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (!user?._id || !token) return;
+  // Read the live token from storage so a rotated access token triggers a
+  // clean reconnect instead of a permanently rejected socket handshake.
+  const token = useFreshToken();
 
-    const socketUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+  useEffect(() => {
+    const currentUserId = user?._id || user?.userId;
+    if (!currentUserId || !token) return;
+
+    const socketUrl = (
+      import.meta.env.VITE_SOCKET_URL ||
+      import.meta.env.VITE_BACKEND_URL ||
+      "http://localhost:5000"
+    ).replace(/\/+$/, "");
     const socket = io(socketUrl, {
       auth: { token },
       transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
+      timeout: 10000,
     });
 
     socketRef.current = socket;
 
-    socket.on("notification", (notif) => {
-      dispatch(addNotification(notif));
+    socket.on("connect", () => {
+      if (import.meta.env.DEV) console.debug("[Socket] Connected");
+    });
+
+    // Handle transient connect failures (e.g. server restarting) without
+    // spamming the console with unhandled errors — socket.io retries anyway.
+    socket.on("connect_error", (err) => {
+      if (import.meta.env.DEV) console.debug("[Socket] Connect error:", err.message);
+    });
+
+    socket.on("notification", () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications", currentUserId] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unreadCount", currentUserId] });
     });
 
     socket.on("typing:start", ({ chatId, userId: typingUserId }) => {
@@ -66,11 +91,12 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
       if (unsubscribeFcm) unsubscribeFcm();
     };
-  }, [user?._id, token, dispatch]);
+  }, [user?._id, token, queryClient, toast]);
 
   return (
     <SocketContext.Provider value={{ socket: socketRef.current, typingUsers }}>

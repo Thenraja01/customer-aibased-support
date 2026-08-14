@@ -1,28 +1,41 @@
 import express from "express";
 import * as docController from "./document.controller.js";
-import { protect, access, selfOrAdmin, selfOrAdminParam } from "../../middleware/auth.middleware.js";
+import { protect, protectFromQueryToken, selfOrAdminParam } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { createDocumentSchema, updateDocumentStatusSchema } from "../../validation/index.js";
 import { uploadToGridFS, handleUpload } from "../../middleware/upload.middleware.js";
 
+// RBAC: admins manage document verification and deletion.
+const ADMINS = ["super_admin", "admin", "branch_admin"];
+// STAFF can view
+const STAFF = ["super_admin", "admin", "branch_admin", "support"];
+
 const router = express.Router();
+
+// The view route is registered before the global `protect` so it can accept a
+// `?token=` query param (file_url embeds it) as well as an Authorization header.
+router.get("/:id/view", protectFromQueryToken, docController.viewDocument);
 
 router.use(protect);
 
-router.post("/", handleUpload(uploadToGridFS), validate(createDocumentSchema), docController.upload);
+router.post("/", checkRole(...ADMINS), handleUpload(uploadToGridFS), validate(createDocumentSchema), docController.upload);
+router.post("/:id/versions", checkRole(...ADMINS), handleUpload(uploadToGridFS), docController.uploadNewVersion);
+router.post("/:id/retry-ingestion", checkRole(...ADMINS), docController.retryIngestion);
 
-router.get("/", access("document.view_all"), docController.getAll);
+router.get("/", checkRole(...STAFF), docController.getAll);
 router.get("/user/:userId", selfOrAdminParam("userId"), docController.getByUser);
-router.get("/status/:status", access("document.view_all"), docController.getByStatus);
-router.get("/:id", access("document.view_all"), docController.getById);
+router.get("/status/:status", checkRole(...STAFF), docController.getByStatus);
+router.get("/:id", checkRole(...STAFF), docController.getById);
 
-router.patch("/:id/approve", access("document.approve"), docController.approve);
-router.patch("/:id/reject", access("document.approve"), docController.reject);
-router.patch("/:id/status", access("document.view_all"), validate(updateDocumentStatusSchema), docController.patchStatus);
+router.patch("/:id/approve", checkRole(...ADMINS), docController.approve);
+router.patch("/:id/reject", checkRole(...ADMINS), docController.reject);
+router.patch("/:id/publish", checkRole(...ADMINS), docController.publish);
+router.patch("/:id/status", checkRole(...ADMINS), validate(updateDocumentStatusSchema), docController.patchStatus);
 
-router.delete("/:id", access("document.delete"), docController.remove);
+router.delete("/:id", checkRole(...ADMINS), docController.remove);
 
-router.get("/:id/roles", access("document.edit"), docController.getRoles);
-router.put("/:id/roles", access("document.edit"), docController.setRoles);
+router.get("/:id/roles", checkRole(...ADMINS), docController.getRoles);
+router.put("/:id/roles", checkRole(...ADMINS), docController.setRoles);
 
 export default router;

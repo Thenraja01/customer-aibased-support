@@ -3,13 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Building2, Image, Shield, HardDrive, Bot, MessageSquare, Clock, Mail,
   Key, CreditCard, Activity, LineChart as LineChartIcon, ArrowLeft, Save, Plus,
-  RefreshCw
+  RefreshCw, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
+import { AdminAPI } from "@/api/admin.api";
 import { useToast } from "@/components/ui/toast";
 import {
   HistogramWidget, AreaChartWidget, WaterfallChartWidget
@@ -133,7 +133,7 @@ export default function OrganizationDetailsPage() {
     if (!id || !newKeyName) return;
     try {
       setSaving(true);
-      const res = await AdminAPI.createOrganization(id);
+      const res = await AdminAPI.createOrgApiKey(id, newKeyName);
       if (res.data?.success) {
         toast.success("Success", "New API key generated successfully.");
         setNewKeyName("");
@@ -141,6 +141,22 @@ export default function OrganizationDetailsPage() {
       }
     } catch (err: any) {
       toast.error("Error", "Failed to generate API key");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevokeApiKey = async (keyId: string) => {
+    if (!id || !keyId) return;
+    try {
+      setSaving(true);
+      const res = await AdminAPI.revokeOrgApiKey(id, keyId);
+      if (res.data?.success) {
+        toast.success("Success", "API key revoked successfully.");
+        loadData();
+      }
+    } catch (err: any) {
+      toast.error("Error", "Failed to revoke API key");
     } finally {
       setSaving(false);
     }
@@ -162,7 +178,7 @@ export default function OrganizationDetailsPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 dark:border-white/[0.06]">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/superadmin/organizations")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/superadmin/organizations")} title="Back to organizations">
             <ArrowLeft size={18} />
           </Button>
           <div>
@@ -224,7 +240,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 1: General Information */}
       {activeTab === "general" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Building2 className="text-primary" size={18} /> General Information
           </h2>
@@ -278,7 +294,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 2: Branding */}
       {activeTab === "branding" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Image className="text-primary" size={18} /> Branding Settings
           </h2>
@@ -340,7 +356,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 3: Subscription Plan */}
       {activeTab === "subscription" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Shield className="text-primary" size={18} /> Subscription Plan
           </h2>
@@ -374,7 +390,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 4: Storage Usage */}
       {activeTab === "storage" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <HardDrive className="text-primary" size={18} /> Storage Usage
           </h2>
@@ -404,7 +420,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 5: AI Configuration */}
       {activeTab === "ai_config" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Bot className="text-primary" size={18} /> AI Configuration
           </h2>
@@ -486,7 +502,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 6: Chatbot Configuration */}
       {activeTab === "chatbot" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <MessageSquare className="text-primary" size={18} /> Chatbot Configuration
           </h2>
@@ -517,7 +533,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 7: Working Hours */}
       {activeTab === "working_hours" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Clock className="text-primary" size={18} /> Working Hours Schedule
           </h2>
@@ -525,7 +541,7 @@ export default function OrganizationDetailsPage() {
             {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((day) => {
               const dayConfig = workingHoursForm[day] || { open: "09:00", close: "17:00", enabled: true };
               return (
-                <div key={day} className="flex items-center justify-between p-3 border rounded-xl dark:border-white/[0.06]">
+                <div key={day} className="flex items-center justify-between p-3">
                   <span className="capitalize font-semibold text-sm w-24">{day}</span>
                   <div className="flex items-center gap-3">
                     <Input
@@ -580,12 +596,12 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 8: Email Templates */}
       {activeTab === "email_templates" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Mail className="text-primary" size={18} /> Email Notifications & Templates
           </h2>
           <div className="space-y-4">
-            <div className="border p-4 rounded-xl space-y-3 dark:border-white/[0.06]">
+            <div className="p-4 space-y-3">
               <h3 className="font-bold text-sm">Ticket Assigned Template</h3>
               <Input
                 value={emailForm.ticket_assigned?.subject || ""}
@@ -609,7 +625,7 @@ export default function OrganizationDetailsPage() {
               />
             </div>
 
-            <div className="border p-4 rounded-xl space-y-3 dark:border-white/[0.06]">
+            <div className="p-4 space-y-3">
               <h3 className="font-bold text-sm">Ticket Resolved Template</h3>
               <Input
                 value={emailForm.ticket_resolved?.subject || ""}
@@ -644,7 +660,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 9: API Keys */}
       {activeTab === "api_keys" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Key className="text-primary" size={18} /> Active API Keys
@@ -660,14 +676,28 @@ export default function OrganizationDetailsPage() {
           <div className="space-y-2">
             {orgData?.api_keys && orgData.api_keys.length > 0 ? (
               orgData.api_keys.map((k: any) => (
-                <div key={k._id || k.key} className="flex items-center justify-between p-3 border rounded-xl dark:border-white/[0.06]">
-                  <div>
+                <div key={k._id || k.key} className="flex items-center justify-between p-3">
+                  <div className="min-w-0">
                     <p className="font-semibold text-sm">{k.name}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{k.key}</p>
+                    <p className="font-mono text-xs text-muted-foreground truncate">{k.key}</p>
                   </div>
-                  <Badge variant={k.is_active ? "default" : "destructive"}>
-                    {k.is_active ? "Active" : "Revoked"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={k.is_active ? "default" : "destructive"} className="shrink-0">
+                      {k.is_active ? "Active" : "Revoked"}
+                    </Badge>
+                    {k.is_active && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10 h-8 w-8"
+                        onClick={() => handleRevokeApiKey(k._id || k.key)}
+                        disabled={saving}
+                        title="Revoke API Key"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))
             ) : (
@@ -679,11 +709,11 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 10: Billing Information */}
       {activeTab === "billing" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <CreditCard className="text-primary" size={18} /> Billing & Invoices
           </h2>
-          <div className="p-4 border rounded-xl bg-muted/20 space-y-2">
+          <div className="p-4 bg-muted/20 space-y-2">
             <p className="text-sm font-semibold">Active Plan: <span className="uppercase text-primary">{orgData?.plan}</span></p>
             <p className="text-xs text-muted-foreground">Payment Status: <span className="text-emerald-600 font-bold">Up to date (Good Standing)</span></p>
           </div>
@@ -692,7 +722,7 @@ export default function OrganizationDetailsPage() {
 
       {/* Tab 11: Activity Log */}
       {activeTab === "activity" && (
-        <div className="rounded-2xl border bg-card p-6 space-y-4">
+        <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-4">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Activity className="text-primary" size={18} /> Tenant Audit Logs
           </h2>

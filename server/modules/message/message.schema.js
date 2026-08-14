@@ -8,10 +8,22 @@ const messageSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    organization_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      index: true,
+    },
+    branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
+      index: true,
+    },
     sender_id: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
+      index: true,
     },
     content: { type: String, required: true },
     message_type: {

@@ -97,7 +97,7 @@ export default function AdminChatHistoryView() {
         </Button>
       </div>
 
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-lg border bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-xl font-bold flex items-center gap-2">
@@ -146,11 +146,11 @@ export default function AdminChatHistoryView() {
             );
 
             return (
-              <div key={msg._id}>
+              <div key={msg._id || `${msg.created_at || ""}-${idx}`}>
                 {showDateHeader && (
                   <div className="flex items-center gap-2 py-4">
                     <div className="flex-1 h-px bg-border" />
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase ">
                       {new Date(msg.created_at).toLocaleDateString("en-US", {
                         weekday: "long", month: "long", day: "numeric", year: "numeric"
                       })}

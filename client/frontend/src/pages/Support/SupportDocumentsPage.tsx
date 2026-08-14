@@ -33,10 +33,19 @@ export default function SupportDocumentsPage() {
     }
   };
 
+  const handleDownload = async (docId: string) => {
+    try {
+      const url = await DocumentAPI.resolveDocumentUrl(docId);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error("Failed to resolve document URL:", err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Documents</h1>
+        <h1 className="text-2xl font-bold ">Documents</h1>
         <p className="text-sm text-muted-foreground">Browse knowledge base documents</p>
       </div>
 
@@ -71,7 +80,7 @@ export default function SupportDocumentsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((doc) => (
-            <div key={doc._id} className="rounded-xl border bg-card p-4 space-y-3 hover:shadow-md transition-shadow">
+            <div key={doc._id} className="rounded-lg border bg-card p-4 space-y-3 hover:shadow-md transition-shadow">
               <div className="flex items-start gap-3">
                 <div className="p-2 rounded-lg bg-primary/5">
                   <FileText size={18} className="text-primary" />
@@ -93,12 +102,13 @@ export default function SupportDocumentsPage() {
                 <p className="text-[10px] text-muted-foreground">Uploaded by {doc.user_id.name}</p>
               )}
               <div className="flex gap-2 pt-1">
-                {doc.file_url && (
-                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                    <Download size={12} /> Download
-                  </a>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleDownload(doc._id)}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <Download size={12} /> Download
+                </button>
               </div>
             </div>
           ))}

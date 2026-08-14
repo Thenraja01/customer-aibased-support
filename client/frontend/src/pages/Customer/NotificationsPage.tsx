@@ -92,7 +92,7 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
+        <h1 className="text-2xl font-bold ">Notifications</h1>
         <p className="text-sm text-muted-foreground">
           Stay updated with your alerts and messages.
         </p>
@@ -126,7 +126,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden">
+      <div className="rounded-lg border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden">
         {notifications.length === 0 ? (
           <div className="p-8 text-center">
             <BellOff size={48} className="mx-auto text-muted-foreground mb-4" />

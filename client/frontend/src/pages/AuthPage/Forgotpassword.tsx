@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { 
   Mail, 
   ArrowLeft, 
+  ArrowRight,
   Send, 
   CheckCircle, 
   AlertCircle,
@@ -136,7 +137,7 @@ export default function ForgotPassword() {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background/95 to-background/90 p-4"
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background/95 to-background/90 px-4 sm:px-6 py-8 sm:py-12"
       onKeyDown={handleKeyDown}
     >
       <div className="w-full max-w-md">
@@ -152,14 +153,14 @@ export default function ForgotPassword() {
         </div>
 
         {/* Main Card */}
-        <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] shadow-lg overflow-hidden">
+        <div className="rounded-lg border bg-card dark:bg-card/50 dark:border-white/[0.06] shadow-lg overflow-hidden">
           {/* Header */}
           <div className="p-6 pb-0">
             <div className="flex flex-col items-center text-center">
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                 <Key size={24} className="text-primary" aria-hidden="true" />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight">Forgot Password?</h1>
+              <h1 className="text-2xl font-bold ">Forgot Password?</h1>
               <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">
                 {isSubmitted 
                   ? "Check your email for the verification code" 
@@ -253,6 +254,7 @@ export default function ForgotPassword() {
                     onClick={handleProceedToReset}
                     className="flex-1 flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium border hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >
+                    <ArrowRight size={16} className="mr-2" aria-hidden="true" />
                     Enter Code
                   </button>
                 </div>

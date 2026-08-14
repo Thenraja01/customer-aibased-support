@@ -19,6 +19,12 @@ const ticketSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      required: true,
+      index: true,
+    },
     subject: { type: String, required: true, maxlength: 255 },
     description: { type: String, required: true },
     category: {
@@ -64,5 +70,9 @@ const ticketSchema = new mongoose.Schema(
     },
   }
 );
+
+// Compound indexes for org + branch scoped queries
+ticketSchema.index({ organization_id: 1, branch_id: 1, status: 1 });
+ticketSchema.index({ organization_id: 1, branch_id: 1, assigned_to: 1 });
 
 export default mongoose.model("Ticket", ticketSchema);

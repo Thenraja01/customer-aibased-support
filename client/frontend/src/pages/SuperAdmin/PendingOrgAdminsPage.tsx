@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MockAdminAPI as AdminAPI } from "@/api/mockAdminApi";
+import { AuthAPI } from "@/api/auth.api";
 import { useToast } from "@/components/ui/toast";
 
 interface PendingAdmin {
@@ -44,7 +44,7 @@ export default function PendingOrgAdminsPage() {
   const fetchPending = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await AdminAPI.getPendingOrgAdmins();
+      const res = await AuthAPI.getPendingRegistrations();
       setAdmins(res.data.data || []);
     } catch (err: any) {
       toast.error("Error", err?.response?.data?.message || "Failed to load pending org admins");
@@ -60,7 +60,7 @@ export default function PendingOrgAdminsPage() {
   const handleApprove = async (id: string) => {
     setActionLoading(id);
     try {
-      await AdminAPI.approveOrgAdmin(id);
+      await AuthAPI.approveRegistration(id, { action: "approve" });
       toast.success("Approved", "Org admin has been approved");
       setAdmins((prev) => prev.filter((a) => a._id !== id));
     } catch (err: any) {
@@ -74,7 +74,7 @@ export default function PendingOrgAdminsPage() {
   const handleReject = async (id: string) => {
     setActionLoading(id);
     try {
-      await AdminAPI.rejectOrgAdmin(id, rejectionReason);
+      await AuthAPI.approveRegistration(id, { action: "reject", rejection_reason: rejectionReason });
       toast.success("Rejected", "Org admin registration has been rejected");
       setAdmins((prev) => prev.filter((a) => a._id !== id));
     } catch (err: any) {
@@ -95,7 +95,7 @@ export default function PendingOrgAdminsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Pending Org Admins</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold ">Pending Org Admins</h1>
           <p className="text-muted-foreground text-sm">Review and approve/reject organization admin registrations</p>
         </div>
         <div className="flex gap-2">

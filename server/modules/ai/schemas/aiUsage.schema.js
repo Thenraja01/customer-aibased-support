@@ -24,6 +24,7 @@ const aiUsageSchema = new mongoose.Schema(
       type: Schema.Types.ObjectId,
       ref: "Organization",
       required: true,
+      index: true,
     },
     user_id: {
       type: Schema.Types.ObjectId,
@@ -36,6 +37,20 @@ const aiUsageSchema = new mongoose.Schema(
       index: true,
     },
     model: { type: String, maxlength: 100, index: true },
+    provider: {
+      type: String,
+      maxlength: 50,
+      default: "",
+      index: true,
+      enum: ["ollama", "gemini", "groq", "google", "grok", "claude", "fallback", ""],
+    },
+    feature: {
+      type: String,
+      maxlength: 60,
+      default: "",
+      index: true,
+      enum: ["chat", "quick-action", "agent", "summarizer", "classifier", ""],
+    },
     input_tokens: { type: Number, default: 0 },
     output_tokens: { type: Number, default: 0 },
     total_tokens: { type: Number, default: 0 },
@@ -51,7 +66,10 @@ const aiUsageSchema = new mongoose.Schema(
 );
 
 aiUsageSchema.plugin(tenantPlugin);
+aiUsageSchema.index({ organization_id: 1, created_at: -1 });
 aiUsageSchema.index({ organization_id: 1, model: 1, created_at: -1 });
+aiUsageSchema.index({ organization_id: 1, provider: 1, created_at: -1 });
+aiUsageSchema.index({ organization_id: 1, feature: 1, created_at: -1 });
 aiUsageSchema.index({ organization_id: 1, success: 1 });
 
 // Virtual for convenience
