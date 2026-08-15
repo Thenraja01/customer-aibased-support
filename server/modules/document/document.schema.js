@@ -131,7 +131,7 @@ const documentSchema = new mongoose.Schema(
     // ── Knowledge pipeline state ─────────────────────────────
     // Mirrors the real processing stages so the UI can show real
     // progress instead of deriving it from the lifecycle `status`.
-    //   ingestionStatus  : queued -> parsing -> chunking -> embedding -> completed / failed
+    //   ingestionStatus  : queued -> processing -> parsing -> chunking -> embedding -> completed / failed
     //   indexingStatus   : idle   -> indexing -> indexed / failed   (ChromaDB vectors)
     //   graphStatus      : idle   -> building -> built / failed     (MongoDB graph)
     //   topicStatus      : idle   -> detecting -> detected / failed
@@ -142,7 +142,7 @@ const documentSchema = new mongoose.Schema(
     },
     ingestionStatus: {
       type: String,
-      enum: ["idle", "queued", "parsing", "chunking", "embedding", "completed", "failed"],
+      enum: ["idle", "queued", "processing", "parsing", "chunking", "embedding", "completed", "failed"],
       default: "idle",
     },
     indexingStatus: {
