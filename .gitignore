@@ -1,1 +1,9 @@
-device-management.jsonserver/config/device-management.json
+node_modules/
+.env
+.env.*
+device-management.json
+server/config/device-management.json
+*.log
+.vscode/
+dist/
+build/
