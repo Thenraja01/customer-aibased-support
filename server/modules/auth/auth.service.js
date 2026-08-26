@@ -271,6 +271,8 @@ export const login = async ({ email, password, organization_id }, ctx = {}) => {
       to: user.email,
       subject: "Your Two-Factor Authentication Code",
       html,
+      organizationId: user.organization_id,
+      branchId: user.branch_id,
     });
 
     return {

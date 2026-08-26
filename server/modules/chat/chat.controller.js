@@ -25,25 +25,12 @@ export const createNewChat = async (req, res) => {
 
 export const processAI = async (req, res) => {
   try {
-    const { chatId, message, model, actionConfirm } = req.body;
+    const { chatId, message, model, provider } = req.body;
     const userId = req.user?.userId || null;
     const organizationId = req.user?.organizationId || req.organizationId || null;
 
     if (!chatId || !message) {
       return res.status(400).json({ success: false, message: "chatId and message are required" });
-    }
-
-    // Retrieve the chat session to determine if it is a copilot session
-    const chat = await Chat.findById(chatId).lean();
-    if (chat && chat.is_copilot) {
-      const result = await processOrchestratedMessage({
-        chatId,
-        user: req.user,
-        message,
-        modelName: model,
-        actionConfirm
-      });
-      return res.status(200).json({ success: true, data: result });
     }
 
     const aiMessage = await processAIMessage({
@@ -53,6 +40,8 @@ export const processAI = async (req, res) => {
       organizationId,
       roleName: req.user?.roleName,
       roleId: req.user?.roleId,
+      model,
+      provider,
     });
 
     res.status(200).json({ success: true, data: aiMessage });
@@ -193,3 +182,83 @@ export const removeChat = async (req, res) => {
     res.status(status).json({ success: false, message: error.message });
   }
 };
+
+export const removeAll = async (req, res) => {
+  try {
+    const orgId = req.scope?.isSuperAdmin ? null : (req.user?.organizationId || req.user?.organization_id);
+    const userId = req.user.userId || req.user._id;
+    const result = await chatService.deleteAllChats(userId, orgId);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const handoff = async (req, res) => {
+  try {
+    const chatId = req.params.id || req.body.chatId;
+    const userId = req.user?.userId || req.user?._id;
+    const organizationId = req.user?.organizationId || req.user?.organization_id;
+    const branchId = req.user?.branchId || req.user?.branch_id || null;
+    const reason = req.body?.reason || "user_requested";
+
+    const { handoffChatToAgent } = await import("./chatHandoff.service.js");
+    const result = await handoffChatToAgent({ chatId, userId, organizationId, branchId, reason });
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const acceptHandoff = async (req, res) => {
+  try {
+    const chatId = req.params.id;
+    const agentId = req.user?.userId || req.user?._id;
+    const Chat = (await import("./chat.schema.js")).default;
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: "Chat not found" });
+    }
+    chat.assigned_to = agentId;
+    chat.status = "in_progress";
+    chat.is_escalated = true;
+    await chat.save();
+    res.status(200).json({ success: true, data: chat });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const getChatSummary = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { generateChatSummary } = await import("./aiChat.service.js");
+    const summary = await generateChatSummary(chatId);
+    res.status(200).json({ success: true, data: { summary } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getSuggestedReplies = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { generateSuggestedReplies } = await import("./aiChat.service.js");
+    const suggestions = await generateSuggestedReplies(chatId);
+    res.status(200).json({ success: true, data: { suggestions } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const polishAgentReply = async (req, res) => {
+  try {
+    const { text, tone } = req.body;
+    const { polishReply } = await import("./aiChat.service.js");
+    const polished = await polishReply(text, tone);
+    res.status(200).json({ success: true, data: { text: polished } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

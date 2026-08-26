@@ -2,7 +2,7 @@ export { registerSchema, loginSchema, changePasswordSchema, registerWithApproval
 export { createUserSchema, updateUserSchema, updateUserStatusSchema, updateProfileSchema, userPasswordSchema, requestOtpSchema, verifyOtpSchema, resetPasswordWithOtpSchema } from "./user.validation.js";
 export { createChatSchema, updateTopicSchema } from "./chat.validation.js";
 export { sendMessageSchema, updateMessageSchema } from "./message.validation.js";
-export { createTicketSchema, assignTicketSchema, updatePrioritySchema } from "./ticket.validation.js";
+export { createTicketSchema, assignTicketSchema, updatePrioritySchema, ticketMessageSchema, ticketActionSchema } from "./ticket.validation.js";
 export { createNotificationSchema, broadcastNotificationSchema, broadcastToOrgSchema } from "./notification.validation.js";
 export { createDocumentSchema, updateDocumentStatusSchema } from "./document.validation.js";
 export { createFaqSchema, updateFaqSchema } from "./faq.validation.js";

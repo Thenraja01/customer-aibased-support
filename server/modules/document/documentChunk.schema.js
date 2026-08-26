@@ -85,9 +85,12 @@ const documentChunkSchema = new mongoose.Schema(
   }
 );
 
-// Compound indexes for pre-retrieval security filtering
+// Compound indexes for pre-retrieval security filtering and fast joins
 documentChunkSchema.index({ organization_id: 1, branch_id: 1, status: 1 });
 documentChunkSchema.index({ organization_id: 1, branch_id: 1, status: 1, customerVisible: 1 });
 documentChunkSchema.index({ organization_id: 1, branch_id: 1, visibility: 1, status: 1 });
+documentChunkSchema.index({ organization_id: 1, status: 1, allowedRoles: 1 });
+documentChunkSchema.index({ _id: 1, organization_id: 1, status: 1 });
+documentChunkSchema.index({ document_id: 1, status: 1 });
 
 export default mongoose.model("DocumentChunk", documentChunkSchema);

@@ -130,3 +130,50 @@ export const getPartners = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const sendToBranch = async (req, res) => {
+  try {
+    const orgId = resolveOrg(req, req.body.organization_id) || req.user.organizationId;
+    const branchId = req.body.branch_id || req.user.branchId;
+    const { message } = req.body;
+    if (!branchId || !message) {
+      return res.status(400).json({ success: false, message: "branch_id and message are required" });
+    }
+    const msg = await communicationService.sendToBranch(req.user.userId, orgId, branchId, message);
+    res.status(201).json({ success: true, data: msg });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const getBranchMessages = async (req, res) => {
+  try {
+    const { branchId } = req.params;
+    const orgId = resolveOrg(req, null);
+    const messages = await communicationService.getBranchMessages(branchId, orgId);
+    res.status(200).json({ success: true, data: messages });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getMyBranchMessages = async (req, res) => {
+  try {
+    const branchId = req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, message: "No branch associated with user" });
+    const messages = await communicationService.getBranchMessages(branchId, req.user.organizationId);
+    res.status(200).json({ success: true, data: messages });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const markBranchSeen = async (req, res) => {
+  try {
+    const { branchId } = req.params;
+    await communicationService.markBranchMessagesAsSeen(branchId, req.user.userId);
+    res.status(200).json({ success: true, message: "Branch messages marked as seen" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

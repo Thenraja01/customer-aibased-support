@@ -33,9 +33,45 @@ const chatSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["open", "closed"],
-      default: "open",
+      enum: [
+        "AI_ACTIVE",
+        "AI_RESOLVED",
+        "HUMAN_REQUESTED",
+        "HUMAN_QUEUED",
+        "HUMAN_ACTIVE",
+        "HUMAN_RESOLVED",
+        "CONVERTED_TO_TICKET",
+        "CLOSED",
+        "open",
+        "closed",
+        "escalated",
+        "in_progress",
+        "waiting_for_agent",
+      ],
+      default: "AI_ACTIVE",
       index: true,
+    },
+    is_escalated: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    escalated_at: {
+      type: Date,
+      default: null,
+    },
+    ticket_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Ticket",
+      default: null,
+    },
+    escalation_reason: {
+      type: String,
+      default: null,
+    },
+    low_confidence: {
+      type: Boolean,
+      default: false,
     },
     last_message_at: {
       type: Date,

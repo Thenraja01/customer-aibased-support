@@ -35,6 +35,8 @@ export const generateOtp = async (email) => {
     to: user.email,
     subject: "Your OTP for Password Change",
     html,
+    organizationId: user.organization_id,
+    branchId: user.branch_id,
   });
 
   return { message: `OTP sent to ${user.email}`, email: user.email};
@@ -139,6 +141,8 @@ export const generateApprovalOtp = async (email) => {
     to: user.email,
     subject: "🎉 Account Approved — Verify Your OTP",
     html,
+    organizationId: user.organization_id,
+    branchId: user.branch_id,
   });
 
   return { message: `Verification OTP sent to ${user.email}`, email: user.email };

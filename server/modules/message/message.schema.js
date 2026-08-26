@@ -32,6 +32,12 @@ const messageSchema = new mongoose.Schema(
       default: "text",
     },
     is_ai: { type: Boolean, default: false, index: true },
+    confidence: { type: Number, default: null },
+    citations: { type: Array, default: [] },
+    escalation: {
+      available: { type: Boolean, default: false },
+      reason: { type: String, default: "" },
+    },
   },
   {
     timestamps: {

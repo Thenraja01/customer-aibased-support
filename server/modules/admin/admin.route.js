@@ -66,6 +66,13 @@ router.delete("/document-types/:id", checkRole("admin"), adminController.deleteD
 router.get("/organization/settings", adminController.getOrgSettings);
 router.put("/organization/settings", checkRole("admin"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
 
+router.get("/settings", adminController.getOrgSettings);
+router.put("/settings", checkRole("admin"), validate(updateOrganizationSettingsSchema), adminController.updateOrgSettings);
+
+// SMTP test — admin only, uses request-body smtp_config (does NOT require saving first)
+router.post("/smtp/test", checkRole("admin"), adminController.testSmtpConfig);
+
+
 // AI configs management
 router.get("/ai-configs", checkRole("admin"), aiConfigController.getAIConfigs);
 router.post("/ai-configs", checkRole("admin"), aiConfigController.createAIConfig);
@@ -76,7 +83,18 @@ router.post("/ai-configs/:id/test", checkRole("admin"), aiConfigController.testA
 // Billing (own-org)
 router.get("/billing", checkRole(...ADMIN), billingController.getBilling);
 router.get("/billing/invoices", checkRole(...ADMIN), billingController.getInvoices);
+router.get("/billing/invoices/:id/download", checkRole(...ADMIN), billingController.downloadInvoice);
 router.post("/billing/change-plan", checkRole("admin"), billingController.changePlan);
+
+// SuperAdmin Billing Analytics, Global Invoices & Custom Plan Configurator
+router.get("/superadmin/billing/overview", checkRole("super_admin"), billingController.getSuperAdminBillingOverview);
+router.get("/superadmin/billing/invoices", checkRole("super_admin"), billingController.getSuperAdminInvoices);
+router.get("/superadmin/billing/plans", checkRole("super_admin"), billingController.getPlatformPlans);
+router.post("/superadmin/billing/plans", checkRole("super_admin"), billingController.savePlatformPlan);
+router.delete("/superadmin/billing/plans/:planKey", checkRole("super_admin"), billingController.deletePlatformPlan);
+
+// Guardrails Testing (own-org & super-admin)
+router.post("/guardrails/test", checkRole(...ADMIN), adminController.testGuardrails);
 
 // Analytics (own-org)
 router.get("/analytics/overview", checkRole(...ADMIN), analyticsController.getOverview);
@@ -124,8 +142,8 @@ router.post("/command-center/backup-db", checkRole("super_admin"), adminControll
 router.get("/global-settings", checkRole("super_admin"), adminController.getGlobalSettings);
 router.put("/global-settings", checkRole("super_admin"), validate(updateGlobalSettingsSchema), adminController.updateGlobalSettings);
 
-// Organization Full Details & Analytics
-router.get("/organizations/:id/full-details", checkRole("admin"), adminController.getOrgFullDetails);
-router.get("/organizations/:id/analytics", checkRole("admin"), adminController.getOrgAnalytics);
+// RAG Evaluation & AI Provider Health Metrics
+router.get("/rag-eval", checkRole(...ADMIN), adminController.getRAGEvaluation);
+router.get("/llm-health", checkRole(...ADMIN), adminController.getLLMHealth);
 
 export default router;

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Save, Palette, Bot, Clock, Mail, Building2, FileText, BarChart3, Shield, Info, Database, Crown, Cpu, KeyRound, CreditCard, ScrollText, LineChart } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { BarChart, Bar, ResponsiveContainer } from "recharts";
+import { Save, Bot, Clock, Mail, Building2, FileText, BarChart3, Shield, Info, Database, Crown, Cpu, KeyRound, CreditCard, ScrollText, LineChart, Brain, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AdminAPI } from "@/api/admin.api";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/toast";
@@ -16,41 +18,130 @@ import ActivityLogPanel from "@/components/admin/settings/ActivityLogPanel";
 import ApiKeysPanel from "@/components/admin/settings/ApiKeysPanel";
 import SubscriptionPanel from "@/components/admin/settings/SubscriptionPanel";
 import StoragePanel from "@/components/admin/settings/StoragePanel";
-import BrandingPanel from "@/components/admin/settings/BrandingPanel";
 import ChatbotPanel from "@/components/admin/settings/ChatbotPanel";
+import RagSettingsPanel from "@/components/admin/settings/RagSettingsPanel";
+import SmtpSettingsPanel from "@/components/admin/settings/SmtpSettingsPanel";
+import SlaAutoClosePanel from "@/components/admin/settings/SlaAutoClosePanel";
+
+import AxiosInstance from "@/api/axiosInstance";
+
+function ChartPreview({ form }: { form: any }) {
+  const [chartData, setChartData] = useState<{ name: string; val: number }[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const res = await AxiosInstance.get("/admin/v1/analytics/overview");
+        if (res.data?.success && Array.isArray(res.data.data?.series) && isMounted) {
+          const series = res.data.data.series.slice(-7).map((s: any) => ({
+            name: s.date ? String(s.date).slice(5) : "Day",
+            val: Number(s.tickets || s.chats || s.calls || 0),
+          }));
+          if (series.length > 0) {
+            setChartData(series);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load chart preview data from backend", err);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
+
+  return (
+    <div className="h-40 w-full bg-card p-4 rounded-xl border border-border">
+      {chartData.length === 0 ? (
+        <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+          Loading backend analytics preview...
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData}>
+            <Bar dataKey="val" fill={form.chart_colors?.primary || "#6366f1"} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+import { 
+  DEFAULT_RAG_CONFIG, 
+  DEFAULT_SMTP_CONFIG, 
+  DEFAULT_AI_SETTINGS, 
+  DEFAULT_WORKING_HOURS, 
+  DEFAULT_GUARDRAILS 
+} from "@/constants/defaults";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 
-const DEFAULT_GUARDRAILS = [
-  "Answer only from approved documents",
-  "Don't answer unrelated questions",
-  "Always cite document sources",
-  "Escalate to a ticket if confidence is low",
+type Tab = "general" | "subscription" | "storage" | "ai-config" | "chatbot" | "rag" | "smtp" | "hours" | "email" | "api-keys" | "billing" | "activity-log" | "analytics" | "security" | "ticket-templates" | "sla-autoclose";
+
+const TAB_GROUPS = [
+  {
+    label: "General",
+    tabs: [
+      { id: "general", label: "General Info", icon: Building2 },
+      { id: "hours", label: "Working Hours", icon: Clock },
+      { id: "sla-autoclose", label: "SLA & Auto-Close", icon: Clock },
+      { id: "security", label: "Security", icon: Shield },
+    ],
+  },
+  {
+    label: "AI & Integrations",
+    tabs: [
+      { id: "ai-config", label: "AI Config", icon: Cpu },
+      { id: "chatbot", label: "Chatbot", icon: Bot },
+      { id: "rag", label: "RAG Settings", icon: Brain },
+      { id: "smtp", label: "SMTP", icon: Server },
+    ],
+  },
+  {
+    label: "Communication",
+    tabs: [
+      { id: "email", label: "Email Templates", icon: Mail },
+      { id: "ticket-templates", label: "Ticket Templates", icon: FileText },
+    ],
+  },
+  {
+    label: "Management",
+    tabs: [
+      { id: "subscription", label: "Subscription", icon: Crown },
+      { id: "storage", label: "Storage", icon: Database },
+      { id: "billing", label: "Billing", icon: CreditCard },
+      { id: "api-keys", label: "API Keys", icon: KeyRound },
+    ],
+  },
+  {
+    label: "Analytics & Logs",
+    tabs: [
+      { id: "analytics", label: "Analytics", icon: LineChart },
+      { id: "activity-log", label: "Activity Log", icon: ScrollText },
+    ],
+  },
 ];
 
-type Tab = "general" | "branding" | "subscription" | "storage" | "ai-config" | "chatbot" | "hours" | "email" | "api-keys" | "billing" | "activity-log" | "analytics" | "security" | "ticket-templates" | "charts";
-
-const tabs: { id: Tab; label: string; icon: any }[] = [
-  { id: "general", label: "General Info", icon: Building2 },
-  { id: "branding", label: "Branding", icon: Palette },
-  { id: "subscription", label: "Subscription", icon: Crown },
-  { id: "storage", label: "Storage", icon: Database },
-  { id: "ai-config", label: "AI Config", icon: Cpu },
-  { id: "chatbot", label: "Chatbot", icon: Bot },
-  { id: "hours", label: "Working Hours", icon: Clock },
-  { id: "email", label: "Email Templates", icon: Mail },
-  { id: "api-keys", label: "API Keys", icon: KeyRound },
-  { id: "billing", label: "Billing", icon: CreditCard },
-  { id: "activity-log", label: "Activity Log", icon: ScrollText },
-  { id: "analytics", label: "Analytics Suite", icon: LineChart },
-  { id: "security", label: "Security", icon: Shield },
-  { id: "ticket-templates", label: "Ticket Templates", icon: FileText },
-  { id: "charts", label: "Chart Settings", icon: BarChart3 },
-];
 
 export default function OrganizationSettingsPage() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab") as Tab | null;
+  const [activeTab, setActiveTabState] = useState<Tab>(() => {
+    if (tabParam) return tabParam;
+    return "general";
+  });
+
+  const setActiveTab = (tab: Tab) => {
+    setActiveTabState(tab);
+    setSearchParams({ tab });
+  };
+
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTabState(tabParam);
+    }
+  }, [tabParam]);
   const [form, setForm] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,36 +167,20 @@ export default function OrganizationSettingsPage() {
           default_language: data.default_language || "en",
           greeting_message: data.greeting_message || "",
           logo: data.logo || { url: "", public_id: "" },
-          brand_colors: data.brand_colors || { primary: "#2563eb", secondary: "#7c3aed", accent: "#f59e0b" },
-          chart_colors: data.chart_colors || {
-            primary: "#2563eb",
-            secondary: "#7c3aed",
-            tertiary: "#059669",
-            quaternary: "#f59e0b",
-            grid: "#e2e8f0",
-            text: "#64748b",
-            background: "#ffffff",
-          },
-          show_charts: data.show_charts !== undefined ? data.show_charts : true,
-          ai_settings: data.ai_settings || {
-            temperature: 0.7,
-            top_k: 40,
-            similarity_threshold: 0.75,
-            max_tokens: 2048,
-            response_style: "balanced",
-          },
+          ai_settings: data.ai_settings || DEFAULT_AI_SETTINGS,
           guardrails: data.guardrails?.length
             ? data.guardrails
-            : DEFAULT_GUARDRAILS.map((rule) => ({ rule, enabled: true })),
-          working_hours: data.working_hours || {
-            timezone: "UTC",
-            ...Object.fromEntries(DAYS.map((d) => [d, { open: "09:00", close: "17:00", enabled: d === "saturday" || d === "sunday" ? false : true }])),
-          },
+            : DEFAULT_GUARDRAILS,
+          working_hours: data.working_hours || DEFAULT_WORKING_HOURS,
           ai_session_logging: data.ai_session_logging !== undefined ? data.ai_session_logging : true,
           email_templates: data.email_templates || {
             ticket_assigned: { subject: "", body: "" },
             ticket_resolved: { subject: "", body: "" },
           },
+          rag_config: data.rag_config || DEFAULT_RAG_CONFIG,
+          smtp_config: data.smtp_config || DEFAULT_SMTP_CONFIG,
+          sla_settings: data.sla_settings || {},
+          auto_close_settings: data.auto_close_settings || { enabled: true, closing_period_hours: 48 },
         });
       }
     } catch (err) {
@@ -154,38 +229,62 @@ export default function OrganizationSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-5">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold ">Organization Settings</h1>
-          <p className="text-muted-foreground">Manage your organization branding, AI behavior, and preferences.</p>
+          <h1 className="text-2xl font-bold">Organization Settings</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage branding, AI behavior, integrations, and preferences.</p>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save size={16} className="mr-1" />
+        <Button onClick={handleSave} disabled={saving} size="sm">
+          <Save size={15} className="mr-1.5" />
           {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 
-      <div className="flex gap-1 border-b dark:border-white/[0.06] overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm border-b-2 transition-colors shrink-0 ${
-              activeTab === tab.id
-                ? "border-primary text-primary font-medium"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <tab.icon size={16} />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Vertical sidebar layout */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as Tab)}
+        orientation="vertical"
+        className="flex flex-col md:flex-row gap-6 items-start"
+      >
+        {/* ── Left nav sidebar ── */}
+        <div className="w-full md:w-60 shrink-0 rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl dark:bg-card/40 dark:border-white/[0.08] p-3 sticky top-4 shadow-sm">
+          <TabsList className="flex flex-col w-full h-auto bg-transparent p-0 gap-1 rounded-none">
+            {TAB_GROUPS.map((group) => (
+              <div key={group.label} className="mb-2 last:mb-0">
+                {/* Group label */}
+                <p className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 select-none">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5 mt-0.5">
+                  {group.tabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className="
+                        w-full flex items-center gap-2.5 px-3 py-2 text-xs sm:text-sm rounded-xl
+                        font-medium text-muted-foreground
+                        hover:text-foreground hover:bg-muted/60
+                        data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold
+                        data-[state=active]:shadow-sm
+                        transition-all duration-150 justify-start h-auto border-0 outline-none
+                      "
+                    >
+                      <tab.icon size={16} className="shrink-0 transition-transform duration-150 group-hover:scale-110" />
+                      <span className="truncate">{tab.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </TabsList>
+        </div>
 
-      <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] p-6">
-        {activeTab === "general" && (
-          <div className="space-y-6">
+        {/* ── Right content area ── */}
+        <div className="flex-1 min-w-0 rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] p-6">
+          <TabsContent value="general" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Building2 size={18} className="text-primary" />
@@ -217,47 +316,61 @@ export default function OrganizationSettingsPage() {
                 <p className="text-xs text-muted-foreground">Used to identify this organization from its subdomain (e.g. acme.yourdomain.com).</p>
               </div>
             </div>
-          </div>
-        )}
+          </TabsContent>
 
-        {activeTab === "branding" && (
-          <BrandingPanel form={form} updateField={updateField} />
-        )}
+          {/* Subscription */}
+          <TabsContent value="subscription" className="mt-0">
+            <SubscriptionPanel />
+          </TabsContent>
 
-        {activeTab === "subscription" && (
-          <SubscriptionPanel />
-        )}
+          {/* Storage */}
+          <TabsContent value="storage" className="mt-0">
+            <StoragePanel />
+          </TabsContent>
 
-        {activeTab === "storage" && (
-          <StoragePanel />
-        )}
+          {/* AI Config */}
+          <TabsContent value="ai-config" className="mt-0">
+            <AIConfigPanel />
+          </TabsContent>
 
-        {activeTab === "ai-config" && (
-          <AIConfigPanel />
-        )}
+          {/* RAG Settings */}
+          <TabsContent value="rag" className="mt-0">
+            <RagSettingsPanel form={form} updateField={updateField} />
+          </TabsContent>
 
-        {activeTab === "chatbot" && (
-          <ChatbotPanel form={form} updateField={updateField} />
-        )}
+          {/* SMTP */}
+          <TabsContent value="smtp" className="mt-0">
+            <SmtpSettingsPanel form={form} updateField={updateField} />
+          </TabsContent>
 
-        {activeTab === "api-keys" && (
-          <ApiKeysPanel />
-        )}
+          {/* Chatbot */}
+          <TabsContent value="chatbot" className="mt-0">
+            <ChatbotPanel form={form} updateField={updateField} />
+          </TabsContent>
 
-        {activeTab === "billing" && (
-          <BillingPanel />
-        )}
+          {/* API Keys */}
+          <TabsContent value="api-keys" className="mt-0">
+            <ApiKeysPanel />
+          </TabsContent>
 
-        {activeTab === "activity-log" && (
-          <ActivityLogPanel />
-        )}
+          {/* Billing */}
+          <TabsContent value="billing" className="mt-0">
+            <BillingPanel />
+          </TabsContent>
 
-        {activeTab === "analytics" && (
-          <AnalyticsPanel />
-        )}
+          {/* Activity Log */}
+          <TabsContent value="activity-log" className="mt-0">
+            <ActivityLogPanel />
+          </TabsContent>
 
-        {activeTab === "security" && (
-          <div className="space-y-6">
+          {/* Analytics */}
+          <TabsContent value="analytics" className="mt-0">
+            <AnalyticsPanel />
+          </TabsContent>
+
+
+          {/* Security */}
+          <TabsContent value="security" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Shield size={18} className="text-primary" />
@@ -340,11 +453,11 @@ export default function OrganizationSettingsPage() {
                 </p>
               </div>
             </div>
-          </div>
-        )}
+          </TabsContent>
 
-        {activeTab === "hours" && (
-          <div className="space-y-6">
+
+          {/* Working Hours */}
+          <TabsContent value="hours" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Clock size={18} className="text-primary" />
@@ -405,11 +518,10 @@ export default function OrganizationSettingsPage() {
                 );
               })}
             </div>
-          </div>
-        )}
+          </TabsContent>
 
-        {activeTab === "email" && (
-          <div className="space-y-6">
+          {/* Email Templates */}
+          <TabsContent value="email" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Mail size={18} className="text-primary" />
@@ -446,11 +558,10 @@ export default function OrganizationSettingsPage() {
                 </div>
               </div>
             ))}
-          </div>
-        )}
+          </TabsContent>
 
-        {activeTab === "ticket-templates" && (
-          <div className="space-y-6">
+          {/* Ticket Templates */}
+          <TabsContent value="ticket-templates" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <FileText size={18} className="text-primary" />
@@ -461,11 +572,15 @@ export default function OrganizationSettingsPage() {
               </p>
             </div>
             <TicketTemplatesManager />
-          </div>
-        )}
+          </TabsContent>
 
-        {activeTab === "charts" && (
-          <div className="space-y-6">
+          {/* SLA & Auto-Close Settings */}
+          <TabsContent value="sla-autoclose" className="mt-0">
+            <SlaAutoClosePanel form={form} updateField={updateField} />
+          </TabsContent>
+
+          {/* Chart Settings */}
+          <TabsContent value="charts" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <BarChart3 size={18} className="text-primary" />
@@ -481,18 +596,11 @@ export default function OrganizationSettingsPage() {
                 <p className="text-sm font-medium">Show Charts</p>
                 <p className="text-xs text-muted-foreground">Toggle visibility of all analytics charts across the dashboard.</p>
               </div>
-              <button
-                onClick={() => updateField("show_charts", !form.show_charts)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  form.show_charts ? "bg-primary" : "bg-muted-foreground/30"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    form.show_charts ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+              <Switch
+                checked={form.show_charts ?? true}
+                onCheckedChange={(v) => updateField("show_charts", v)}
+                aria-label="Toggle chart visibility"
+              />
             </div>
 
             <div className="border-t dark:border-white/[0.06] pt-6">
@@ -531,74 +639,16 @@ export default function OrganizationSettingsPage() {
               <h4 className="text-sm font-semibold mb-3">Preview</h4>
               <ChartPreview form={form} />
             </div>
-          </div>
-        )}
-      </div>
+          </TabsContent>
+        </div>
+      </Tabs>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving} size="lg">
-          <Save size={16} className="mr-1" />
+      <div className="flex justify-end pb-2">
+        <Button onClick={handleSave} disabled={saving} size="sm">
+          <Save size={15} className="mr-1.5" />
           {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
-    </div>
-  );
-}
-
-function ChartPreview({ form }: { form: any }) {
-  const colors = form.chart_colors || {};
-  const sampleData = [
-    { name: "Jan", tickets: 40, chats: 24 },
-    { name: "Feb", tickets: 30, chats: 38 },
-    { name: "Mar", tickets: 20, chats: 28 },
-    { name: "Apr", tickets: 27, chats: 39 },
-    { name: "May", tickets: 18, chats: 30 },
-  ];
-  const pieData = [
-    { name: "Open", value: 35 },
-    { name: "Resolved", value: 55 },
-    { name: "Pending", value: 10 },
-  ];
-
-  return (
-    <div className="rounded-xl border dark:border-white/[0.06] overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 dark:bg-white/[0.03] border-b dark:border-white/[0.06]">
-        <span className="text-xs font-medium text-muted-foreground">Chart Preview</span>
-        {form.show_charts === false && (
-          <span className="text-xs font-medium text-destructive">Charts are hidden</span>
-        )}
-      </div>
-      {form.show_charts !== false && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-          <div className="rounded-lg border dark:border-white/[0.06] p-3">
-            <p className="text-xs font-medium mb-2" style={{ color: colors.text || "#64748b" }}>Bar Chart</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={sampleData}>
-                <CartesianGrid stroke={colors.grid || "#e2e8f0"} strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: colors.text || "#64748b" }} />
-                <YAxis tick={{ fontSize: 10, fill: colors.text || "#64748b" }} />
-                <Tooltip />
-                <Bar dataKey="tickets" fill={colors.primary || "#2563eb"} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="chats" fill={colors.secondary || "#7c3aed"} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="rounded-lg border dark:border-white/[0.06] p-3">
-            <p className="text-xs font-medium mb-2" style={{ color: colors.text || "#64748b" }}>Pie Chart</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={60} innerRadius={30}>
-                  {pieData.map((_, index) => {
-                    const palette = [colors.primary || "#2563eb", colors.tertiary || "#059669", colors.quaternary || "#f59e0b"];
-                    return <Cell key={index} fill={palette[index]} />;
-                  })}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

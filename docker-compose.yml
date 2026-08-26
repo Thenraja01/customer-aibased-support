@@ -38,8 +38,31 @@ services:
       - "8000:8000"
     volumes:
       - chroma-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v2/heartbeat || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  mongodb:
+    image: mongo:8
+    container_name: supportai-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: change-me
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   redis-data:
   ollama-data:
   chroma-data:
+  mongodb-data:

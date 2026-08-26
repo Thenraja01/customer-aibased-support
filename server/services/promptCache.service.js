@@ -31,17 +31,6 @@ const buildCacheKey = (organizationId, roleFilter, query) => {
   return `${CACHE_PREFIX}${hash}`;
 };
 
-// ── Get cached response ──────────────────────────────────────────────
-
-/**
- * Look up a cached LLM response.
- * Returns null on cache miss or if caching is disabled.
- *
- * @param {string} organizationId
- * @param {object|null} roleFilter  — the accessScope.roleFilter value
- * @param {string} query            — the rewritten/normalized user query
- * @returns {object|null}           — { text, provider, citations, cachedAt } or null
- */
 export const getResponseCache = async (organizationId, roleFilter, query) => {
   if (!query) return null;
 
@@ -59,19 +48,6 @@ export const getResponseCache = async (organizationId, roleFilter, query) => {
   }
 };
 
-// ── Set cached response ──────────────────────────────────────────────
-
-/**
- * Store an LLM response in cache.
- * Only caches responses with medium/high confidence to avoid
- * caching "I don't know" low-confidence answers.
- *
- * @param {string} organizationId
- * @param {object|null} roleFilter
- * @param {string} query
- * @param {object} responseData   — { text, provider, citations, confidence, responseMode }
- * @param {number} [ttlMs]        — override TTL in ms
- */
 export const setResponseCache = async (
   organizationId,
   roleFilter,
@@ -102,14 +78,6 @@ export const setResponseCache = async (
   }
 };
 
-// ── Invalidate org cache ─────────────────────────────────────────────
-
-/**
- * Invalidate all response cache entries for an organization.
- * Call this when a document is approved, updated, or deleted.
- *
- * @param {string} organizationId
- */
 export const invalidateOrgResponseCache = async (organizationId) => {
   if (!organizationId) return;
   const cache = getCache();

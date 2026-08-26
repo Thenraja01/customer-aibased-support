@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Search, Edit, Trash2, Building2, MapPin, Phone, Mail, FileText, Save, X } from "lucide-react";
 import BranchAPI from "@/api/branch.api.js";
 import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function BranchesPage() {
   const toast = useToast();
@@ -14,6 +15,7 @@ export default function BranchesPage() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingBranch, setEditingBranch] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
+  const [deleteBranch, setDeleteBranch] = useState<any>(null);
 
   const fetchBranches = useCallback(async () => {
     setLoading(true);
@@ -87,11 +89,12 @@ export default function BranchesPage() {
     }
   };
 
-  const handleDelete = async (branch: any) => {
-    if (!window.confirm(`Delete ${branch.name}? This cannot be undone.`)) return;
+  const handleDelete = async () => {
+    if (!deleteBranch) return;
     try {
-      await BranchAPI.remove(branch._id);
+      await BranchAPI.remove(deleteBranch._id);
       toast.success("Success", "Branch deleted");
+      setDeleteBranch(null);
       fetchBranches();
     } catch (error: any) {
       toast.error("Error", error?.response?.data?.message || "Failed to delete branch");
@@ -189,7 +192,7 @@ export default function BranchesPage() {
                         <Edit size={14} />
                       </button>
                       <button
-                        onClick={() => handleDelete(branch)}
+                        onClick={() => setDeleteBranch(branch)}
                         className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive"
                         title="Delete"
                       >
@@ -317,6 +320,16 @@ export default function BranchesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteBranch}
+        title="Delete Branch"
+        message={`Are you sure you want to delete ${deleteBranch?.name}? This action cannot be undone.`}
+        confirmLabel="Delete Branch"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteBranch(null)}
+      />
     </div>
   );
 }

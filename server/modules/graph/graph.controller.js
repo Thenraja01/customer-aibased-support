@@ -157,7 +157,10 @@ export const getIndexStatus = async (req, res) => {
     const totalChunks = await DocumentChunk.countDocuments(query);
     const embeddedChunks = await DocumentChunk.countDocuments({
       ...query,
-      embedding: { $exists: true, $not: { $size: 0 } }
+      $or: [
+        { embedding: { $exists: true, $not: { $size: 0 } } },
+        { status: { $in: ["published", "approved", "ready_for_review"] } }
+      ]
     });
 
     res.status(200).json({

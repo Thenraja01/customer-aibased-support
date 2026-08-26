@@ -27,3 +27,14 @@ export const getStats = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const submitCsat = async (req, res) => {
+  try {
+    const { chatId, rating, comment } = req.body;
+    const orgId = req.user?.organizationId || req.organizationId || null;
+    const feedback = await feedbackService.submitCsatSurvey({ chatId, rating, comment, organizationId: orgId });
+    res.status(201).json({ success: true, data: feedback });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

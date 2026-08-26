@@ -256,8 +256,11 @@ export const getDocumentApprovalHistory = async (documentId) => {
 const triggerIngestion = async (doc) => {
   if (!doc.cloudinary_public_id) return;
 
-  const fileBuffer = await downloadFromCloudinary(doc.cloudinary_public_id, doc.cloudinary_resource_type);
-  const text = await extractTextFromBuffer(fileBuffer, doc.file_mimetype);
+  const fileBuffer = await downloadFromCloudinary(doc.cloudinary_public_id, doc.cloudinary_resource_type, {
+    organizationId: doc.organization_id,
+    branchId: doc.branch_id,
+  });
+  const text = await extractTextFromBuffer(fileBuffer, doc.file_mimetype, doc.file_name);
 
   if (text.trim().length < 10) return;
 

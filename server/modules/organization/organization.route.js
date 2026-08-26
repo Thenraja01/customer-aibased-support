@@ -15,5 +15,6 @@ router.get("/search", checkRole(...["admin", "branch_admin"]), orgController.sea
 router.get("/:id", checkRole(...["admin", "branch_admin"]), orgController.getById);
 router.put("/:id", checkRole("super_admin"), validate(updateOrganizationSchema), orgController.update);
 router.delete("/:id", checkRole("super_admin"), orgController.remove);
+router.delete("/", checkRole("super_admin"), orgController.removeAll);
 
 export default router;

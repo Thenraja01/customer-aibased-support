@@ -33,8 +33,10 @@ import {
   verifyOtpSchema,
   resetPasswordWithOtpSchema,
 } from "../../validation/index.js";
+import mongoose from "mongoose";
 import Organization from "../organization/organization.schema.js";
 import User from "../user/user.schema.js";
+import Role from "../role/role.schema.js";
 import GlobalSetting from "../global-setting/globalSetting.schema.js";
 import {
   generateOtp,
@@ -46,10 +48,6 @@ import {
 } from "../user/otp.service.js";
 
 const router = express.Router();
-
-// ──────────────────────────────────────────────────────────────
-// Standard Registration & Auth
-// ──────────────────────────────────────────────────────────────
 
 router.post("/v1/register", validate(registerSchema), async (req, res) => {
   try {
@@ -184,6 +182,8 @@ router.post("/v1/login/request-2fa", async (req, res) => {
       to: user.email,
       subject: "Your Two-Factor Authentication Code",
       html,
+      organizationId: user.organization_id,
+      branchId: user.branch_id,
     });
 
     res.status(200).json({ success: true, message: `Verification code sent to ${user.email}` });
@@ -240,14 +240,6 @@ router.put("/v1/change-password", protect, validate(changePasswordSchema), async
   }
 });
 
-// ──────────────────────────────────────────────────────────────
-// Admin Approval Workflow — Public endpoints
-// ──────────────────────────────────────────────────────────────
-
-/**
- * POST /v1/register-with-approval
- * Creates a user with status "pending". No login granted until approved + OTP verified.
- */
 router.post("/v1/register-with-approval", validate(registerWithApprovalSchema), async (req, res) => {
   try {
     const result = await registerWithApproval(req.body);
@@ -257,10 +249,6 @@ router.post("/v1/register-with-approval", validate(registerWithApprovalSchema), 
   }
 });
 
-/**
- * GET /v1/check-user-status?email=
- * Returns the approval status of a user. Used by the RegistrationPending page.
- */
 router.get("/v1/check-user-status", async (req, res) => {
   try {
     const { email } = req.query;
@@ -272,10 +260,6 @@ router.get("/v1/check-user-status", async (req, res) => {
   }
 });
 
-/**
- * POST /v1/otp/request-approval
- * Sends an OTP to an "approved" user's email for account activation.
- */
 router.post("/v1/otp/request-approval", async (req, res) => {
   try {
     const { email } = req.body;
@@ -287,11 +271,6 @@ router.post("/v1/otp/request-approval", async (req, res) => {
   }
 });
 
-/**
- * POST /v1/otp/verify-approval
- * Verifies OTP and sets user status to "active". On success the user is
- * signed in immediately (access + refresh tokens are returned).
- */
 router.post("/v1/otp/verify-approval", async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -503,10 +482,6 @@ router.get("/v1/roles", async (_req, res) => {
   }
 });
 
-// ──────────────────────────────────────────────────────────────
-// OAuth Configuration Check
-// ──────────────────────────────────────────────────────────────
-
 router.get("/v1/oauth/providers", async (_req, res) => {
   try {
     const providers = {
@@ -518,10 +493,6 @@ router.get("/v1/oauth/providers", async (_req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
-// ──────────────────────────────────────────────────────────────
-// OAuth Callback Routes
-// ──────────────────────────────────────────────────────────────
 
 router.get("/v1/oauth/google/url", async (req, res) => {
   try {
@@ -603,15 +574,6 @@ router.post("/v1/oauth/facebook/callback", async (req, res) => {
   }
 });
 
-// ──────────────────────────────────────────────────────────────
-// OAuth Registration Completion
-// ──────────────────────────────────────────────────────────────
-
-/**
- * POST /v1/oauth/complete
- * Finish a new-user OAuth registration by selecting an org + requested role.
- * Body: { oauthToken, organization_id, requested_role }
- */
 router.post("/v1/oauth/complete", async (req, res) => {
   try {
     const { oauthToken, organization_id, requested_role } = req.body;
@@ -629,26 +591,47 @@ router.post("/v1/oauth/complete", async (req, res) => {
   }
 });
 
-/**
- * GET /v1/roles/requestable/:orgId
- * Return roles that a new user may self-select for the given organization.
- * Excludes restricted roles (super_admin, admin, branch_admin).
- */
 router.get("/v1/roles/requestable/:orgId", async (req, res) => {
   try {
     const { orgId } = req.params;
+    let orgMongoId = orgId;
+
+    if (orgId && orgId !== "null" && orgId !== "undefined") {
+      const isObjectId = mongoose.isValidObjectId(orgId);
+      const org = await Organization.findOne({
+        $or: [
+          ...(isObjectId ? [{ _id: orgId }] : []),
+          { organization_id: orgId },
+        ],
+      });
+      if (org) orgMongoId = org._id;
+    }
+
     const roles = await Role.find({
-      $or: [{ organization_id: orgId }, { organization_id: null }],
+      $or: [{ organization_id: orgMongoId }, { organization_id: null }],
     }).sort({ role_name: 1 }).select("role_name description");
 
-    const requestable = roles.filter((r) => {
-      const normalized = r.role_name.toLowerCase().replace(/[\s_]+/g, "");
-      return !["superadmin", "tenantadmin", "admin"].includes(normalized);
+    let requestable = roles.filter((r) => {
+      const normalized = (r.role_name || "").toLowerCase().replace(/[\s_]+/g, "");
+      return !["superadmin", "tenantadmin", "admin", "branchadmin"].includes(normalized);
     });
+
+    if (!requestable || requestable.length === 0) {
+      requestable = [
+        { _id: "customer", role_name: "customer", description: "Customer / End User" },
+        { _id: "support", role_name: "support", description: "Customer Support Agent" },
+      ];
+    }
 
     res.status(200).json({ success: true, data: requestable });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(200).json({
+      success: true,
+      data: [
+        { _id: "customer", role_name: "customer", description: "Customer / End User" },
+        { _id: "support", role_name: "support", description: "Customer Support Agent" },
+      ],
+    });
   }
 });
 

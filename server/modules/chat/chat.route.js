@@ -59,8 +59,13 @@ router.get("/user/:userId/count", selfOrStaff(), chatController.getUserChatCount
 router.get("/:id", chatController.getChat);
 router.patch("/:id/topic", checkRole(...STAFF), validate(updateTopicSchema), chatController.updateTopic);
 router.patch("/close-all", checkRole(...STAFF), chatController.closeAll);
-router.patch("/:id/close", checkRole(...STAFF), chatController.close);
-router.patch("/:id/reopen", checkRole(...STAFF), chatController.reopen);
+router.patch("/:id/close", selfChatOrStaff(), chatController.close);
+router.patch("/:id/reopen", selfChatOrStaff(), chatController.reopen);
+router.post("/:id/handoff", selfChatOrStaff(), chatController.handoff);
+router.post("/:id/accept-handoff", checkRole(...STAFF), chatController.acceptHandoff);
+router.get("/:chatId/copilot-summary", checkRole(...STAFF), chatController.getChatSummary);
+router.get("/:chatId/copilot-suggestions", checkRole(...STAFF), chatController.getSuggestedReplies);
+router.post("/polish-reply", checkRole(...STAFF), chatController.polishAgentReply);
 router.delete("/:id", selfChatOrStaff(), chatController.removeChat);
 
 const publicRouter = express.Router();

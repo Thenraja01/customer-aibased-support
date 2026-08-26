@@ -5,8 +5,6 @@ import AIUsage from "../ai/schemas/aiUsage.schema.js";
 import AIFeedback from "../ai/schemas/aiFeedback.schema.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Fill date buckets so the chart series has no gaps. */
 const fillSeries = (buckets, days) => {
   const map = new Map(buckets.map((b) => [String(b._id), b]));
   const series = [];
@@ -28,10 +26,6 @@ const fillSeries = (buckets, days) => {
 
 const lastNDays = (days) => new Date(Date.now() - (days - 1) * DAY_MS);
 
-/**
- * Organization analytics overview — support KPIs + AI usage summary.
- * All queries are scoped to the requesting organization (server-side).
- */
 export const getAnalyticsOverview = async (orgId, { days = 30 } = {}) => {
   const since = lastNDays(days);
   const orgMatch = { organization_id: orgId };

@@ -28,6 +28,11 @@ import {
   Cpu,
   Braces,
   ShieldAlert,
+  Inbox,
+  Sliders,
+  Key,
+  UserCheck,
+  Eye,
 } from "lucide-react";
 import { ROLE_KEYS } from "@/lib/roles";
 
@@ -112,51 +117,72 @@ export const navigationConfig: NavItem[] = [
     section: "OVERVIEW",
   },
   {
-    label: "My Tickets",
-    path: "/support/tickets",
-    icon: Ticket,
+    label: "Live Human Handoff",
+    path: "/support/live-handoff",
+    icon: UserCheck,
     roles: [ROLE_KEYS.SUPPORT],
-    section: "SUPPORT",
+    section: "SUPPORT WORKSPACE",
+  },
+  {
+    label: "AI Copilot Assistant",
+    path: "/support/ai",
+    icon: Sparkles,
+    roles: [ROLE_KEYS.SUPPORT],
+    section: "SUPPORT WORKSPACE",
   },
   {
     label: "Customer Conversations",
     path: "/support/chat-history",
     icon: MessageCircle,
     roles: [ROLE_KEYS.SUPPORT],
-    section: "SUPPORT",
+    section: "SUPPORT WORKSPACE",
   },
   {
-    label: "AI Assistant",
-    path: "/support/chat",
-    icon: Sparkles,
+    label: "Support Tickets",
+    path: "/support/tickets",
+    icon: Ticket,
     roles: [ROLE_KEYS.SUPPORT],
-    section: "SUPPORT",
+    section: "SUPPORT WORKSPACE",
+  },
+  {
+    label: "Active Queue",
+    path: "/support/queue",
+    icon: ListOrdered,
+    roles: [ROLE_KEYS.SUPPORT],
+    section: "SUPPORT WORKSPACE",
+  },
+  {
+    label: "Team Communication",
+    path: "/support/communication",
+    icon: MessageCircle,
+    roles: [ROLE_KEYS.SUPPORT],
+    section: "SUPPORT WORKSPACE",
   },
   {
     label: "Knowledge Base",
     path: "/support/faq",
     icon: BookOpen,
     roles: [ROLE_KEYS.SUPPORT],
-    section: "KNOWLEDGE",
+    section: "KNOWLEDGE HUB",
   },
   {
     label: "Documents",
     path: "/support/documents",
     icon: FileText,
     roles: [ROLE_KEYS.SUPPORT],
-    section: "KNOWLEDGE",
-  },
-  {
-    label: "Queue",
-    path: "/support/queue",
-    icon: ListOrdered,
-    roles: [ROLE_KEYS.SUPPORT],
-    section: "SUPPORT",
+    section: "KNOWLEDGE HUB",
   },
   {
     label: "Notifications",
     path: "/support/notifications",
     icon: Bell,
+    roles: [ROLE_KEYS.SUPPORT],
+    section: "PLATFORM",
+  },
+  {
+    label: "Profile",
+    path: "/support/profile",
+    icon: User,
     roles: [ROLE_KEYS.SUPPORT],
     section: "PLATFORM",
   },
@@ -170,83 +196,136 @@ export const navigationConfig: NavItem[] = [
     section: "OVERVIEW",
   },
   {
+    label: "Branch Live Support",
+    path: "/branch/live-support",
+    icon: MessageCircle,
+    roles: [ROLE_KEYS.BRANCH_ADMIN],
+    section: "SUPPORT",
+  },
+  {
     label: "Branch Tickets",
-    path: "/support/tickets",
+    path: "/branch/tickets",
     icon: Ticket,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
     section: "SUPPORT",
   },
   {
-    label: "Customers",
-    path: "/admin/users",
-    icon: Users,
+    label: "Team Communication",
+    path: "/branch/communication",
+    icon: MessageCircle,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
-    section: "ORGANIZATION MANAGEMENT",
+    section: "SUPPORT",
   },
   {
     label: "Support Agents",
-    path: "/admin/team",
+    path: "/branch/agents",
     icon: Users,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
-    section: "ORGANIZATION MANAGEMENT",
+    section: "MANAGEMENT",
   },
   {
-    label: "AI Assistant",
-    path: "/support/chat",
-    icon: Sparkles,
+    label: "Customers",
+    path: "/branch/customers",
+    icon: Users,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
-    section: "SUPPORT",
+    section: "MANAGEMENT",
   },
   {
-    label: "Admin Copilot",
-    path: "/branch/copilot",
-    icon: Sparkles,
+    label: "Knowledge Base",
+    path: "/branch/knowledge",
+    icon: BookOpen,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
-    section: "SUPPORT",
+    section: "AI & KNOWLEDGE",
   },
   {
-    label: "FAQ",
-    path: "/admin/faq",
+    label: "Branch FAQs",
+    path: "/branch/faq",
     icon: HelpCircle,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
     section: "AI & KNOWLEDGE",
   },
   {
-    label: "Documents",
-    path: "/branch/documents",
-    icon: FileText,
+    label: "SLA Policy",
+    path: "/branch/sla",
+    icon: Clock,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
-    section: "AI & KNOWLEDGE",
+    section: "OPERATIONS",
   },
   {
-    label: "Branches",
-    path: "/admin/branches",
-    icon: Building2,
-    roles: [ROLE_KEYS.BRANCH_ADMIN],
-    section: "ORGANIZATION MANAGEMENT",
-  },
-  {
-    label: "Reports",
-    path: "/admin/ai-analytics",
+    label: "Branch Analytics",
+    path: "/branch/analytics",
     icon: BarChart3,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
-    section: "AI & KNOWLEDGE",
+    section: "OPERATIONS",
   },
   {
     label: "Notifications",
-    path: "/admin/notifications",
+    path: "/branch/notifications",
     icon: Bell,
     roles: [ROLE_KEYS.BRANCH_ADMIN],
     section: "PLATFORM",
   },
+  {
+    label: "Branch Settings",
+    path: "/branch/settings",
+    icon: Settings,
+    roles: [ROLE_KEYS.BRANCH_ADMIN],
+    section: "PLATFORM",
+  },
 
-  // Admin Navigation
+  // Admin Navigation - EMBEDDED AI PLATFORM (Configuration & Deployment Layer)
+  {
+    label: "Embedded Platform",
+    path: "/admin/embedded-overview",
+    icon: Sparkles,
+    roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
+    section: "EMBEDDED AI PLATFORM",
+    children: [
+      {
+        label: "Overview",
+        path: "/admin/embedded-overview",
+        icon: LayoutDashboard,
+        roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
+      },
+      {
+        label: "Knowledge Base",
+        path: "/admin/embedded-knowledge",
+        icon: BookOpen,
+        roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
+      },
+      {
+        label: "Chatbot Config",
+        path: "/admin/embedded-chatbot",
+        icon: Sparkles,
+        roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
+      },
+      {
+        label: "API Keys & Embed",
+        path: "/admin/api-keys",
+        icon: Key,
+        roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
+      },
+      {
+        label: "Conversations",
+        path: "/admin/conversations",
+        icon: MessageCircle,
+        roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
+      },
+    ],
+  },
   {
     label: "Dashboard",
     path: "/admin/dashboard",
     icon: LayoutDashboard,
     roles: [ROLE_KEYS.ADMIN],
     section: "OVERVIEW",
+  },
+  {
+    label: "Live Chat Monitoring",
+    path: "/admin/live-chat",
+    icon: Eye,
+    roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
+    section: "SUPPORT",
   },
   {
     label: "Chat",
@@ -256,18 +335,51 @@ export const navigationConfig: NavItem[] = [
     section: "SUPPORT",
   },
   {
-    label: "Admin Copilot",
-    path: "/admin/copilot",
-    icon: Sparkles,
-    roles: [ROLE_KEYS.ADMIN],
+    label: "Communication",
+    path: "/admin/communication",
+    icon: MessageCircle,
+    roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
     section: "SUPPORT",
   },
+
   {
     label: "Tickets",
-    path: "/support/tickets",
+    path: "/admin/tickets",
     icon: Ticket,
     roles: [ROLE_KEYS.ADMIN],
     section: "SUPPORT",
+    children: [
+      {
+        label: "All Tickets",
+        path: "/admin/tickets",
+        icon: Inbox,
+        roles: [ROLE_KEYS.ADMIN],
+      },
+      {
+        label: "Escalated",
+        path: "/admin/tickets/escalated",
+        icon: AlertTriangle,
+        roles: [ROLE_KEYS.ADMIN],
+      },
+      {
+        label: "Queue / Assignment",
+        path: "/admin/queue",
+        icon: Users,
+        roles: [ROLE_KEYS.ADMIN],
+      },
+      {
+        label: "Ticket Templates",
+        path: "/admin/tickets/templates",
+        icon: FileText,
+        roles: [ROLE_KEYS.ADMIN],
+      },
+      {
+        label: "Form Customization",
+        path: "/admin/tickets/form-customization",
+        icon: Sliders,
+        roles: [ROLE_KEYS.ADMIN],
+      },
+    ],
   },
   {
     label: "Customers",
@@ -338,42 +450,42 @@ export const navigationConfig: NavItem[] = [
     children: [
       {
         label: "System Prompt",
-        path: "/admin/ai",
+        path: "/admin/ai?tab=prompt",
         icon: Cpu,
         roles: [ROLE_KEYS.ADMIN],
       },
       {
         label: "Model",
-        path: "/admin/ai",
+        path: "/admin/ai?tab=settings",
         icon: Database,
         roles: [ROLE_KEYS.ADMIN],
       },
       {
         label: "RAG Settings",
-        path: "/admin/ai",
+        path: "/admin/ai?tab=settings",
         icon: Braces,
         roles: [ROLE_KEYS.ADMIN],
       },
       {
         label: "Guardrails",
-        path: "/admin/ai",
+        path: "/admin/ai?tab=guardrails",
         icon: ShieldAlert,
         roles: [ROLE_KEYS.ADMIN],
       },
     ],
   },
   {
-    label: "Reports",
-    path: "/admin/ai-analytics",
-    icon: BarChart3,
-    roles: [ROLE_KEYS.ADMIN],
-    section: "AI & KNOWLEDGE",
-  },
-  {
     label: "Model Health",
     path: "/admin/model-health",
     icon: Cpu,
     roles: [ROLE_KEYS.ADMIN],
+    section: "AI & KNOWLEDGE",
+  },
+  {
+    label: "AI Ops Center",
+    path: "/admin/ai-intelligence",
+    icon: Activity,
+    roles: [ROLE_KEYS.ADMIN, ROLE_KEYS.SUPER_ADMIN],
     section: "AI & KNOWLEDGE",
   },
   {
@@ -474,6 +586,13 @@ export const navigationConfig: NavItem[] = [
     section: "OVERVIEW",
   },
   {
+    label: "AI Workspace",
+    path: "/superadmin/ai",
+    icon: Sparkles,
+    roles: [ROLE_KEYS.SUPER_ADMIN],
+    section: "OVERVIEW",
+  },
+  {
     label: "System Monitoring",
     path: "/superadmin/command-center",
     icon: Activity,
@@ -489,7 +608,7 @@ export const navigationConfig: NavItem[] = [
   },
   {
     label: "Subscriptions",
-    path: "/superadmin/organizations",
+    path: "/superadmin/subscriptions",
     icon: CreditCard,
     roles: [ROLE_KEYS.SUPER_ADMIN],
     section: "ORGANIZATION MANAGEMENT",
@@ -516,23 +635,9 @@ export const navigationConfig: NavItem[] = [
     section: "AI & KNOWLEDGE",
   },
   {
-    label: "Communication",
-    path: "/superadmin/communication",
-    icon: Send,
-    roles: [ROLE_KEYS.SUPER_ADMIN],
-    section: "SUPPORT",
-  },
-  {
     label: "Global Search",
     path: "/superadmin/search",
     icon: Globe,
-    roles: [ROLE_KEYS.SUPER_ADMIN],
-    section: "SUPPORT",
-  },
-  {
-    label: "Business AI Copilot",
-    path: "/superadmin/copilot",
-    icon: Sparkles,
     roles: [ROLE_KEYS.SUPER_ADMIN],
     section: "SUPPORT",
   },
@@ -542,13 +647,6 @@ export const navigationConfig: NavItem[] = [
     icon: MessageCircle,
     roles: [ROLE_KEYS.SUPER_ADMIN],
     section: "SUPPORT",
-  },
-  {
-    label: "Platform Settings",
-    path: "/superadmin/app-settings",
-    icon: Settings,
-    roles: [ROLE_KEYS.SUPER_ADMIN],
-    section: "PLATFORM",
   },
   {
     label: "Audit Logs",
@@ -606,16 +704,24 @@ export function isActiveRoute(
   itemPath: string,
   hasChildren: boolean = false
 ): boolean {
+  const cleanCurrent = currentPath.split("?")[0];
+  const cleanItem = itemPath.split("?")[0];
+
   if (hasChildren) {
-    return currentPath.startsWith(itemPath);
+    return cleanCurrent === cleanItem || cleanCurrent.startsWith(cleanItem + "/");
   }
   
-  // Exact match or starts with path (for dynamic routes)
   if (currentPath === itemPath) return true;
   
-  // Handle dynamic routes like /tickets/:id
-  const baseRoute = itemPath.split("/:")[0];
-  if (currentPath.startsWith(baseRoute + "/")) return true;
+  if (cleanCurrent === cleanItem) {
+    if (itemPath.includes("?")) {
+      return currentPath === itemPath;
+    }
+    return true;
+  }
+
+  const baseRoute = itemPath.split("/:")[0].split("?")[0];
+  if (cleanCurrent.startsWith(baseRoute + "/")) return true;
   
   return false;
 }

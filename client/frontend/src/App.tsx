@@ -4,7 +4,7 @@ import { NavigationProvider } from "./context/NavigationContext";
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <NavigationProvider>
         <AppRoutes />
       </NavigationProvider>

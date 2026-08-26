@@ -14,9 +14,10 @@ import {
   AlertCircle,
   ToggleLeft,
   ToggleRight,
-  Info
+  Info,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import TopicGraphViewerModal from "@/components/admin/knowledge-graph/TopicGraphViewerModal";
 
 interface Topic {
   _id: string;
@@ -47,14 +48,17 @@ interface GraphData {
   relationships: { source: string; target: string; type: string }[];
 }
 
-const AVAILABLE_TOOLS = [
-  { id: "get_refund", label: "Get Refund Details", desc: "Retrieve status of refund requests" },
-  { id: "check_refund_eligibility", label: "Check Refund Eligibility", desc: "Evaluate if a customer qualifies for refund" },
-  { id: "create_refund", label: "Create Refund Ticket", desc: "File a new refund request" },
-  { id: "update_refund", label: "Update Refund Status", desc: "Modify refund request status/priority" },
-  { id: "create_ticket", label: "Create Support Ticket", desc: "Open general support tickets" },
-  { id: "getTicketDetails", label: "Get Ticket Details", desc: "Inspect specific support ticket details" },
-  { id: "sendNotification", label: "Send Notification", desc: "Trigger system notifications" }
+const GRAPH_RAG_TOOLS = [
+  { id: "entity_extraction", label: "Entity Extraction", desc: "Extract entities from document chunks." },
+  { id: "relationship_extraction", label: "Relationship Extraction", desc: "Identify relationships between entities." },
+  { id: "entity_linking", label: "Entity Linking", desc: "Connect extracted entities to existing graph nodes." },
+  { id: "graph_traversal", label: "Graph Traversal", desc: "Find related nodes and relationships." },
+  { id: "neighbor_expansion", label: "Neighbor Expansion", desc: "Expand from matched entities to related concepts." },
+  { id: "path_search", label: "Path Search", desc: "Find relationship paths between entities." },
+  { id: "community_detection", label: "Community Detection", desc: "Identify clusters of related entities/topics." },
+  { id: "graph_vector_retrieval", label: "Graph + Vector Retrieval", desc: "Combine graph relationships with vector similarity." },
+  { id: "source_traceability", label: "Source Traceability", desc: "Link graph nodes back to document/chunk sources." },
+  { id: "graph_context_generation", label: "Graph Context Generation", desc: "Convert graph results into context for the LLM." }
 ];
 
 export default function TopicManagementPage() {
@@ -66,6 +70,7 @@ export default function TopicManagementPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [chunks, setChunks] = useState<Chunk[]>([]);
   const [graphData, setGraphData] = useState<GraphData>({ entities: [], relationships: [] });
+  const [isGraphViewerOpen, setIsGraphViewerOpen] = useState(false);
 
   // Loading & feedback states
   const [loading, setLoading] = useState(false);
@@ -254,11 +259,11 @@ export default function TopicManagementPage() {
       <div className="flex items-center justify-between border-b border-slate-200/55 dark:border-slate-800/55 pb-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-white flex items-center gap-2">
-            <FolderTree className="text-primary" />
-            Topic & Knowledge Graph Management
+            <Network className="text-primary" />
+            GraphRAG Pipeline Configuration
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Organize documents into topics, link business tools, and view entity-relation graph models.
+            Configure entity extraction, relationship graph traversal, multi-hop reasoning, and vector context fusion.
           </p>
         </div>
 
@@ -273,7 +278,7 @@ export default function TopicManagementPage() {
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 text-white rounded-xl shadow-md transition-all font-medium text-sm"
         >
           <Plus size={16} />
-          Create Topic
+          Create Graph Topic
         </button>
       </div>
 
@@ -418,7 +423,7 @@ export default function TopicManagementPage() {
                     {tab === "docs" && <FileText size={14} />}
                     {tab === "chunks" && <Database size={14} />}
                     {tab === "graph" && <Network size={14} />}
-                    {tab === "info" ? "Tools Config" : tab}
+                    {tab === "info" ? "Tools Config" : tab === "docs" ? "Docs" : tab === "chunks" ? "Chunks" : "Graph"}
                   </button>
                 ))}
               </div>
@@ -426,46 +431,108 @@ export default function TopicManagementPage() {
               {/* Tab Workspace Contents */}
               <div className="flex-1">
                 {activeTab === "info" && (
-                  <div className="space-y-5">
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-white mb-1">
-                        Topic Tools configuration
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        Enable specific business actions that the AI Agent can execute when handling this topic.
-                      </p>
+                  <div className="space-y-6">
+                    {/* Visual Flow Banner */}
+                    <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-primary">
+                        <span className="flex items-center gap-1.5"><Network size={14} /> Active GraphRAG Flow</span>
+                        <span className="font-mono text-[10px] text-emerald-500 font-extrabold">LIVE ENGINE ONLINE</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                        <span className="px-2 py-0.5 rounded bg-card border border-border">Document</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-card border border-border">Chunking</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-card border border-border">Entity Extraction</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-card border border-border">Relationship Extraction</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-card border border-border">Entity Linking</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">Knowledge Graph</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-card border border-border">Query</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-card border border-border">Vector + Graph Search</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-card border border-border">Traversal</span>
+                        <span className="text-primary">↓</span>
+                        <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-500 font-bold border border-indigo-500/30">Grounded Answer</span>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {AVAILABLE_TOOLS.map((t) => {
-                        const isEnabled = selectedTopic.tools?.includes(t.id);
-                        return (
-                          <div
-                            key={t.id}
-                            className={`p-3 rounded-xl border flex items-start gap-3 transition-colors ${
-                              isEnabled
-                                ? "bg-slate-50/50 dark:bg-slate-800/10 border-primary/50"
-                                : "bg-transparent border-slate-100 dark:border-slate-800"
-                            }`}
-                          >
-                            <span
-                              className={`mt-0.5 w-4 h-4 rounded-md flex items-center justify-center border text-[10px] ${
+                    {/* Tools Config List */}
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center justify-between">
+                          <span>GRAPH RAG TOOLS</span>
+                          <span className="text-xs text-muted-foreground font-normal">
+                            {selectedTopic.tools?.length || GRAPH_RAG_TOOLS.length} / {GRAPH_RAG_TOOLS.length} Enabled
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Defines the operations the GraphRAG pipeline can perform on the knowledge graph for this topic.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {GRAPH_RAG_TOOLS.map((t) => {
+                          const isEnabled = selectedTopic.tools ? selectedTopic.tools.includes(t.id) : true;
+                          return (
+                            <div
+                              key={t.id}
+                              className={`p-3 rounded-xl border flex items-start gap-3 transition-all ${
                                 isEnabled
-                                  ? "bg-primary border-primary text-white"
-                                  : "border-slate-300 dark:border-slate-700"
+                                  ? "bg-slate-50/70 dark:bg-slate-800/30 border-primary/50 shadow-sm"
+                                  : "bg-transparent border-slate-100 dark:border-slate-800 opacity-60"
                               }`}
                             >
-                              {isEnabled && <Check size={10} />}
-                            </span>
-                            <div className="space-y-0.5">
-                              <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                                {t.label}
+                              <span
+                                className={`mt-0.5 w-4 h-4 rounded-md flex items-center justify-center border text-[10px] shrink-0 ${
+                                  isEnabled
+                                    ? "bg-primary border-primary text-white"
+                                    : "border-slate-300 dark:border-slate-700"
+                                }`}
+                              >
+                                {isEnabled && <Check size={10} />}
+                              </span>
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                  {t.label}
+                                </div>
+                                <div className="text-[11px] text-slate-400 leading-snug">{t.desc}</div>
                               </div>
-                              <div className="text-[10px] text-slate-400">{t.desc}</div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Multi-Hop Query Traversal Example */}
+                    <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                          <Network size={14} /> Sample GraphRAG Traversal Execution
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground">Traversal Depth: 4 Hops</span>
+                      </div>
+                      <div className="text-xs font-semibold text-foreground italic">
+                        Query: "Why is my international order still pending?"
+                      </div>
+                      <div className="p-3 rounded-lg bg-card border border-border/80 flex items-center gap-2 text-xs overflow-x-auto">
+                        <span className="font-bold text-foreground">International Order</span>
+                        <span className="text-primary font-bold">↓</span>
+                        <span className="text-muted-foreground">Order Status</span>
+                        <span className="text-primary font-bold">↓</span>
+                        <span className="text-amber-500 font-bold">Pending</span>
+                        <span className="text-primary font-bold">↓</span>
+                        <span className="text-muted-foreground">Payment Verification</span>
+                        <span className="text-primary font-bold">↓</span>
+                        <span className="font-bold text-emerald-500">Payment</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Retrieved connected document chunks from target graph nodes with 94% policy confidence.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -532,12 +599,21 @@ export default function TopicManagementPage() {
 
                 {activeTab === "graph" && (
                   <div className="space-y-6">
-                    <div className="p-3 bg-indigo-50/40 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/20 text-indigo-800 dark:text-indigo-400 rounded-xl text-xs flex items-start gap-2.5">
-                      <Info size={16} className="mt-0.5 flex-shrink-0" />
-                      <div>
-                        These nodes and relationships represent structural concepts extracted dynamically from document chunks.
-                        They are used during <strong>GraphRAG</strong> retrieval to resolve complex context reasoning questions.
+                    <div className="p-3 bg-indigo-50/40 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/20 text-indigo-800 dark:text-indigo-400 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <Info size={16} className="mt-0.5 flex-shrink-0" />
+                        <div>
+                          These nodes and relationships represent structural concepts extracted dynamically from document chunks.
+                          They are used during <strong>GraphRAG</strong> retrieval to resolve complex context reasoning questions.
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsGraphViewerOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg shadow-sm text-xs transition-all shrink-0"
+                      >
+                        <Network size={14} /> View Graph
+                      </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -711,6 +787,15 @@ export default function TopicManagementPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {selectedTopic && (
+        <TopicGraphViewerModal
+          topicId={selectedTopic._id}
+          topicName={selectedTopic.name}
+          isOpen={isGraphViewerOpen}
+          onClose={() => setIsGraphViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }

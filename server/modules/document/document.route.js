@@ -16,18 +16,25 @@ const router = express.Router();
 // The view route is registered before the global `protect` so it can accept a
 // `?token=` query param (file_url embeds it) as well as an Authorization header.
 router.get("/:id/view", protectFromQueryToken, docController.viewDocument);
+router.get("/:id/content", protectFromQueryToken, docController.getDocumentContent);
 
 router.use(protect);
 
 router.post("/", checkRole(...ADMINS), handleUpload(uploadToGridFS), validate(createDocumentSchema), docController.upload);
+router.post("/upload", checkRole(...ADMINS), handleUpload(uploadToGridFS), validate(createDocumentSchema), docController.upload);
 router.post("/:id/versions", checkRole(...ADMINS), handleUpload(uploadToGridFS), docController.uploadNewVersion);
+router.post("/:id/version", checkRole(...ADMINS), handleUpload(uploadToGridFS), docController.uploadNewVersion);
 router.post("/:id/retry-ingestion", checkRole(...ADMINS), docController.retryIngestion);
+router.post("/:id/reprocess", checkRole(...ADMINS), docController.retryIngestion);
+router.post("/:id/generate-summary", checkRole(...STAFF), docController.generateSummary);
 
-router.get("/", checkRole(...STAFF), docController.getAll);
+router.get("/", docController.getAll);
 router.get("/user/:userId", selfOrAdminParam("userId"), docController.getByUser);
 router.get("/status/:status", checkRole(...STAFF), docController.getByStatus);
 router.get("/:id", checkRole(...STAFF), docController.getById);
 
+router.put("/:id/metadata", checkRole(...ADMINS), docController.updateMetadata);
+router.put("/:id", checkRole(...ADMINS), docController.updateMetadata);
 router.patch("/:id/approve", checkRole(...ADMINS), docController.approve);
 router.patch("/:id/reject", checkRole(...ADMINS), docController.reject);
 router.patch("/:id/publish", checkRole(...ADMINS), docController.publish);

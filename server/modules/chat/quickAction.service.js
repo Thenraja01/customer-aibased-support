@@ -1,83 +1,72 @@
 import Document from "../document/document.schema.js";
 import DocumentChunk from "../document/documentChunk.schema.js";
 import Faq from "../faq/faq.schema.js";
-import DocumentType from "../document-type/documentType.schema.js";
+import Topic from "../topic/topic.schema.js";
+import GraphNode from "../graph/graphNode.schema.js";
+import GraphRelationship from "../graph/graphRelationship.schema.js";
 import Chat from "./chat.schema.js";
-import GraphEntity from "./graphEntity.schema.js";
 import { getCache } from "../../config/redis.js";
 import { getAuthorizedDocumentIds } from "../rag/rag.service.js";
-import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
-import { generateResponse } from "../llm/index.js";
+import { normalizeRoleName } from "../../utils/constants.js";
 
-// Helper to normalize category/topic names to standard labels
-export function normalizeCategoryName(name) {
-  if (!name) return "";
-  let clean = name.trim();
-  clean = clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
-
-  // Standard mappings for quick-action alignment
-  if (/refund|return/i.test(clean)) return "Refunds";
-  if (/billing|payment|invoice/i.test(clean)) return "Billing";
-  if (/account|profile|login/i.test(clean)) return "Account";
-  if (/support|technical|help|troubleshoot/i.test(clean)) return "Support";
-  if (/shipping|delivery|tracking/i.test(clean)) return "Shipping";
-  if (/password|credential/i.test(clean)) return "Password";
-  if (/order|purchase/i.test(clean)) return "Orders";
-  if (/warranty|guarantee/i.test(clean)) return "Warranty";
-  
-  return clean;
+// Helper to format a clean user-facing label
+export function formatActionLabel(name) {
+  if (!name || typeof name !== "string") return "";
+  let clean = name.trim().replace(/[_\-]+/g, " ");
+  return clean
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 }
 
-// Map a normalized label to a predefined user query template
-export function getQueryForLabel(label) {
-  const queryMap = {
-    "Refunds": "How do I request a refund?",
-    "Billing": "I have a question about my billing",
-    "Account": "I need help with my account",
-    "Support": "I need technical support",
-    "Shipping": "Where is my order shipping status?",
-    "Password": "How do I reset my password?",
-    "Orders": "How do I track my orders?",
-    "Warranty": "What is the warranty policy?",
-  };
-  return queryMap[label] || `I need help with ${label.toLowerCase()}`;
+// Generate dynamic natural query from real topic/entity name and description
+export function generateQueryFromEntity(name, description = "") {
+  const cleanName = formatActionLabel(name);
+  const lower = cleanName.toLowerCase();
+
+  if (/policy|guideline|terms/i.test(lower)) {
+    return `What is the official ${cleanName}?`;
+  }
+  if (/how to|setup|install|configure/i.test(lower)) {
+    return `How do I ${cleanName}?`;
+  }
+  if (/error|issue|troubleshoot|bug/i.test(lower)) {
+    return `How do I troubleshoot ${cleanName}?`;
+  }
+  if (/pricing|cost|plan|bill|invoice/i.test(lower)) {
+    return `What are the details regarding ${cleanName}?`;
+  }
+  if (/return|refund|exchange/i.test(lower)) {
+    return `How do I request a ${cleanName}?`;
+  }
+  if (/shipping|delivery|track/i.test(lower)) {
+    return `What is the status or policy for ${cleanName}?`;
+  }
+
+  if (description && description.trim().length > 5) {
+    return `Can you explain ${cleanName}: ${description.trim().replace(/\.$/, "")}?`;
+  }
+
+  return `Tell me about ${cleanName}`;
 }
 
-// Map a normalized label to a predefined icon key
-export function getIconForLabel(label) {
-  const iconMap = {
-    "Refunds": "refund",
-    "Billing": "billing",
-    "Account": "account",
-    "Support": "support",
-    "Shipping": "shipping",
-    "Password": "password",
-    "Orders": "orders",
-    "Warranty": "warranty",
-  };
-  return iconMap[label] || "support";
-}
-
-// Get the role specific expectations to apply scoring boost
-export function getRoleKeywords(role) {
-  const normalized = normalizeRoleName(role);
-  if (normalized === "customer") {
-    return ["Refunds", "Billing", "Orders", "Account"];
-  }
-  if (normalized === "support") {
-    return ["Refunds", "Billing", "Support", "Account"];
-  }
-  if (normalized === "branch_admin") {
-    return ["Billing", "Support", "Orders", "Account"];
-  }
-  if (isNormalizedAdminRole(normalized) || normalized === "super_admin") {
-    return ["Billing", "Support", "Account"];
-  }
-  return [];
+// Map dynamic name to appropriate visual icon
+export function getIconForEntity(name) {
+  const lower = (name || "").toLowerCase();
+  if (/refund|return|money|exchange/i.test(lower)) return "refund";
+  if (/bill|invoice|payment|pricing|plan/i.test(lower)) return "billing";
+  if (/account|profile|user|auth|login|password/i.test(lower)) return "account";
+  if (/ship|delivery|track|courier/i.test(lower)) return "shipping";
+  if (/order|purchase|cart/i.test(lower)) return "orders";
+  if (/warranty|guarantee|claim/i.test(lower)) return "warranty";
+  if (/security|privacy|2fa|protect/i.test(lower)) return "security";
+  if (/error|troubleshoot|bug|fix/i.test(lower)) return "troubleshoot";
+  return "support";
 }
 
 /**
- * Main Service for generating personalized, tenant-aware quick actions
+ * Dynamic Service: Generates personalized, tenant-aware quick actions
+ * driven entirely by real Document Topics and Knowledge Graph entities.
  */
 export const getQuickActions = async (user) => {
   if (!user) return [];
@@ -92,7 +81,7 @@ export const getQuickActions = async (user) => {
   const cacheKey = `quick-actions:${orgId}:${branchId || "global"}:${normalizedRole}`;
   const cache = getCache();
 
-  // 1. Try cache hit
+  // 1. Check Redis cache
   try {
     const cached = await cache.get(cacheKey);
     if (cached) {
@@ -102,190 +91,158 @@ export const getQuickActions = async (user) => {
     console.error("[QuickActionService] Cache read error:", err.message);
   }
 
-  // 2. Fetch authorized published document IDs
+  // 2. Fetch authorized published document IDs for this user/tenant
   const authDocIds = await getAuthorizedDocumentIds(orgId, roleName, branchId);
 
-  // 3. Collect candidates across layers
-  const candidates = {}; // Key: normalizedLabel, Value: { label, topicFreq, faqFreq, graphFreq, branchDocCount }
+  const candidatesMap = new Map(); // Key: normalized name -> Candidate Object
 
-  const registerCandidate = (rawName, scoreObj) => {
-    const label = normalizeCategoryName(rawName);
-    if (!label) return;
-    if (!candidates[label]) {
-      candidates[label] = {
-        label,
-        topicFreq: 0,
-        faqFreq: 0,
-        graphFreq: 0,
-        branchDocCount: 0,
-      };
-    }
-    const cand = candidates[label];
-    if (scoreObj.topicFreq) cand.topicFreq += scoreObj.topicFreq;
-    if (scoreObj.faqFreq) cand.faqFreq += scoreObj.faqFreq;
-    if (scoreObj.graphFreq) cand.graphFreq += scoreObj.graphFreq;
-    if (scoreObj.branchDocCount) cand.branchDocCount += scoreObj.branchDocCount;
-  };
+  const recordCandidate = (name, description, boostObj) => {
+    const formatted = formatActionLabel(name);
+    if (!formatted || formatted.length < 3) return;
 
-  // Layer 1: FAQ Categories
-  const faqs = await Faq.find({
-    organization_id: orgId,
-    status: "approved",
-    is_active: true,
-  }).lean();
-  for (const faq of faqs) {
-    if (faq.category) {
-      registerCandidate(faq.category, { faqFreq: 1 });
-    }
-  }
-
-  // Fetch authorized documents for Types and Metadata
-  const documents = await Document.find({ _id: { $in: authDocIds }, status: "published" })
-    .populate("document_type_id")
-    .lean();
-
-  // Layer 2: Document Types
-  for (const doc of documents) {
-    const isBranchSpecific = doc.branch_id && branchId && doc.branch_id.toString() === branchId.toString();
-    if (doc.document_type_id && doc.document_type_id.name) {
-      registerCandidate(doc.document_type_id.name, {
-        topicFreq: 1,
-        branchDocCount: isBranchSpecific ? 1 : 0
+    const key = formatted.toLowerCase();
+    if (!candidatesMap.has(key)) {
+      candidatesMap.set(key, {
+        id: key.replace(/\s+/g, "_"),
+        label: formatted,
+        description: description || `Information and help regarding ${formatted}`,
+        query: generateQueryFromEntity(formatted, description),
+        icon: getIconForEntity(formatted),
+        score: 0,
       });
     }
+
+    const item = candidatesMap.get(key);
+    item.score += (boostObj.topicScore || 0) +
+                  (boostObj.graphScore || 0) +
+                  (boostObj.faqScore || 0) +
+                  (boostObj.docScore || 0);
+  };
+
+  // ── Source 1: Real Frontend Configured Topics ──
+  const topicFilter = { organization_id: orgId, enabled: true };
+  if (branchId) {
+    topicFilter.$or = [{ branch_id: branchId }, { branch_id: null }];
+  }
+  const realTopics = await Topic.find(topicFilter).lean();
+  for (const t of realTopics) {
+    recordCandidate(t.name, t.description, { topicScore: 20 });
   }
 
-  // Layer 3: Document Metadata / Titles
-  for (const doc of documents) {
-    const isBranchSpecific = doc.branch_id && branchId && doc.branch_id.toString() === branchId.toString();
-    // Parse words from title as potential candidates
-    const titleWords = doc.title.split(/[^a-zA-Z]+/);
-    for (const word of titleWords) {
-      if (word.length > 4) {
-        registerCandidate(word, {
-          topicFreq: 1,
-          branchDocCount: isBranchSpecific ? 1 : 0
+  // ── Source 2: Multi-User Crowd Popularity Aggregation (Most Used Cases) ──
+  try {
+    const chatStats = await Chat.aggregate([
+      { $match: { organization_id: orgId } },
+      {
+        $group: {
+          _id: { $toLower: "$topic" },
+          uniqueUsers: { $addToSet: "$user_id" },
+          totalChats: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          topic: "$_id",
+          userCount: { $size: "$uniqueUsers" },
+          totalChats: 1,
+        },
+      },
+      { $sort: { userCount: -1, totalChats: -1 } },
+      { $limit: 20 },
+    ]);
+
+    for (const stat of chatStats) {
+      if (stat.topic && stat.topic !== "general") {
+        // Boost existing candidate or register popular chat topic
+        recordCandidate(stat.topic, "", {
+          topicScore: (stat.userCount * 15) + (stat.totalChats * 4),
         });
       }
     }
+  } catch (aggErr) {
+    console.warn("[QuickActionService] Chat crowd analytics aggregation warning:", aggErr.message);
   }
 
-  // Layer 4: Knowledge Graph entities
-  const graphEntities = await GraphEntity.find({
-    document_id: { $in: authDocIds },
-    organization_id: orgId,
-  }).lean();
-  for (const ge of graphEntities) {
-    registerCandidate(ge.entity_name, { graphFreq: 1 });
-  }
+  // ── Source 3: Real Knowledge Graph Entities & Relations ──
+  if (authDocIds.length > 0) {
+    const graphRelationships = await GraphRelationship.find({
+      organization_id: orgId,
+      $or: [
+        { document_id: { $in: authDocIds } },
+        { type: { $in: ["HAS_ENTITY", "RELATED_TO", "HAS_TOPIC"] } }
+      ]
+    }).limit(40).lean();
 
-  // Layer 5: Ollama Topic Generation (fallback or enrichment if sparse)
-  if (Object.keys(candidates).length < 4 && documents.length > 0) {
-    try {
-      const docExcerpts = documents.map((d) => ({
-        title: d.title,
-        description: d.description || "",
-        type: d.document_type_id?.name || "",
-      })).slice(0, 8);
-
-      const systemPrompt = `You are generating quick-action topics for a support chatbot.
-Based only on the supplied authorized document metadata, generate the most useful support categories a user may want to ask about.
-
-Supplied Document Metadata:
-${JSON.stringify(docExcerpts, null, 2)}
-
-Return JSON only:
-{
-  "categories": [
-    {
-      "label": "Refunds",
-      "description": "Refund and return questions",
-      "confidence": 0.95
+    const entityFreq = {};
+    for (const rel of graphRelationships) {
+      if (rel.target_name) {
+        entityFreq[rel.target_name] = (entityFreq[rel.target_name] || 0) + (rel.confidence_score || 1);
+      }
+      if (rel.source_name) {
+        entityFreq[rel.source_name] = (entityFreq[rel.source_name] || 0) + (rel.confidence_score || 1);
+      }
     }
-  ]
-}
 
-Rules:
-- maximum 8 categories
-- use short user-friendly labels (1-2 words, e.g. "Refunds", "Billing", "Account", "Shipping")
-- do not invent categories unsupported by the supplied data
-- merge duplicate/similar topics
-- do not include internal/system terminology
-- do not include authorization information
-- do not include document IDs
-- do not include private information`;
+    for (const [entityName, freq] of Object.entries(entityFreq)) {
+      recordCandidate(entityName, "", { graphScore: Math.round(freq * 3) });
+    }
 
-      const llmRes = await generateResponse(systemPrompt, null, { provider: "ollama", temperature: 0.1 });
-      const cleanText = llmRes.text.trim();
-      const startIdx = cleanText.indexOf("{");
-      const endIdx = cleanText.lastIndexOf("}");
-      if (startIdx !== -1 && endIdx !== -1) {
-        const parsed = JSON.parse(cleanText.slice(startIdx, endIdx + 1));
-        if (parsed.categories && Array.isArray(parsed.categories)) {
-          for (const item of parsed.categories) {
-            registerCandidate(item.label, { topicFreq: 2 });
-          }
+    // Direct GraphNode concepts
+    const graphNodes = await GraphNode.find({
+      organization_id: orgId,
+      type: { $in: ["topic", "policy", "service", "product", "resolution"] },
+    }).limit(15).lean();
+
+    for (const gn of graphNodes) {
+      recordCandidate(gn.name, gn.properties?.description || "", { graphScore: 8 });
+    }
+  }
+
+  // ── Source 4: Real FAQ Categories ──
+  const approvedFaqs = await Faq.find({
+    organization_id: orgId,
+    status: "approved",
+    is_active: true,
+  }).limit(20).lean();
+
+  for (const faq of approvedFaqs) {
+    if (faq.category) {
+      recordCandidate(faq.category, "", { faqScore: 6 });
+    }
+  }
+
+  // ── Source 5: Real Document Titles ──
+  if (authDocIds.length > 0) {
+    const publishedDocs = await Document.find({
+      _id: { $in: authDocIds },
+      status: "published",
+    }).select("title description document_type_id").populate("document_type_id").limit(15).lean();
+
+    for (const doc of publishedDocs) {
+      if (doc.document_type_id?.name) {
+        recordCandidate(doc.document_type_id.name, "", { docScore: 5 });
+      }
+      if (doc.title) {
+        const cleanTitle = doc.title.replace(/\.[a-zA-Z0-9]+$/, "").trim();
+        if (cleanTitle.length <= 40) {
+          recordCandidate(cleanTitle, doc.description || "", { docScore: 4 });
         }
       }
-    } catch (llmErr) {
-      console.warn("[QuickActionService] Ollama category extraction failed:", llmErr.message);
     }
   }
 
-  // 4. Score and rank candidates
-  const scored = [];
-  const roleKeywords = getRoleKeywords(roleName);
+  // ── 6. Select Top 4 Most Popular User Use Cases ──
+  const candidateList = Array.from(candidatesMap.values());
 
-  for (const key of Object.keys(candidates)) {
-    const cand = candidates[key];
-    const catName = cand.label;
+  // Sort strictly by crowd popularity / total score descending
+  candidateList.sort((a, b) => b.score - a.score);
 
-    // recentUsage boost: check active chats with this topic/label
-    let recentUsageBoost = 0;
-    try {
-      const chatCount = await Chat.countDocuments({
-        organization_id: orgId,
-        topic: { $regex: new RegExp(catName, "i") },
-      });
-      recentUsageBoost = chatCount * 2;
-    } catch {
-      /* ignore */
-    }
+  // Take the Best 4
+  const topActions = candidateList.slice(0, 4);
 
-    // roleRelevance boost
-    const isRoleRelevant = roleKeywords.includes(catName);
-    const roleRelevanceBoost = isRoleRelevant ? 10 : 0;
-
-    // branchRelevance boost
-    const branchRelevanceBoost = cand.branchDocCount * 5;
-
-    const totalScore =
-      cand.topicFreq +
-      cand.faqFreq +
-      cand.graphFreq +
-      recentUsageBoost +
-      roleRelevanceBoost +
-      branchRelevanceBoost;
-
-    scored.push({
-      id: catName.toLowerCase(),
-      label: catName,
-      description: `Questions about ${catName.toLowerCase()}`,
-      query: getQueryForLabel(catName),
-      icon: getIconForLabel(catName),
-      score: totalScore,
-    });
-  }
-
-  // Sort by score descending
-  scored.sort((a, b) => b.score - a.score);
-
-  // Return top 4
-  const topActions = scored.slice(0, 4);
-
-  // 5. Cache the results
+  // 7. Cache result in Redis (10-minute TTL)
   try {
-    await cache.set(cacheKey, JSON.stringify(topActions));
+    await cache.set(cacheKey, JSON.stringify(topActions), 600);
   } catch (err) {
     console.error("[QuickActionService] Cache write error:", err.message);
   }
@@ -294,7 +251,7 @@ Rules:
 };
 
 /**
- * Cache Invalidation Method
+ * Invalidate Redis cache whenever Topics, Documents, or FAQs are updated
  */
 export const invalidateQuickActionCache = async (organizationId) => {
   if (!organizationId) return;
@@ -308,47 +265,5 @@ export const invalidateQuickActionCache = async (organizationId) => {
     }
   } catch (err) {
     console.error("[QuickActionService] Cache invalidation failed:", err.message);
-  }
-};
-
-/**
- * Seeder to populate GraphEntity table for telemetry and Priorities testing
- */
-export const seedGraphEntities = async () => {
-  try {
-    const count = await GraphEntity.countDocuments();
-    if (count > 0) return;
-
-    console.log("[QuickActionService] GraphEntity collection is empty. Seeding concept nodes...");
-    const docs = await Document.find({ status: "published" }).lean();
-    if (docs.length === 0) {
-      console.log("[QuickActionService] No published documents found to seed graph from.");
-      return;
-    }
-
-    const seedConcepts = ["Refund", "Billing", "Account", "Support", "Shipping", "Warranty", "Orders"];
-    const entitiesToInsert = [];
-
-    for (const doc of docs) {
-      // Pick 2-3 random concepts that match or fit general domains
-      const countToSeed = Math.min(3, seedConcepts.length);
-      const shuffled = [...seedConcepts].sort(() => 0.5 - Math.random());
-      
-      for (let i = 0; i < countToSeed; i++) {
-        entitiesToInsert.push({
-          entity_name: shuffled[i],
-          document_id: doc._id,
-          organization_id: doc.organization_id,
-          branch_id: doc.branch_id || null,
-        });
-      }
-    }
-
-    if (entitiesToInsert.length > 0) {
-      await GraphEntity.insertMany(entitiesToInsert);
-      console.log(`[QuickActionService] Seeded ${entitiesToInsert.length} graph entity link records.`);
-    }
-  } catch (err) {
-    console.error("[QuickActionService] Seeding GraphEntity failed:", err.message);
   }
 };

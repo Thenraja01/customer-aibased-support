@@ -37,18 +37,18 @@ const flushQueue = (token: string | null) => {
 // Request interceptor — attach the current access token.
 AxiosInstance.interceptors.request.use(
   (config) => {
-    let token = safeGetItem<string>(STORAGE_KEYS.TOKEN);
+    let token = safeGetItem<string>(STORAGE_KEYS.TOKEN) || safeGetItem<string>("token") || localStorage.getItem("token") || localStorage.getItem("auth_token");
     if (token) {
       if (typeof token === "string") {
         token = token.replace(/^["']|["']$/g, "").trim();
       }
       config.headers.Authorization = `Bearer ${token}`;
     }
-    const tenantId = safeGetItem<string>(STORAGE_KEYS.ORG_ID);
+    const tenantId = safeGetItem<string>(STORAGE_KEYS.ORG_ID) || safeGetItem<string>("orgId") || localStorage.getItem("orgId");
     if (tenantId) {
       config.headers["x-tenant-id"] = tenantId;
     }
-    const branchId = safeGetItem<string>(STORAGE_KEYS.BRANCH_ID);
+    const branchId = safeGetItem<string>(STORAGE_KEYS.BRANCH_ID) || safeGetItem<string>("branchId") || localStorage.getItem("branchId");
     if (branchId) {
       config.headers["x-branch-id"] = branchId;
     }
@@ -56,8 +56,6 @@ AxiosInstance.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
-
-// Response interceptor — transparently rotate the access token on 401.
 AxiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -65,13 +63,11 @@ AxiosInstance.interceptors.response.use(
     const status = error.response?.status;
 
     if (status === 401 && original && !original._retry) {
-      // Never attempt refresh on the refresh request itself.
       if (original.url?.includes("/auth/v1/refresh")) {
         flushAndRedirect();
         return Promise.reject(error);
       }
-
-      const currentRefresh = safeGetItem<string>(STORAGE_KEYS.REFRESH_TOKEN);
+      const currentRefresh = safeGetItem<string>(STORAGE_KEYS.REFRESH_TOKEN) || safeGetItem<string>("refreshToken") || localStorage.getItem("refreshToken") || localStorage.getItem("auth_refresh_token");
       if (!currentRefresh) {
         flushAndRedirect();
         return Promise.reject(error);
@@ -127,8 +123,7 @@ AxiosInstance.interceptors.response.use(
 
 let redirected = false;
 function flushAndRedirect() {
-  // Best-effort wipe of token keys; AuthContext.logout does the full cleanup.
-  try {
+   try {
     localStorage.removeItem(STORAGE_KEYS.TOKEN);
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   } catch {

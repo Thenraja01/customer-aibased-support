@@ -1,5 +1,16 @@
-import { useState, useRef, useEffect, useCallback, memo } from "react";
-import { Send, Paperclip, X } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback, memo } from "react";
+import {
+  Send,
+  Paperclip,
+  X,
+  Sparkles,
+  Zap,
+  FileText,
+  ShieldCheck,
+  RefreshCw,
+  Clock,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/context/SocketContext";
 import { useAuthContext } from "@/context/AuthContext";
@@ -12,7 +23,19 @@ interface ChatInputProps {
   chatId?: string;
 }
 
-const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialValue, chatId }: ChatInputProps) {
+const QUICK_SUGGESTION_PILLS = [
+  { icon: RefreshCw, label: "Refund Policy", query: "What is your refund and return policy?" },
+  { icon: Clock, label: "Track My Order", query: "Help me track my recent shipment." },
+  { icon: ShieldCheck, label: "Account Security", query: "How do I secure my account with 2FA?" },
+  { icon: Zap, label: "Live System Diagnostics", query: "Run diagnostics check on my active services." },
+];
+
+const ChatInput = memo(function ChatInput({
+  onSend,
+  disabled = false,
+  initialValue,
+  chatId,
+}: ChatInputProps) {
   const [message, setMessage] = useState("");
   const { orgSettings } = useAuthContext();
   const botName = orgSettings?.chatbot_name || "Support Assistant";
@@ -24,31 +47,37 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
   const typingValue = useDebounce(message, 300);
   const typingEmittedRef = useRef(false);
 
-  const emitTyping = useCallback((isTyping: boolean) => {
-    if (!socket || !chatId) return;
-    socket.emit(isTyping ? "typing:start" : "typing:stop", { chatId });
-  }, [socket, chatId]);
+  const emitTyping = useCallback(
+    (isTyping: boolean) => {
+      if (!socket || !chatId) return;
+      socket.emit(isTyping ? "typing:start" : "typing:stop", { chatId });
+    },
+    [socket, chatId]
+  );
 
   useEffect(() => {
     if (initialValue !== undefined) {
       setMessage(initialValue);
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
-        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px";
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 180) + "px";
       }
     }
   }, [initialValue]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setMessage(val);
-    if (chatId && socket && val.trim()) {
-      if (!typingEmittedRef.current) {
-        emitTyping(true);
-        typingEmittedRef.current = true;
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value;
+      setMessage(val);
+      if (chatId && socket && val.trim()) {
+        if (!typingEmittedRef.current) {
+          emitTyping(true);
+          typingEmittedRef.current = true;
+        }
       }
-    }
-  }, [chatId, socket, emitTyping]);
+    },
+    [chatId, socket, emitTyping]
+  );
 
   useEffect(() => {
     if (typingValue === message && message.trim() && typingEmittedRef.current) {
@@ -105,37 +134,75 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
     const el = textareaRef.current;
     if (el) {
       el.style.height = "auto";
-      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      el.style.height = Math.min(el.scrollHeight, 180) + "px";
     }
   }, []);
 
-  return (
-    <div className="px-4 pb-4 pt-2 bg-transparent md:px-6">
-      <form onSubmit={handleSubmit} className="relative">
-        {/* File preview */}
-        {selectedFile && (
-          <div className="mb-2 flex items-center gap-2 px-1">
-            <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 text-xs border border-border">
-              <Paperclip size={12} className="text-muted-foreground" />
-              <span className="text-muted-foreground truncate max-w-[200px]">{selectedFile.name}</span>
-              <button
-                type="button"
-                onClick={handleRemoveFile}
-                className="hover:text-destructive transition-colors p-0.5"
-                aria-label="Remove file"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          </div>
-        )}
+  const hasContent = message.trim().length > 0 || selectedFile !== null;
 
-        <div
-          className={cn(
-            "flex items-end rounded-xl border border-border bg-card",
-            "focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40 transition-all"
+  return (
+    <div className="w-full px-2 sm:px-4 pb-4 pt-1 bg-transparent select-none">
+      {/* 1. Interactive Floating Quick Suggestion Chips */}
+      {!chatId && (
+        <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex items-center gap-1.5 shrink-0 text-[11px] font-bold text-primary px-1">
+            <Sparkles size={13} className="text-primary animate-pulse" />
+            <span>Suggested:</span>
+          </div>
+          {QUICK_SUGGESTION_PILLS.map((pill, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => onSend(pill.query)}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-card/80 border border-border/80 hover:border-primary/50 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-all duration-200 shadow-sm active:scale-95"
+            >
+              <pill.icon size={12} className="text-primary" />
+              <span>{pill.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 2. Main 3D Floating Input Capsule */}
+      <form
+        onSubmit={handleSubmit}
+        className={cn(
+          "relative rounded-2xl border transition-all duration-300 backdrop-blur-2xl bg-card/90",
+          "border-border/70 hover:border-primary/40",
+          "focus-within:border-primary/60 focus-within:ring-4 focus-within:ring-primary/10",
+          "shadow-[0_10px_35px_-5px_rgba(0,0,0,0.15),0_0_20px_rgba(16,185,129,0.05)]",
+          "focus-within:shadow-[0_15px_40px_-5px_rgba(0,0,0,0.25),0_0_30px_rgba(16,185,129,0.18)]"
+        )}
+      >
+        {/* Selected File Chip */}
+        <AnimatePresence>
+          {selectedFile && (
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 5 }}
+              className="pt-2 px-3 flex items-center gap-2"
+            >
+              <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/25 rounded-xl px-3 py-1.5 text-xs text-primary shadow-sm">
+                <FileText size={13} className="text-primary" />
+                <span className="truncate max-w-[240px] font-medium">{selectedFile.name}</span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  ({(selectedFile.size / 1024).toFixed(0)} KB)
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRemoveFile}
+                  className="hover:text-destructive transition-colors p-0.5 rounded-full hover:bg-black/20"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </motion.div>
           )}
-        >
+        </AnimatePresence>
+
+        {/* Input Text Area */}
+        <div className="flex items-end px-3 py-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -143,50 +210,75 @@ const ChatInput = memo(function ChatInput({ onSend, disabled = false, initialVal
             className="hidden"
             accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
           />
+
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="flex-shrink-0 p-3 hover:bg-muted/50 rounded-l-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="Attach file"
+            className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            title="Attach document or screenshot"
           >
-            <Paperclip size={16} className="text-muted-foreground" />
+            <Paperclip size={18} />
           </button>
+
           <textarea
             ref={textareaRef}
             value={message}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
-            placeholder={`Message ${botName}...`}
+            placeholder={`Ask ${botName} anything or type your request...`}
             disabled={disabled}
             rows={1}
             className={cn(
-              "flex-1 resize-none bg-transparent px-1 py-3 text-sm",
-              "placeholder:text-muted-foreground/60",
-              "focus:outline-none",
-              "min-h-[44px] max-h-[200px]",
-              "disabled:cursor-not-allowed disabled:opacity-50"
+              "flex-1 resize-none bg-transparent px-2.5 py-1.5 text-sm",
+              "placeholder:text-muted-foreground/60 text-foreground font-sans",
+              "focus:outline-none leading-relaxed",
+              "min-h-[40px] max-h-[180px]",
+              "disabled:cursor-not-allowed disabled:opacity-50 scrollbar-thin"
             )}
           />
-          <button
-            type="submit"
-            disabled={(!message.trim() && !selectedFile) || disabled}
-            className={cn(
-              "flex-shrink-0 m-1.5 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200",
-              (message.trim() || selectedFile)
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                : "bg-muted text-muted-foreground/40"
-            )}
-            aria-label="Send message"
-          >
-            <Send size={14} />
-          </button>
+
+          {/* 3D Action Send Button */}
+          <div className="flex items-center gap-1.5 shrink-0 pl-2">
+            <motion.button
+              type="submit"
+              disabled={!hasContent || disabled}
+              whileHover={hasContent ? { scale: 1.06, y: -1 } : {}}
+              whileTap={hasContent ? { scale: 0.94, y: 1 } : {}}
+              className={cn(
+                "h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200 shadow-md",
+                hasContent
+                  ? "bg-gradient-to-r from-primary via-emerald-400 to-teal-400 text-black font-bold shadow-[0_4px_16px_rgba(16,185,129,0.4)]"
+                  : "bg-muted/80 text-muted-foreground/40 cursor-not-allowed shadow-none"
+              )}
+            >
+              <Send size={15} className={hasContent ? "translate-x-[1px]" : ""} />
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Input Bar Bottom Info Strip */}
+        <div className="flex items-center justify-between px-3.5 pb-2 text-[10px] text-muted-foreground border-t border-border/40 pt-1.5">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1 text-primary font-semibold">
+              <Zap size={11} /> AI Neural RAG Engine
+            </span>
+            <span className="hidden sm:inline opacity-40">·</span>
+            <span className="hidden sm:inline text-muted-foreground/70">
+              End-to-End Enterprise Encrypted
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 text-muted-foreground/70 font-mono text-[10px]">
+            <span>Press</span>
+            <kbd className="px-1.5 py-0.5 rounded bg-muted text-foreground border border-border text-[9px] font-bold">
+              Enter ↵
+            </kbd>
+            <span className="hidden sm:inline">to send</span>
+          </div>
         </div>
       </form>
-      <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
-        {botName} can make mistakes. Consider checking important information.
-      </p>
     </div>
   );
 });

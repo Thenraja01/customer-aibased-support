@@ -21,7 +21,7 @@ export class GrokProvider extends LLMProvider {
   }
 
   _apiKey(options = {}) {
-    return options.apiKey || process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+    return options.apiKey || options.api_key || options.grok_api_key || process.env.GROK_API_KEY || process.env.XAI_API_KEY;
   }
 
   async _call(messages, options, maxTokens) {

@@ -10,8 +10,32 @@ const graphNodeSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["entity", "topic", "document", "chunk"],
+      enum: [
+        "entity",
+        "topic",
+        "document",
+        "chunk",
+        "customer",
+        "ticket",
+        "error",
+        "transaction",
+        "product",
+        "service",
+        "policy",
+        "incident",
+        "resolution",
+      ],
       required: true,
+      index: true,
+    },
+    canonical_id: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    entity_resolution_hash: {
+      type: String,
+      default: null,
       index: true,
     },
     ref_id: {
@@ -46,5 +70,6 @@ const graphNodeSchema = new mongoose.Schema(
 
 // Optimize node indexing per organization
 graphNodeSchema.index({ organization_id: 1, type: 1, name: 1 });
+graphNodeSchema.index({ organization_id: 1, canonical_id: 1 }, { sparse: true });
 
 export default mongoose.model("GraphNode", graphNodeSchema);

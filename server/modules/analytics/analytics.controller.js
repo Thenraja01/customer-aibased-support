@@ -2,7 +2,6 @@ import * as analyticsService from "./analytics.service.js";
 
 const orgIdFrom = (req) => req.scope?.organizationId || req.user?.organizationId;
 
-// GET /admin/v1/analytics/overview
 export const getOverview = async (req, res) => {
   try {
     const orgId = orgIdFrom(req);
@@ -17,7 +16,6 @@ export const getOverview = async (req, res) => {
   }
 };
 
-// GET /admin/v1/analytics/ai-usage
 export const getAIUsage = async (req, res) => {
   try {
     const orgId = orgIdFrom(req);

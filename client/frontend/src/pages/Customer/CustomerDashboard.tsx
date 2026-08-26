@@ -1,4 +1,4 @@
-import { useEffect, memo, useCallback } from "react";
+import { useEffect, memo, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MessageSquare, Ticket, Clock, CheckCircle2, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +6,7 @@ import { useTickets } from "@/hooks/useTickets";
 import { useChat } from "@/hooks/useChat";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 interface StatCardProps {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
@@ -58,6 +59,48 @@ export default function CustomerDashboard() {
   const inProgressCount = tickets.filter((t: any) => t.status === "in_progress").length;
   const resolvedCount = tickets.filter((t: any) => t.status === "resolved").length;
   const openChats = chats.filter((c: any) => c.status === "open").length;
+
+  const trendData = useMemo(() => {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const today = new Date();
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - i));
+      return {
+        dayName: days[d.getDay()],
+        dateStr: d.toISOString().split("T")[0],
+        open: 0,
+        resolved: 0,
+      };
+    });
+
+    tickets.forEach((t: any) => {
+      if (!t.created_at) return;
+      const ticketDate = new Date(t.created_at).toISOString().split("T")[0];
+      const match = last7Days.find((d) => d.dateStr === ticketDate);
+      if (match) {
+        if (t.status === "resolved" || t.status === "closed") {
+          match.resolved += 1;
+        } else {
+          match.open += 1;
+        }
+      }
+    });
+
+    return last7Days.map((d) => ({
+      name: d.dayName,
+      open: d.open,
+      resolved: d.resolved,
+    }));
+  }, [tickets]);
+
+  const pieData = useMemo(() => {
+    return [
+      { name: "Open", value: openCount, color: "#6366f1" },
+      { name: "In Progress", value: inProgressCount, color: "#3b82f6" },
+      { name: "Resolved", value: resolvedCount, color: "#10b981" },
+    ].filter((item) => item.value > 0);
+  }, [openCount, inProgressCount, resolvedCount]);
 
   const handleNavigateToChat = useCallback(() => navigate("/chat"), [navigate]);
   const handleNavigateToTickets = useCallback(() => navigate("/tickets"), [navigate]);
@@ -129,7 +172,7 @@ export default function CustomerDashboard() {
               icon={Ticket}
               label="Open Tickets"
               value={openCount}
-              accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              accent="bg-primary/10 text-primary"
             />
             <StatCard
               icon={Clock}
@@ -149,6 +192,72 @@ export default function CustomerDashboard() {
               value={openChats}
               accent="bg-amber-500/10 text-amber-600 dark:text-amber-400"
             />
+          </div>
+
+          {/* Interactive Recharts Analytics Graphs */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Ticket Activity & Resolution Trend (2 Cols) */}
+            <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">Ticket Activity & Resolution Trend</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Overview of your submitted support requests over time</p>
+                </div>
+              </div>
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trendData}>
+                    <defs>
+                      <linearGradient id="colorOpen" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorResolved" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
+                    <YAxis stroke="#64748b" fontSize={11} tickLine={false} allowDecimals={false} />
+                    <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px", color: "#f8fafc" }} />
+                    <Area type="monotone" dataKey="open" stroke="#6366f1" fillOpacity={1} fill="url(#colorOpen)" strokeWidth={2} name="Open Tickets" />
+                    <Area type="monotone" dataKey="resolved" stroke="#10b981" fillOpacity={1} fill="url(#colorResolved)" strokeWidth={2} name="Resolved" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Status Breakdown Pie Chart (1 Col) */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md p-5 space-y-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">Status Distribution</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Real-time status breakdown</p>
+              </div>
+              <div className="h-48 w-full flex items-center justify-center">
+                {pieData.length === 0 ? (
+                  <div className="text-xs text-slate-500 font-medium text-center py-10">No ticket status data recorded</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={65}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, idx) => (
+                          <Cell key={`cell-${idx}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px", color: "#f8fafc" }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Quick actions */}

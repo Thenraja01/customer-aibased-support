@@ -16,4 +16,6 @@ export const ChatAPI = {
   getQuickActions: () => AxiosInstance.get("/chats/quick-actions"),
   sendAI: (chatId, message, model, actionConfirm) =>
     AxiosInstance.post("/chats/ai", { chatId, message, model, actionConfirm }, { timeout: 180000 }),
+  handoff: (chatId, reason = "user_requested") =>
+    AxiosInstance.post(`/chats/${chatId}/handoff`, { reason }),
 };

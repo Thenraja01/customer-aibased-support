@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import Document from "./document.schema.js";
 import DocumentChunk from "./documentChunk.schema.js";
 import DocumentVersion from "../document-version/documentVersion.schema.js";
@@ -108,11 +110,45 @@ export const processDocument = async (documentId, versionId) => {
     doc.ingestionStatus = "parsing";
     await doc.save();
 
-    // Download secure file buffer from Cloudinary
-    const fileBuffer = await downloadFromCloudinary(doc.cloudinary_public_id, doc.cloudinary_resource_type);
+    // Download secure file buffer from Cloudinary or local fallback
+    let fileBuffer = Buffer.from("");
+    if (doc.cloudinary_public_id) {
+      try {
+        fileBuffer = await downloadFromCloudinary(doc.cloudinary_public_id, doc.cloudinary_resource_type, {
+          organizationId: doc.organization_id,
+          branchId: doc.branch_id,
+        });
+      } catch (err) {
+        console.warn(`[Download] Cloudinary download warning:`, err.message);
+      }
+    }
+
+    if ((!fileBuffer || fileBuffer.length === 0) && doc.file_name) {
+      const localPaths = [
+        path.resolve("docs/knowledge_base", doc.file_name),
+        path.resolve("../docs/knowledge_base", doc.file_name),
+        path.resolve("../../docs/knowledge_base", doc.file_name),
+        path.resolve("uploads", doc.file_name),
+      ];
+      for (const lp of localPaths) {
+        if (fs.existsSync(lp)) {
+          fileBuffer = fs.readFileSync(lp);
+          break;
+        }
+      }
+    }
 
     // Extract text
-    const text = await extractTextFromBuffer(fileBuffer, doc.file_mimetype);
+    let text = await extractTextFromBuffer(fileBuffer, doc.file_mimetype, doc.file_name);
+  if (!text || text.trim().length < 10) {
+      const existingChunks = await DocumentChunk.find({ document_id: documentId }).lean();
+      if (existingChunks.length > 0) {
+        text = existingChunks.map((c) => c.content || c.text_content).join("\n\n");
+      } else if (doc.description && doc.description.trim().length >= 10) {
+        text = doc.description.trim();
+      }
+    }
+
     if (!text || text.trim().length < 10) {
       doc.ingestionStatus = "failed";
       doc.indexingStatus = "failed";
@@ -173,9 +209,18 @@ export const processDocument = async (documentId, versionId) => {
     doc.embedded_chunk_count = savedChunks.filter((c) => c.embedding && c.embedding.length > 0).length;
     doc.indexed_chunk_count = savedChunks.length;
     doc.indexingStatus = "indexed";
+
+    // Build Knowledge Graph nodes & extract entity-relation triples (GraphRAG)
+    try {
+      await ingestDocumentGraph(documentId, doc.organization_id, doc.branch_id, savedChunks, detectedTopicIds);
+      doc.graphStatus = "built";
+    } catch (graphErr) {
+      console.error(`[GraphRAG] Failed to ingest graph for doc ${documentId}:`, graphErr.message);
+      doc.graphStatus = "failed";
+    }
+
     doc.ingestionStatus = "completed";
     doc.knowledge_index_status = "indexed";
-    doc.graphStatus = "built";
     doc.ingestion_error = null;
     doc.failed_stage = null;
     doc.last_indexed_at = new Date();
@@ -225,7 +270,10 @@ export const createDocument = async (data, userId, fileBuffer, fileName, fileMim
   const publicId = `organizations/${data.organization_id}/${branchPath}/documents/${documentId}/v${versionNumber}/${sanitizedFileName}`;
 
   // Upload to Cloudinary
-  const uploadResult = await uploadToCloudinary(fileBuffer, publicId, resourceType);
+  const uploadResult = await uploadToCloudinary(fileBuffer, publicId, resourceType, {
+    organizationId: data.organization_id,
+    branchId: data.branch_id,
+  });
 
   const docStatus = "uploaded"; // Always start as uploaded for background processing
 
@@ -302,14 +350,16 @@ export const uploadNewVersion = async (documentId, userId, orgId, branchId, user
   if (!doc) throw new Error("Document not found");
 
   // Multi-tenant check
-  if (doc.organization_id.toString() !== orgId.toString()) {
+  const normalizedRole = normalizeRoleName(userRole);
+  const isSuperAdmin = normalizedRole === "super_admin";
+  const isOrgAdmin = normalizedRole === "admin" || isSuperAdmin;
+
+  if (!isSuperAdmin && orgId && doc.organization_id.toString() !== orgId.toString()) {
     throw new Error("Forbidden: Document belongs to another organization");
   }
 
-  // Branch check
-  const normalizedRole = normalizeRoleName(userRole);
-  const isAdmin = isNormalizedAdminRole(normalizedRole) || normalizedRole === "super_admin";
-  if (!isAdmin && doc.branch_id && doc.branch_id.toString() !== branchId?.toString()) {
+  // Branch check: Org admin (and super_admin) can manage all branch documents in their organization
+  if (!isOrgAdmin && doc.branch_id && branchId && doc.branch_id.toString() !== branchId.toString()) {
     throw new Error("Forbidden: Document belongs to another branch");
   }
 
@@ -330,7 +380,10 @@ export const uploadNewVersion = async (documentId, userId, orgId, branchId, user
   const publicId = `organizations/${orgId}/${branchPath}/documents/${documentId}/v${nextVersionNumber}/${sanitizedFileName}`;
 
   // Upload to Cloudinary
-  const uploadResult = await uploadToCloudinary(fileBuffer, publicId, resourceType);
+  const uploadResult = await uploadToCloudinary(fileBuffer, publicId, resourceType, {
+    organizationId: orgId,
+    branchId: doc.branch_id,
+  });
 
   // Update Document metadata (keep old allowed_roles, status transitions to "uploaded")
   doc.status = "uploaded";
@@ -391,14 +444,21 @@ export const getDocumentForViewing = async (documentId, user) => {
 
   // 2. Verify branch scope
   if (!isSuperAdmin && !isAdmin) {
-    if (doc.branch_id && doc.branch_id.toString() !== userBranchId?.toString()) {
+    const isOrgOrPublicVisible =
+      doc.visibility === "organization" ||
+      doc.visibility === "public" ||
+      doc.allowed_roles?.includes("customer") ||
+      doc.allowed_roles?.includes("all") ||
+      doc.allowed_roles?.includes("public");
+
+    if (doc.branch_id && doc.branch_id.toString() !== userBranchId?.toString() && !isOrgOrPublicVisible) {
       throw new Error("Forbidden: Document belongs to another branch");
     }
   }
 
   // 3. Verify allowed_roles
   if (!isSuperAdmin && !isAdmin && !isBranchAdmin) {
-    const allowed = doc.allowed_roles || ["admin", "branch_admin", "support"];
+    const allowed = doc.allowed_roles || ["admin", "branch_admin", "support", "customer", "all", "public"];
     if (!matchRoles(userRole, allowed)) {
       throw new Error("Forbidden: Your role does not have permission to view this document");
     }
@@ -406,13 +466,10 @@ export const getDocumentForViewing = async (documentId, user) => {
 
   // 4. Verify document status
   if (!isSuperAdmin && !isAdmin && !isBranchAdmin) {
-    if (doc.status !== "published" && doc.status !== "approved") {
+    const validStatuses = ["published", "approved", "ready_for_review", "uploaded", "completed"];
+    if (!validStatuses.includes(doc.status)) {
       throw new Error("Forbidden: Document is not published");
     }
-  }
-
-  if (!doc.cloudinary_public_id) {
-    throw new Error("Document storage error: No Cloudinary public ID found");
   }
 
   return doc;
@@ -420,21 +477,33 @@ export const getDocumentForViewing = async (documentId, user) => {
 
 export const downloadDocument = async (documentId, user) => {
   const doc = await getDocumentForViewing(documentId, user);
-  const buffer = await downloadFromCloudinary(doc.cloudinary_public_id, doc.cloudinary_resource_type);
+  const buffer = await downloadFromCloudinary(doc.cloudinary_public_id, doc.cloudinary_resource_type, {
+    organizationId: doc.organization_id,
+    branchId: doc.branch_id,
+  });
   return { buffer, contentType: doc.file_mimetype || "application/pdf" };
 };
 
 
-export const getAllDocuments = async (organizationId = null, branchId = null, page = 1, limit = 20, status = "", search = "") => {
+export const getAllDocuments = async (organizationId = null, branchId = null, page = 1, limit = 20, status = "", search = "", userRole = null) => {
   const filter = {};
   if (organizationId) filter.organization_id = organizationId;
-  if (branchId) filter.branch_id = branchId;
+  if (branchId) {
+    filter.branch_id = { $in: [branchId, null] };
+  }
   if (status) filter.status = status;
   if (search) {
     filter.$or = [
       { title: { $regex: search, $options: "i" } },
       { description: { $regex: search, $options: "i" } },
     ];
+  }
+  if (userRole) {
+    const normalizedRole = normalizeRoleName(userRole);
+    const isAdmin = isNormalizedAdminRole(normalizedRole) || normalizedRole === "super_admin";
+    if (!isAdmin) {
+      filter.allowed_roles = { $in: [normalizedRole, "all", "public"] };
+    }
   }
   const skip = (page - 1) * limit;
   const [data, total] = await Promise.all([
@@ -467,16 +536,25 @@ export const getDocumentsByUser = async (userId, roleName = null, roleId = null,
 
   const userDocs = await Document.find({ user_id: userId }).sort({ created_at: -1 });
 
-  if (roleId && organizationId) {
-    const accessEntries = await DocumentRoleAccess.find({
-      organization_id: organizationId,
-      role_id: roleId,
-    }).select("document_id").lean();
-    const accessibleIds = new Set(accessEntries.map((e) => e.document_id.toString()));
+  if (organizationId) {
+    const accessibleIds = new Set();
+
+    if (roleId && mongoose.isValidObjectId(roleId)) {
+      const accessEntries = await DocumentRoleAccess.find({
+        organization_id: organizationId,
+        role_id: roleId,
+      }).select("document_id").lean();
+      accessEntries.forEach((e) => {
+        if (e.document_id) accessibleIds.add(e.document_id.toString());
+      });
+    }
 
     const roleMatchDocs = await Document.find({
       organization_id: organizationId,
-      assigned_role: { $in: [normalizedRole, "all"] },
+      $or: [
+        { assigned_role: { $in: [normalizedRole, "all", "customer"] } },
+        { allowed_roles: { $in: [normalizedRole, "all", "customer", "public"] } }
+      ]
     }).lean();
     roleMatchDocs.forEach((d) => accessibleIds.add(d._id.toString()));
 
@@ -504,8 +582,52 @@ export const getDocumentsByStatus = async (status, organizationId = null) => {
     .sort({ created_at: -1 });
 };
 
-export const updateDocumentStatus = async (id, updateData) => {
-  const doc = await Document.findByIdAndUpdate(id, updateData, { new: true });
+export const updateDocumentMetadata = async (id, metadata, orgId, branchId) => {
+  const query = { _id: id, organization_id: orgId };
+  if (branchId) query.branch_id = branchId;
+
+  const updateFields = {};
+  if (metadata.title !== undefined) updateFields.title = metadata.title;
+  if (metadata.description !== undefined) updateFields.description = metadata.description;
+  if (metadata.document_type !== undefined) updateFields.document_type = metadata.document_type;
+  if (metadata.visibility !== undefined) updateFields.visibility = metadata.visibility;
+  if (metadata.tags !== undefined) updateFields.tags = metadata.tags;
+  
+  if (metadata.branch_id !== undefined) {
+    updateFields.branch_id = (metadata.branch_id === "all" || metadata.branch_id === "ALL" || !metadata.branch_id) ? null : metadata.branch_id;
+  }
+  
+  if (metadata.allowed_roles !== undefined) {
+    let roles = metadata.allowed_roles;
+    if (typeof roles === "string") {
+      try { roles = JSON.parse(roles); } catch { roles = roles.split(",").map((r) => r.trim()).filter(Boolean); }
+    }
+    updateFields.allowed_roles = roles.map(normalizeRoleName).filter(Boolean);
+  }
+
+  const doc = await Document.findOneAndUpdate(query, { $set: updateFields }, { new: true }).lean();
+  if (!doc) throw new Error("Document not found");
+
+  // Sync updated branch_id & allowed_roles down to all DocumentChunks for RAG
+  const chunkUpdate = {};
+  if (updateFields.branch_id !== undefined) chunkUpdate.branch_id = updateFields.branch_id;
+  if (updateFields.allowed_roles !== undefined) chunkUpdate.allowedRoles = updateFields.allowed_roles;
+
+  if (Object.keys(chunkUpdate).length > 0) {
+    await DocumentChunk.updateMany({ document_id: id }, { $set: chunkUpdate });
+  }
+
+  // Invalidate RAG prompt response cache for this organization
+  const { invalidateOrgResponseCache } = await import("../../services/promptCache.service.js");
+  await invalidateOrgResponseCache(orgId).catch(() => null);
+
+  return doc;
+};
+
+export const updateDocumentStatus = async (id, updateData, orgId, branchId) => {
+  const query = { _id: id, organization_id: orgId };
+  if (branchId) query.branch_id = branchId;
+  const doc = await Document.findOneAndUpdate(query, updateData, { new: true });
   if (!doc) throw new Error("Document not found");
 
   const chunkUpdate = {};
@@ -522,10 +644,13 @@ export const updateDocumentStatus = async (id, updateData) => {
   return doc;
 };
 
-export const approveDocument = async (id, userId) => {
+export const approveDocument = async (id, userId, orgId, branchId) => {
   const now = new Date();
-  const doc = await Document.findByIdAndUpdate(
-    id,
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  if (branchId) query.branch_id = branchId;
+  const doc = await Document.findOneAndUpdate(
+    query,
     { status: "approved", approved_by: userId, approved_at: now, verification_status: "approved", verified_by: userId, verified_at: now },
     { new: true }
   ).populate("document_type_id");
@@ -552,10 +677,13 @@ export const approveDocument = async (id, userId) => {
   return doc;
 };
 
-export const publishDocument = async (id, userId) => {
+export const publishDocument = async (id, userId, orgId, branchId) => {
   const now = new Date();
-  const doc = await Document.findByIdAndUpdate(
-    id,
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  if (branchId) query.branch_id = branchId;
+  const doc = await Document.findOneAndUpdate(
+    query,
     { status: "published", approved_by: userId, approved_at: now, published_at: now, verification_status: "approved", verified_by: userId, verified_at: now },
     { new: true }
   ).populate("document_type_id");
@@ -585,9 +713,12 @@ export const publishDocument = async (id, userId) => {
   return doc;
 };
 
-export const rejectDocument = async (id, userId, remarks) => {
-  const doc = await Document.findByIdAndUpdate(
-    id,
+export const rejectDocument = async (id, userId, remarks, orgId, branchId) => {
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  if (branchId) query.branch_id = branchId;
+  const doc = await Document.findOneAndUpdate(
+    query,
     { status: "rejected", rejection_reason: remarks || "", verification_status: "rejected", verified_by: userId, verified_at: new Date() },
     { new: true }
   );
@@ -609,34 +740,53 @@ export const rejectDocument = async (id, userId, remarks) => {
   return doc;
 };
 
-export const deleteDocument = async (id) => {
-  const doc = await Document.findById(id);
+export const deleteDocument = async (id, orgId, branchId) => {
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  if (branchId) query.branch_id = branchId;
+  const doc = await Document.findOne(query);
   if (!doc) throw new Error("Document not found");
 
   // Get all versions to delete their Cloudinary assets
   const versions = await DocumentVersion.find({ document_id: id }).lean();
   for (const ver of versions) {
     if (ver.cloudinary_public_id) {
-      await deleteFromCloudinary(ver.cloudinary_public_id, ver.cloudinary_resource_type).catch((err) => {
+      await deleteFromCloudinary(ver.cloudinary_public_id, ver.cloudinary_resource_type, {
+        organizationId: doc.organization_id,
+        branchId: doc.branch_id,
+      }).catch((err) => {
         console.error(`Failed to delete Cloudinary asset ${ver.cloudinary_public_id}:`, err.message);
       });
     }
   }
 
-  // Delete from DB
+  // Delete from DB: Document, Version, Chunk, RoleAccess, Verification, GraphNode, GraphRelationship, Topic
+  const GraphNode = mongoose.models.GraphNode || null;
+  const GraphRelationship = mongoose.models.GraphRelationship || mongoose.models.GraphEdge || null;
+  const Topic = mongoose.models.Topic || null;
+
   await Promise.all([
     Document.findByIdAndDelete(id),
     DocumentVersion.deleteMany({ document_id: id }),
     DocumentChunk.deleteMany({ document_id: id }),
     DocumentRoleAccess.deleteMany({ document_id: id }),
     DocumentVerification.deleteMany({ document_id: id }),
+    GraphNode ? GraphNode.deleteMany({ $or: [{ ref_id: id }, { "properties.document_id": id }] }).catch(() => null) : Promise.resolve(),
+    GraphRelationship ? GraphRelationship.deleteMany({ $or: [{ source_document_id: id }, { target_document_id: id }, { chunk_id: id }] }).catch(() => null) : Promise.resolve(),
+    Topic ? Topic.deleteMany({ document_id: id }).catch(() => null) : Promise.resolve(),
   ]);
 
   if (doc.organization_id) {
     await invalidateQuickActionCache(doc.organization_id);
+    try {
+      const { invalidateOrgResponseCache } = await import("../../services/promptCache.service.js");
+      await invalidateOrgResponseCache(doc.organization_id);
+    } catch {
+      // cache clear best-effort
+    }
   }
 
-  return { message: "Document and related data deleted" };
+  return { message: "Document and all associated graph nodes, chunks, and caches deleted cleanly" };
 };
 
 export const setDocumentRoleAccess = async (documentId, roleIds, organizationId) => {

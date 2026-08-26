@@ -1,134 +1,53 @@
 import mongoose from "mongoose";
 import { generateResponse } from "../../modules/llm/index.js";
 import { getAuthContext } from "./aiOrchestrator.js";
-import * as businessTools from "../business-ai/businessTools.js";
 import { searchWithScope } from "../../modules/rag/rag.service.js";
 import { retrieveGraphContext } from "../mongodbGraph.service.js";
 import Topic from "../../modules/topic/topic.schema.js";
 
-const isWriteOperation = (toolName) => {
-  const writeTools = [
-    "sendNotification", "createTicket", "updateTicket", "assignTicket",
-    "updateDocumentStatus", "createFAQ", "updateFAQ", "createUser",
-    "updateUser", "disableUser", "createBranch", "updateBranch",
-    "createOrganization", "updateOrganizationStatus",
-    "create_refund", "update_refund"
-  ];
-  return writeTools.includes(toolName);
-};
-
-const TOOL_DEFINITIONS = {
-  getOrganizationDetails: "getOrganizationDetails() - Retrieves details of the authenticated organization.",
-  getOrganizations: "getOrganizations(filters: { status, search }) - Retrieves all organizations on the platform (super_admin only).",
-  getPlatformStats: "getPlatformStats() - Retrieves platform-wide analytics and statistics (super_admin only).",
-  getAuditLogs: "getAuditLogs(filters: { organizationId, action }) - Retrieves platform audit trails (super_admin only).",
-  getBranches: "getBranches() - Retrieves list of branches inside the organization.",
-  getUsers: "getUsers(filters: { role, status, branchId }) - Retrieves list of users.",
-  getUserDetails: "getUserDetails(userId) - Retrieves details of a specific user.",
-  getTickets: "getTickets(filters: { status, priority, branchId }) - Retrieves list of tickets.",
-  getTicketDetails: "getTicketDetails(ticketId) - Retrieves details of a support ticket.",
-  getDocuments: "getDocuments(filters: { status, branchId, visiblity }) - Retrieves list of documents.",
-  getDocumentStatus: "getDocumentStatus(docId) - Retrieves processing status of a document.",
-  getNotifications: "getNotifications(filters: { branchId }) - Retrieves notifications sent to users.",
-  getFAQs: "getFAQs(filters: { category, isActive }) - Retrieves Frequently Asked Questions.",
-  getReports: "getReports() - Retrieves quick branch/org statistics summary.",
-  getPendingItems: "getPendingItems() - Retrieves list of pending tickets/documents.",
-  sendNotification: "sendNotification(args: { branchId, title, message, type }) - Broadcasts notifications.",
-  createTicket: "createTicket(args: { userId, subject, description, priority, category, branchId }) - Creates a support ticket.",
-  updateTicket: "updateTicket(args: { ticketId, updates: { status, priority, category, subject, description } }) - Updates ticket status/priority.",
-  assignTicket: "assignTicket(args: { ticketId, assignedToId }) - Assigns a ticket to a support representative.",
-  updateDocumentStatus: "updateDocumentStatus(args: { docId, status }) - Approves or archives a document.",
-  createFAQ: "createFAQ(args: { question, answer, category, is_active }) - Creates an FAQ entry.",
-  updateFAQ: "updateFAQ(args: { faqId, updates }) - Edits an FAQ entry.",
-  createUser: "createUser(args: { name, email, phone, role, password, branchId }) - Creates a user account.",
-  updateUser: "updateUser(args: { targetUserId, updates }) - Edits user profile/status.",
-  disableUser: "disableUser(args: { targetUserId }) - Suspends a user account.",
-  createBranch: "createBranch(args: { name, code, address, phone, email }) - Registers a branch.",
-  updateBranch: "updateBranch(args: { branchId, updates }) - Edits branch contact info.",
-  createOrganization: "createOrganization(args: { name, email, code, phone, address, domain }) - Creates a new tenant (super_admin only).",
-  updateOrganizationStatus: "updateOrganizationStatus(args: { organizationId, status }) - Suspends or activates a tenant (super_admin only).",
-  get_refund: "get_refund(args: { refundId }) - Retrieves details of a refund request.",
-  check_refund_eligibility: "check_refund_eligibility(args: { userId }) - Checks if a customer is eligible for a refund.",
-  create_refund: "create_refund(args: { userId, subject, description, priority, branchId }) - Submits a refund request.",
-  update_refund: "update_refund(args: { refundId, updates: { status, priority, description } }) - Updates an existing refund request."
-};
-
-const buildDynamicSystemPrompt = (enabledTools) => {
-  const readToolsText = [];
-  const actionToolsText = [];
-
-  enabledTools.forEach(tName => {
-    const desc = TOOL_DEFINITIONS[tName];
-    if (!desc) return;
-    
-    if (isWriteOperation(tName)) {
-      actionToolsText.push(`- ${desc}`);
-    } else {
-      readToolsText.push(`- ${desc}`);
-    }
-  });
-
-  return `
-You are the Business AI assistant for a customer-support system.
-Your job is to understand the user's request and select the correct business tool.
-You work only with live application/business data. Do not answer general questions.
-
-AVAILABLE READ-ONLY TOOLS:
-${readToolsText.join("\n") || "None"}
-
-AVAILABLE ACTION TOOLS:
-${actionToolsText.join("\n") || "None"}
-
-CRITICAL RULES:
-1. Output exactly ONE valid JSON object.
-2. Do not output markdown, backticks or explanations.
-3. If required arguments are missing, return a "clarification" response instead of inventing values.
-4. If request does not match an available tool, return "unsupported".
-
-OUTPUT TYPES:
-{
-  "type": "tool",
-  "tool": "toolName",
-  "args": { ... }
-}
-or
-{
-  "type": "action",
-  "tool": "toolName",
-  "requiresConfirmation": true,
-  "args": { ... }
-}
-or
-{
-  "type": "clarification",
-  "message": "..."
-}
-`;
-};
-
-// Detect Topic using LLM
+// Detect Topic using fast keyword matching
 export const classifyUserQuestionTopic = async (message, organizationId) => {
   const topics = await Topic.find({ organization_id: organizationId, enabled: true }).lean();
   if (topics.length === 0) return null;
 
-  const topicList = topics.map(t => `- Name: "${t.name}" | Description: "${t.description || ''}"`).join('\n');
-  const prompt = `Classify this user request into exactly one of the topics below.
-Topics:
-${topicList}
+  const lowerMsg = (message || "").toLowerCase();
 
-User Request: "${message}"
+  // 1. Direct name and configured keyword match
+  for (const t of topics) {
+    const tName = t.name.toLowerCase();
+    if (lowerMsg.includes(tName)) return t;
+    if (t.keywords && Array.isArray(t.keywords) && t.keywords.some((k) => lowerMsg.includes(k.toLowerCase()))) {
+      return t;
+    }
+  }
 
-Respond ONLY with the name of the topic. If it matches none of them, respond with "none". Do not add any explanation or quotes.`;
+  // 2. Common domain semantics mapping
+  if (/return|refund/i.test(lowerMsg)) {
+    return topics.find((t) => /return|refund/i.test(t.name)) || null;
+  }
+  if (/ship|delivery|tracking|courier|dispatch/i.test(lowerMsg)) {
+    return topics.find((t) => /shipping|delivery/i.test(t.name)) || null;
+  }
+  if (/warranty|guarantee|claim/i.test(lowerMsg)) {
+    return topics.find((t) => /warranty/i.test(t.name)) || null;
+  }
+  if (/pay|invoice|bill|charge|card|upi|bank/i.test(lowerMsg)) {
+    return topics.find((t) => /billing|payment/i.test(t.name)) || null;
+  }
+  if (/order|cancel|modify order/i.test(lowerMsg)) {
+    return topics.find((t) => /order/i.test(t.name)) || null;
+  }
+  if (/complaint|grievance|escalat/i.test(lowerMsg)) {
+    return topics.find((t) => /complaint|escalat/i.test(t.name)) || null;
+  }
+  if (/password|2fa|login|auth|security|otp/i.test(lowerMsg)) {
+    return topics.find((t) => /security|auth/i.test(t.name)) || null;
+  }
+  if (/error|troubleshoot|bug|issue|crash/i.test(lowerMsg)) {
+    return topics.find((t) => /troubleshoot/i.test(t.name)) || null;
+  }
 
-  const llmRes = await generateResponse(prompt, message, {
-    provider: "ollama",
-    model: "llama3.2:3b",
-    organizationId
-  });
-
-  const responseText = (llmRes.text || "").trim().replace(/['"]/g, "");
-  const matchedTopic = topics.find(t => t.name.toLowerCase() === responseText.toLowerCase());
-  return matchedTopic || null;
+  return null;
 };
 
 // Primary streaming orchestration function
@@ -159,8 +78,35 @@ export const processAIStream = async (req, res) => {
 
   try {
     const Message = mongoose.model("Message");
+    const Chat = mongoose.model("Chat");
 
-    // Save incoming user message in background
+    // Suppress AI response if chat is in live human handoff mode
+    if (chatId) {
+      const chatDoc = await Chat.findById(chatId).lean();
+      if (chatDoc && (chatDoc.is_escalated || chatDoc.status === "escalated" || chatDoc.status === "in_progress" || chatDoc.status === "HUMAN_ACTIVE" || chatDoc.status === "HUMAN_QUEUED")) {
+        const userMsg = await Message.create({
+          chat_id: chatId,
+          sender_id: auth.userId,
+          sender_type: "user",
+          content: message,
+          is_ai: false
+        }).catch(() => null);
+
+        try {
+          const { getIO } = await import("./socket.service.js");
+          const io = getIO();
+          if (io) {
+            io.emit("chat:message", { chatId, chat_id: chatId, content: message, is_ai: false, sender_id: auth.userId });
+            io.emit("message:new", userMsg);
+          }
+        } catch {}
+
+        res.write(`data: ${JSON.stringify({ type: "done", text: "", isHumanHandoff: true })}\n\n`);
+        return res.end();
+      }
+    }
+
+    // Save incoming user message in background for standard AI chats
     if (chatId) {
       await Message.create({
         chat_id: chatId,
@@ -171,81 +117,49 @@ export const processAIStream = async (req, res) => {
       }).catch(() => null);
     }
 
+    // ── 0. Pre-Flight Input Guardrails & Prompt Injection Defense ──
+    const { checkInputGuardrails, detectPromptInjection, checkOutputGuardrails } = await import("../../modules/chat/guardrails.service.js");
+    const inputCheck = await checkInputGuardrails(message, orgId);
+    const injectionCheck = detectPromptInjection(message);
+
+    if (!inputCheck.passed || injectionCheck.isInjected) {
+      sendStatus("Safety filter applied");
+      const safeFallback = "I'm unable to process this request as it contains restricted or unrecognized instructions. Please ask questions regarding our official products, services, or support policies.";
+      sendToken(safeFallback);
+      
+      const defaultSafetyActions = [
+        { label: "Browse Help Center", action: "browse_docs", query: "What topics can you help me with?" },
+        { label: "Talk to Support", action: "contact_agent", query: "I want to speak with a human support agent" }
+      ];
+
+      res.write(`data: ${JSON.stringify({
+        type: "done",
+        text: safeFallback,
+        confidence: 0,
+        citations: [],
+        escalation: { available: true, reason: "guardrail_violation" },
+        quickActions: defaultSafetyActions
+      })}\n\n`);
+      return res.end();
+    }
+
     sendStatus("Analyzing question");
 
     // 1. Detect Topic
     const matchedTopic = await classifyUserQuestionTopic(message, orgId);
-    let enabledTools = [];
 
     if (matchedTopic) {
       sendStatus(`Topic: ${matchedTopic.name}`);
-      enabledTools = matchedTopic.tools || [];
     } else {
       sendStatus("Topic: General");
     }
 
-    // 2. Load Tools and check if tool should be executed
-    let toolResultContext = "";
-    let executingToolName = "";
-    let executionPending = null;
+    // 3. Search Vector Database & Conversational Context
+    sendStatus("Analyzing conversation context");
+    const { getConversationContext, updateConversationContext, resolveContextualQuery } = await import("../../modules/chat/conversationContext.service.js");
+    const convContext = await getConversationContext(chatId, auth.userId);
+    const contextualMessage = resolveContextualQuery(message, convContext);
 
-    if (enabledTools.length > 0) {
-      sendStatus("Checking topic capabilities");
-
-      const toolPrompt = `${buildDynamicSystemPrompt(enabledTools)}\n\nUser request: "${message}"\nSelect matching tool or return unsupported:`;
-      const toolRes = await generateResponse(toolPrompt, message, {
-        provider: "ollama",
-        model: "llama3.2:3b",
-        organizationId: orgId
-      });
-
-      let toolDecision = null;
-      try {
-        const text = toolRes.text || "";
-        const firstBrace = text.indexOf("{");
-        const lastBrace = text.lastIndexOf("}");
-        if (firstBrace !== -1 && lastBrace !== -1) {
-          toolDecision = JSON.parse(text.substring(firstBrace, lastBrace + 1));
-        }
-      } catch {}
-
-      if (toolDecision && toolDecision.tool && enabledTools.includes(toolDecision.tool)) {
-        const toolName = toolDecision.tool;
-        const args = toolDecision.args || {};
-
-        if (isWriteOperation(toolName)) {
-          // If not confirmed yet, halt stream and ask for confirmation
-          if (!actionConfirm || actionConfirm.action !== toolName || !actionConfirm.confirmed) {
-            res.write(`data: ${JSON.stringify({
-              type: "confirmation",
-              pendingAction: {
-                action: toolName,
-                payload: args,
-                preview: {
-                  message: `This will trigger the action: "${toolName}" with arguments: ${JSON.stringify(args)}.`
-                }
-              }
-            })}\n\n`);
-            res.end();
-            return;
-          }
-        }
-
-        // Execute Tool
-        sendStatus(`Running tool: ${toolName}`);
-        const toolFunc = businessTools[toolName];
-        if (toolFunc) {
-          const runResult = await toolFunc(auth, args);
-          if (runResult.success) {
-            toolResultContext = `\n[Tool Executed Successfully: ${toolName}]\nArguments: ${JSON.stringify(args)}\nResult Data: ${JSON.stringify(runResult.data)}`;
-          } else {
-            toolResultContext = `\n[Tool Execution Failed: ${toolName}]\nError: ${JSON.stringify(runResult.error)}`;
-          }
-        }
-      }
-    }
-
-    // 3. Search Vector Database (ChromaDB)
     sendStatus("Searching knowledge base");
     const accessScope = {
       roleName: auth.role,
@@ -258,89 +172,132 @@ export const processAIStream = async (req, res) => {
     const { getAuthorizedDocumentIds } = await import("../../modules/rag/rag.service.js");
     accessScope.authorizedDocumentIds = await getAuthorizedDocumentIds(orgId, auth.role, accessScope.branchId);
 
-    const ragResults = await searchWithScope(message, orgId, accessScope, 5, auth.userId, chatId);
+    const ragResults = await searchWithScope(contextualMessage, orgId, accessScope, 5, auth.userId, chatId);
 
-    // 4. Retrieve Graph RAG Context
+    // 4. Retrieve Relationship-Aware Graph RAG Context
     sendStatus("Checking graph relationships");
-    const graphContext = ragResults.graph_context || "";
+    const { retrieveGraphContext } = await import("../mongodbGraph.service.js");
+    const graphResults = await retrieveGraphContext(
+      contextualMessage,
+      orgId,
+      accessScope.branchId,
+      accessScope.authorizedDocumentIds,
+      convContext
+    );
+    const graphContextText = graphResults.contextText || ragResults.graph_context || "";
 
     // 5. Combine everything into LLM generation prompt
     sendStatus("Generating response");
 
+    const minScoreThreshold = parseFloat(process.env.LLM_MIN_RAG_SCORE || "0.1");
+
     const citations = ragResults.document_results
-      .filter((r) => r.score >= 0.35)
+      .filter((r) => r.score >= minScoreThreshold || r.keywordScore >= 0.1 || r.vectorScore >= 0.1)
       .slice(0, 5)
       .map((r) => ({
         documentId: r.document_id?.toString(),
-        title: r.title || "Source Document",
-        score: r.score,
-        excerpt: r.content?.slice(0, 200)
+        documentName: r.title || r.file_name || "Source Document",
+        title: r.title || r.file_name || "Source Document",
+        chunkId: r._id?.toString(),
+        chunkIndex: r.chunk_index ?? 0,
+        pageNumber: r.page_number || (typeof r.chunk_index === "number" ? r.chunk_index + 1 : 1),
+        score: parseFloat((r.score || 0).toFixed(4)),
+        relevanceScore: parseFloat((r.score || 0).toFixed(4)),
+        excerpt: (r.content || r.text_content || "").slice(0, 500),
+        file_url: `/documents/${r.document_id?.toString()}/view`
       }));
 
     const ragTextContext = ragResults.document_results
-      .filter((r) => r.score >= 0.35)
+      .filter((r) => r.score >= minScoreThreshold || r.keywordScore >= 0.1 || r.vectorScore >= 0.1)
       .slice(0, 5)
       .map((r) => `[Source: ${r.title || "Doc"}] ${r.content}`)
       .join("\n\n");
 
-    const finalPrompt = `You are a supportive customer support AI. Use the retrieved documentation, database entity relations, and tool execution results below to formulate a helpful, direct response to the user.
+    const finalPrompt = `You are a friendly, knowledgeable Customer Support Specialist. Formulate a direct, natural, and helpful answer for the customer based on the official company information below.
 
-RETRIEVED DOCUMENTATION CONTEXT:
-${ragTextContext || "No documentation found."}
+OFFICIAL COMPANY KNOWLEDGE:
+${ragTextContext || "No exact policy or documentation details found."}
 
-${graphContext ? `RELEVANT GRAPH CONNECTIONS:\n${graphContext}\n` : ""}
-${toolResultContext ? `LIVE SYSTEM DATA (TOOL RESULTS):\n${toolResultContext}\n` : ""}
-USER QUESTION:
-"${message}"
+${graphContextText ? `RELATED CONTEXT:\n${graphContextText}` : ""}
 
-Respond directly and politely. Do not make up facts.`;
+CUSTOMER QUESTION:
+"${contextualMessage}"
 
-    // 6. Connect to Ollama generate streaming endpoint
-    const ollamaUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-    const ollamaModel = process.env.OLLAMA_MODEL || "llama3.2:3b";
+CONVERSATIONAL RULES:
+1. QUERY FOCUS & INTENT ALIGNMENT: Strictly align your answer with the user's explicit question. For example, if the user asks "Explain about billing", answer about billing options, payment methods, and invoice policies. Do NOT fixate on unrelated sub-bullets in the retrieved text (like bulk discounts or shipping) unless directly requested.
+2. OVERVIEW SYNTHESIS: If the user asks a broad topic question (e.g. "Explain about billing"), summarize the available billing & payment info clearly, then ask a helpful follow-up question.
+3. NATURAL CUSTOMER SERVICE TONE: Answer directly first in friendly, professional language.
+4. NEVER mention internal terms such as "provided document context", "section 4", "retrieved chunks", "RAG", "knowledge graph", or "vector search".
+5. ZERO HALLUCINATION: Do NOT hallucinate missing figures, prices, or policies. State what is known naturally.
+6. If information is unavailable, politely inform the customer and offer to connect them with a support representative or open a ticket.`;
 
-    const fetchRes = await fetch(`${ollamaUrl}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: ollamaModel,
-        prompt: finalPrompt,
-        stream: true,
-        options: {
-          temperature: 0.7,
-          num_predict: 1024
-        }
-      })
+    const reqProvider = req.body?.provider;
+    const reqModel = req.body?.model;
+
+    const llmRes = await generateResponse(finalPrompt, message, {
+      organizationId: orgId,
+      provider: reqProvider,
+      model: reqModel,
     });
 
-    if (!fetchRes.ok) {
-      throw new Error(`Ollama returned status: ${fetchRes.status}`);
+    const rawAnswer = typeof llmRes === "string" ? llmRes : llmRes?.text || "No response generated.";
+
+    // ── 6. Output Guardrails & PII Sanitization ──
+    const outputGuardrailResult = await checkOutputGuardrails(rawAnswer, orgId);
+    const fullAnswer = outputGuardrailResult.sanitized || rawAnswer;
+
+    // Update conversation context buffer
+    await updateConversationContext(chatId, auth.userId, message, fullAnswer, "question");
+    
+    // Stream response tokens to SSE client
+    const chunkSize = 12;
+    for (let i = 0; i < fullAnswer.length; i += chunkSize) {
+      const chunk = fullAnswer.slice(i, i + chunkSize);
+      sendToken(chunk);
     }
 
-    const reader = fetchRes.body.getReader();
-    const decoder = new TextDecoder();
-    let fullAnswer = "";
-    let buffer = "";
+    // ── 7. Confidence & Dynamic Quick Action Generation ──
+    const { computeConfidence } = await import("../../modules/chat/confidence.service.js");
+    const confidenceObj = computeConfidence(ragResults, [], message);
+    const confidenceScore = confidenceObj?.confidence || (citations.length > 0 ? 0.8 : 0.35);
+    const requiresEscalation = confidenceScore < 0.75 || citations.length === 0;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    // Generate contextual Quick Action Buttons
+    const quickActions = [];
+    const lowerQ = (message || "").toLowerCase();
+    if (/order|track|shipping|delivery/i.test(lowerQ)) {
+      quickActions.push(
+        { label: "Track Order", action: "track_order", query: "How do I track my order delivery?" },
+        { label: "Shipping Policy", action: "view_policy", query: "What are your shipping delivery timelines?" }
+      );
+    } else if (/return|refund/i.test(lowerQ)) {
+      quickActions.push(
+        { label: "Request Refund", action: "refund_request", query: "How do I request a return or refund?" },
+        { label: "Return Policy", action: "view_policy", query: "What is the return window policy?" }
+      );
+    } else if (/bill|invoice|payment|charge/i.test(lowerQ)) {
+      quickActions.push(
+        { label: "Download Invoice", action: "download_invoice", query: "How can I download my billing receipts?" },
+        { label: "Payment Options", action: "billing_settings", query: "What payment methods are supported?" }
+      );
+    } else if (/password|login|auth|2fa/i.test(lowerQ)) {
+      quickActions.push(
+        { label: "Reset Password", action: "reset_password", query: "Send me password reset instructions" },
+        { label: "Security Settings", action: "account_security", query: "How do I enable Two-Factor Authentication?" }
+      );
+    } else {
+      quickActions.push(
+        { label: "Explore Help Topics", action: "browse_docs", query: "Show available knowledge categories" },
+        { label: "Speak to Live Agent", action: "contact_agent", query: "I would like to speak to a human support agent" }
+      );
+    }
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const parsed = JSON.parse(line);
-          const token = parsed.response;
-          if (token) {
-            fullAnswer += token;
-            sendToken(token);
-          }
-        } catch {}
-      }
+    if (requiresEscalation) {
+      quickActions.unshift({
+        label: "Create Support Ticket",
+        action: "create_ticket",
+        query: "Please create a support ticket for this issue"
+      });
     }
 
     // Save generated AI response
@@ -351,22 +308,46 @@ Respond directly and politely. Do not make up facts.`;
         sender_id: auth.userId,
         sender_type: "ai",
         content: fullAnswer,
-        is_ai: true
+        is_ai: true,
+        confidence: confidenceScore,
+        citations,
+        escalation: {
+          available: requiresEscalation,
+          reason: requiresEscalation ? "low_confidence_or_missing_info" : "none",
+        },
       }).catch(() => null);
       savedMsgId = aiMsg?._id;
     }
 
-    // Send final Done state with citations
+    // Send final Done state with structured citations, quick actions & escalation metadata
     res.write(`data: ${JSON.stringify({
       type: "done",
       messageId: savedMsgId,
       text: fullAnswer,
-      citations
+      confidence: confidenceScore,
+      citations,
+      quickActions,
+      escalation: {
+        available: requiresEscalation,
+        reason: requiresEscalation ? "low_confidence_or_missing_info" : "none",
+      }
     })}\n\n`);
     res.end();
 
   } catch (error) {
     console.error("[StreamingAI] Error in streaming pipeline:", error);
+    try {
+      const { notifyAdminsOnSystemError } = await import("../../modules/notification/notification.service.js");
+      await notifyAdminsOnSystemError({
+        organizationId: auth?.orgId || null,
+        title: "AI Pipeline Exception",
+        message: `AI Chat pipeline error: ${error.message || "Unknown error"}`,
+        type: "error",
+        link: "/admin/ai-intelligence",
+      });
+    } catch {
+      // notification fallback
+    }
     sendError(error.message);
   }
 };

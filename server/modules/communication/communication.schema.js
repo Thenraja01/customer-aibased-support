@@ -18,6 +18,18 @@ const communicationSchema = new mongoose.Schema(
       ref: "Organization",
       index: true,
     },
+    branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
+      index: true,
+    },
+    scope: {
+      type: String,
+      enum: ["org_broadcast", "branch_channel", "direct"],
+      default: "org_broadcast",
+      index: true,
+    },
     message: { type: String, required: true, maxlength: 2000 },
     status: {
       type: String,
@@ -34,5 +46,8 @@ const communicationSchema = new mongoose.Schema(
     },
   }
 );
+
+communicationSchema.index({ organization_id: 1, branch_id: 1, created_at: -1 });
+communicationSchema.index({ sender_id: 1, receiver_id: 1, created_at: -1 });
 
 export default mongoose.model("Communication", communicationSchema);

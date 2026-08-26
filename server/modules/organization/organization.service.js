@@ -69,16 +69,22 @@ const purgeTenantData = async (orgIdStr) => {
 
     // 2. Delete Cloudinary files
     try {
-      const docs = await Document.find({ organization_id: orgId }).select("cloudinary_public_id cloudinary_resource_type").lean();
+      const docs = await Document.find({ organization_id: orgId }).select("cloudinary_public_id cloudinary_resource_type branch_id").lean();
       for (const doc of docs) {
         if (doc.cloudinary_public_id) {
-          await deleteFromCloudinary(doc.cloudinary_public_id, doc.cloudinary_resource_type).catch(() => {});
+          await deleteFromCloudinary(doc.cloudinary_public_id, doc.cloudinary_resource_type, {
+            organizationId: orgId,
+            branchId: doc.branch_id,
+          }).catch(() => {});
         }
       }
-      const versions = await DocumentVersion.find({ organization_id: orgId }).select("cloudinary_public_id cloudinary_resource_type").lean();
+      const versions = await DocumentVersion.find({ organization_id: orgId }).select("cloudinary_public_id cloudinary_resource_type branch_id").lean();
       for (const ver of versions) {
         if (ver.cloudinary_public_id) {
-          await deleteFromCloudinary(ver.cloudinary_public_id, ver.cloudinary_resource_type).catch(() => {});
+          await deleteFromCloudinary(ver.cloudinary_public_id, ver.cloudinary_resource_type, {
+            organizationId: orgId,
+            branchId: ver.branch_id,
+          }).catch(() => {});
         }
       }
     } catch (err) {
@@ -135,4 +141,23 @@ export const searchOrganizations = async (keyword) => {
   return await Organization.find({
     name: { $regex: safe, $options: "i" },
   });
+};
+
+export const deleteAllOrganizations = async () => {
+  const orgs = await Organization.find({
+    email: { $nin: ["default@supportai.com", "supernova@gmail.com"] }
+  }).select("_id").lean();
+
+  const orgIds = orgs.map(o => o._id.toString());
+  
+  await Organization.updateMany(
+    { _id: { $in: orgIds } },
+    { status: "DELETION_PENDING" }
+  );
+
+  for (const id of orgIds) {
+    purgeTenantData(id).catch(err => console.error("Purge Error:", err));
+  }
+
+  return { deletedCount: orgIds.length, orgIds };
 };

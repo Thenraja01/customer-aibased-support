@@ -13,7 +13,14 @@ const organizationSchema = new mongoose.Schema(
   {
     organization_id: { type: String, unique: true, required: true },
     name: { type: String, trim: true },
-    domain: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
+    domain: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true,
+      set: (v) => (v === null || v === undefined || !String(v).trim() ? undefined : String(v).trim().toLowerCase()),
+    },
     address: { type: String },
     phone: { type: String, maxlength: 20 },
     email: { type: String, unique: true, lowercase: true, maxlength: 255 },
@@ -53,10 +60,13 @@ const organizationSchema = new mongoose.Schema(
     show_charts: { type: Boolean, default: true },
     ai_session_logging: { type: Boolean, default: true },
 
-    // Chatbot
+    // Chatbot & Embedded Widget Settings
     chatbot_name: { type: String, default: "Support AI" },
     default_language: { type: String, default: "en" },
     greeting_message: { type: String, default: "Hello! How can I help you today?" },
+    widget_position: { type: String, enum: ["right", "left"], default: "right" },
+    widget_theme: { type: String, enum: ["dark", "light", "custom"], default: "dark" },
+    widget_enabled: { type: Boolean, default: true },
 
     // AI Settings
     ai_settings: {
@@ -74,6 +84,46 @@ const organizationSchema = new mongoose.Schema(
         enum: ["concise", "balanced", "detailed"],
         default: "balanced",
       },
+    },
+
+    // Tenant-Level Configurations (Overrides Global .env)
+    smtp_config: {
+      host: { type: String, default: "" },
+      port: { type: Number, default: 587 },
+      secure: { type: Boolean, default: false },
+      user: { type: String, default: "" },
+      pass: { type: String, default: "" },
+      from: { type: String, default: "" },
+      enabled: { type: Boolean, default: false },
+    },
+    llm_config: {
+      provider: { type: String, default: "" },
+      api_key: { type: String, default: "" },
+      model: { type: String, default: "" },
+      model_name: { type: String, default: "" },
+      base_url: { type: String, default: "" },
+      groq_api_key: { type: String, default: "" },
+      gemini_api_key: { type: String, default: "" },
+      openai_api_key: { type: String, default: "" },
+      grok_api_key: { type: String, default: "" },
+      claude_api_key: { type: String, default: "" },
+      timeout_ms: { type: Number, default: 5000 },
+      max_retries: { type: Number, default: 2 },
+      temperature: { type: Number, default: 0.7 },
+      max_tokens: { type: Number, default: 2048 },
+    },
+    cloudinary_config: {
+      cloud_name: { type: String, default: "" },
+      api_key: { type: String, default: "" },
+      api_secret: { type: String, default: "" },
+      url: { type: String, default: "" },
+    },
+    rag_config: {
+      chunk_size: { type: Number, default: 500 },
+      chunk_overlap: { type: Number, default: 100 },
+      top_k: { type: Number, default: 5 },
+      min_score: { type: Number, default: 0.35 },
+      bfs_max_depth: { type: Number, default: 2 },
     },
 
     // Guardrails
@@ -95,6 +145,30 @@ const organizationSchema = new mongoose.Schema(
       saturday: { type: workingDaySchema, default: () => ({ open: "10:00", close: "14:00", enabled: false }) },
       sunday: { type: workingDaySchema, default: () => ({ open: "10:00", close: "14:00", enabled: false }) },
     },
+
+    // Per-priority SLA overrides (in minutes). Structure:
+    // { urgent: { first_response_minutes, resolution_minutes }, high: {...}, ... }
+    sla_settings: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
+
+    // Ticket Auto-close settings after resolution
+    auto_close_settings: {
+      enabled: { type: Boolean, default: true },
+      closing_period_hours: { type: Number, default: 48, min: 1, max: 720 },
+    },
+
+    // Ticket Form Customization Config
+    ticket_form_config: [
+      {
+        field_key: { type: String, required: true },
+        label: { type: String, required: true },
+        enabled: { type: Boolean, default: true },
+        required: { type: Boolean, default: true },
+        order: { type: Number, default: 0 },
+      },
+    ],
 
     // Email Templates
     email_templates: {
@@ -130,5 +204,25 @@ const organizationSchema = new mongoose.Schema(
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
   }
 );
+
+organizationSchema.pre("save", function (next) {
+  if (this.domain === "" || (typeof this.domain === "string" && !this.domain.trim())) {
+    this.domain = undefined;
+  }
+  next();
+});
+
+organizationSchema.pre("findOneAndUpdate", function (next) {
+  const update = this.getUpdate();
+  if (update) {
+    if (update.domain === "" || (typeof update.domain === "string" && !update.domain.trim())) {
+      delete update.domain;
+    }
+    if (update.$set && (update.$set.domain === "" || (typeof update.$set.domain === "string" && !update.$set.domain.trim()))) {
+      delete update.$set.domain;
+    }
+  }
+  if (typeof next === "function") next();
+});
 
 export default mongoose.model("Organization", organizationSchema);

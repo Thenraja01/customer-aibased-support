@@ -75,10 +75,12 @@ export const upload = async (req, res) => {
 export const uploadNewVersion = async (req, res) => {
   try {
     const documentId = req.params.id;
-    const userId = req.user.userId || req.user._id;
-    const orgId = req.user.organizationId;
-    const branchId = req.user.branchId || null;
-    const userRole = req.user.role;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
+    const rawOrgId = req.scope?.organizationId || req.user?.organizationId || req.user?.organization_id;
+    const orgId = typeof rawOrgId === "object" && rawOrgId?._id ? rawOrgId._id : rawOrgId;
+    const rawBranchId = req.scope?.branchId || req.user?.branchId || req.user?.branch_id;
+    const branchId = typeof rawBranchId === "object" && rawBranchId?._id ? rawBranchId._id : rawBranchId;
+    const userRole = req.user?.roleName || req.user?.role || req.user?.role_id?.name;
     const changelog = req.body.changelog || "New version uploaded";
 
     if (!req.file) {
@@ -129,8 +131,11 @@ export const viewDocument = async (req, res) => {
 
 export const getAll = async (req, res) => {
   try {
-    let organizationId = req.query.organization_id || req.user?.organizationId || null;
-    let branchId = req.query.branch_id || req.query.branchId || null;
+    let rawOrgId = req.query.organization_id || req.user?.organizationId || req.user?.organization_id || null;
+    let organizationId = typeof rawOrgId === "object" && rawOrgId?._id ? rawOrgId._id : rawOrgId;
+    let rawBranchId = req.query.branch_id || req.query.branchId || req.user?.branch_id || req.user?.branchId || null;
+    let branchId = typeof rawBranchId === "object" && rawBranchId?._id ? rawBranchId._id : rawBranchId;
+    const userRole = req.user?.roleName || req.user?.role || req.user?.role_id?.name;
 
     // Reject malformed ObjectId filters (would otherwise throw a CastError → 400).
     if (organizationId && !mongoose.isValidObjectId(organizationId)) {
@@ -144,7 +149,7 @@ export const getAll = async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const status = req.query.status || "";
     const search = req.query.search || "";
-    const result = await docService.getAllDocuments(organizationId, branchId, page, limit, status, search);
+    const result = await docService.getAllDocuments(organizationId, branchId, page, limit, status, search, userRole);
     const dataWithUrl = result.data.map((d) => formatDoc(req, d));
     res.status(200).json({ success: true, data: dataWithUrl, pagination: result.pagination });
   } catch (error) {
@@ -236,7 +241,17 @@ export const patchStatus = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    const result = await docService.deleteDocument(req.params.id);
+    const rawOrgId = req.scope?.organizationId || req.user?.organizationId || req.user?.organization_id;
+    const orgId = typeof rawOrgId === "object" && rawOrgId?._id ? rawOrgId._id : rawOrgId;
+    const rawBranchId = req.scope?.branchId || req.user?.branchId || req.user?.branch_id;
+    const branchId = typeof rawBranchId === "object" && rawBranchId?._id ? rawBranchId._id : rawBranchId;
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
+
+    const result = await docService.deleteDocument(
+      req.params.id,
+      isSuperAdmin ? null : orgId,
+      isSuperAdmin ? null : branchId
+    );
     res.status(200).json({ success: true, message: result.message });
   } catch (error) {
     const status = error.message === "Document not found" ? 404 : 500;
@@ -276,3 +291,61 @@ export const retryIngestion = async (req, res) => {
     res.status(status).json({ success: false, message: error.message });
   }
 };
+
+export const updateMetadata = async (req, res) => {
+  try {
+    const docId = req.params.id;
+    const { title, description, allowed_roles, visibility, customerVisible, document_type_id, branch_id, assigned_role } = req.body;
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (document_type_id !== undefined) updateData.document_type_id = document_type_id;
+    if (branch_id !== undefined) updateData.branch_id = branch_id;
+    if (visibility !== undefined) updateData.visibility = visibility;
+    if (customerVisible !== undefined) updateData.customerVisible = customerVisible;
+    if (assigned_role !== undefined) updateData.assigned_role = assigned_role;
+    if (allowed_roles !== undefined) {
+      const roles = Array.isArray(allowed_roles) ? allowed_roles : [allowed_roles];
+      updateData.allowed_roles = roles.map(normalizeRoleName).filter(Boolean);
+    }
+    const doc = await docService.updateDocumentStatus(docId, updateData);
+    res.status(200).json({ success: true, data: formatDoc(req, doc) });
+  } catch (error) {
+    const status = error.message === "Document not found" ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+export const getDocumentContent = async (req, res) => {
+  try {
+    const doc = await docService.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+    const { getChunksByDocument } = await import("./documentChunk.service.js");
+    const chunks = await getChunksByDocument(req.params.id);
+    const content = chunks.map((c) => c.text || c.content).join("\n\n");
+    res.status(200).json({ success: true, data: { text: content, chunks } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const generateSummary = async (req, res) => {
+  try {
+    const { getChunksByDocument } = await import("./documentChunk.service.js");
+    const chunks = await getChunksByDocument(req.params.id);
+    const textSample = chunks.slice(0, 5).map((c) => c.text || c.content).join("\n\n");
+    let summary = "Summary not available";
+    if (textSample) {
+      const { generateResponse } = await import("../llm/index.js");
+      summary = await generateResponse({
+        prompt: `Please provide a concise 2-3 sentence executive summary for the following document text:\n\n${textSample.substring(0, 2500)}`,
+        temperature: 0.3,
+        maxTokens: 300,
+      });
+    }
+    res.status(200).json({ success: true, data: { summary } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

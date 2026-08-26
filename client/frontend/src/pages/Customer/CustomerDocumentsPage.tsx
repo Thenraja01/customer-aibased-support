@@ -7,12 +7,12 @@ import {
   Clock, 
   XCircle, 
   Eye,
-  Download,
   Calendar,
   User,
   Building,
   Tag
 } from "lucide-react";
+import DocumentViewer from "@/components/ui/DocumentViewer";
 import type { IDocument } from "@/types";
 
 interface AdminAssignedDocument extends IDocument {
@@ -35,6 +35,8 @@ export default function CustomerDocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewingDoc, setViewingDoc] = useState<any>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   useEffect(() => {
     loadDocuments();
@@ -81,13 +83,9 @@ export default function CustomerDocumentsPage() {
     }
   };
 
-  const handleOpenDocument = async (docId: string) => {
-    try {
-      const url = await DocumentAPI.resolveDocumentUrl(docId);
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      console.error("Failed to resolve document URL:", err);
-    }
+  const handleOpenDocument = (doc: any) => {
+    setViewingDoc(doc);
+    setIsViewerOpen(true);
   };
 
   const getPriorityColor = (priority?: string) => {
@@ -260,19 +258,11 @@ export default function CustomerDocumentsPage() {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => handleOpenDocument(doc._id)}
+                        onClick={() => handleOpenDocument(doc)}
                         className="p-2 hover:bg-muted rounded-lg transition-colors"
                         title="View Document"
                       >
                         <Eye size={16} className="text-muted-foreground hover:text-primary transition-colors" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDocument(doc._id)}
-                        className="p-2 hover:bg-muted rounded-lg transition-colors"
-                        title="Download Document"
-                      >
-                        <Download size={16} className="text-muted-foreground hover:text-primary transition-colors" />
                       </button>
                     </div>
                   </div>
@@ -282,6 +272,18 @@ export default function CustomerDocumentsPage() {
           </div>
         )}
       </div>
+
+      {viewingDoc && (
+        <DocumentViewer
+          title={viewingDoc.title}
+          fileUrl={viewingDoc.file_url}
+          isOpen={isViewerOpen}
+          onClose={() => {
+            setViewingDoc(null);
+            setIsViewerOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

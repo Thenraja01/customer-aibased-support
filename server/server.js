@@ -38,15 +38,25 @@ import { feedbackRouter } from "./modules/feedback/index.js";
 import { superAdminRouter } from "./modules/super-admin/index.js";
 import { documentApprovalRouter } from "./modules/document-approval/index.js";
 import { agentRoutes } from "./modules/agent/index.js";
-import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
 import graphRouter from "./modules/graph/graph.route.js";
+import { knowledgeRouter } from "./modules/knowledge/index.js";
 import { topicRouter } from "./modules/topic/index.js";
+import widgetRouter from "./modules/widget/widget.route.js";
+import { apiKeyRouter } from "./modules/api-key/index.js";
+import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
 import { initFirebase } from "./config/firebase.js";
 import { initRedis } from "./config/redis.js";
 import { chromaService } from "./config/chroma.js";
 import { warmupEmbeddingModel } from "./services/embedding.service.js";
 import { runDocumentStatusMigration } from "./utils/migration.utils.js";
 import { startWorker } from "./modules/ai/worker.js";
+
+process.on("uncaughtException", (err) => {
+  console.error("[UncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[UnhandledRejection]", reason);
+});
 
 const app = express();
 
@@ -64,6 +74,8 @@ app.use(
 );
 
 app.use("/uploads", express.static(path.resolve("uploads")));
+app.use(express.static(path.resolve("../public")));
+app.use(express.static(path.resolve("public")));
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -101,22 +113,28 @@ app.use("/organizations", organizationRouter);
 app.use("/branches", branchRouter);
 app.use("/document-types", documentTypeRouter);
 app.use("/ai-sessions", aiSessionRouter);
+app.use("/api/ai", aiSessionRouter);
 app.use("/audit-logs", auditLogRouter);
 app.use("/faqs", faqRouter);
 app.use("/rag", ragRouter);
 app.use("/memory", memoryRouter);
 app.use("/knowledge-gaps", knowledgeGapRouter);
 app.use("/knowledge-graph", graphRouter);
+app.use("/knowledge-nodes", knowledgeRouter);
 app.use("/topics", topicRouter);
 app.use("/admin/v1", adminRouter);
 app.use("/search/v1", searchRouter);
 app.use("/admin/v1/prompt", promptVersionRouter);
 app.use("/ai", aiRouter);
 app.use("/communication", communicationRouter);
+app.use("/communications", communicationRouter);
 app.use("/feedback", feedbackRouter);
-app.use("/super-admin", superAdminRouter);
-app.use("/document-approvals", documentApprovalRouter);
 app.use("/agent", agentRoutes);
+app.use("/api/v1/api-keys", apiKeyRouter);
+app.use("/api-keys", apiKeyRouter);
+app.use("/api/v1", widgetRouter);
+app.use("/api/v1/feedback", feedbackRouter);
+app.use("/widget", widgetRouter);
 
 app.get("/api/health/v1", (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;
@@ -142,12 +160,6 @@ const startServer = async () => {
 
     // Run database migrations for legacy document statuses and roles
     await runDocumentStatusMigration();
-
-    // Seed graph entity concepts for Knowledge Graph telemetry
-    const { seedGraphEntities } = await import("./modules/chat/quickAction.service.js");
-    await seedGraphEntities().catch((err) =>
-      console.error("[Startup] GraphEntity seeding error:", err.message)
-    );
 
     // Initialize Chroma DB for Vector Search
     await chromaService.init();

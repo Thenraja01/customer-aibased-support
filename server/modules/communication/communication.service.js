@@ -11,12 +11,43 @@ export const sendToOrg = async (senderId, orgId, message) => {
   const msg = await Communication.create({
     sender_id: senderId,
     organization_id: orgId,
+    scope: "org_broadcast",
     message,
     status: "sent",
   });
   return await Communication.findById(msg._id)
     .populate("sender_id", "name email")
     .populate("organization_id", "name");
+};
+
+export const sendToBranch = async (senderId, orgId, branchId, message) => {
+  const msg = await Communication.create({
+    sender_id: senderId,
+    organization_id: orgId,
+    branch_id: branchId,
+    scope: "branch_channel",
+    message,
+    status: "sent",
+  });
+  return await Communication.findById(msg._id)
+    .populate("sender_id", "name email")
+    .populate("organization_id", "name")
+    .populate("branch_id", "name");
+};
+
+export const getBranchMessages = async (branchId, orgId = null) => {
+  const filter = { branch_id: branchId, scope: "branch_channel" };
+  if (orgId) filter.organization_id = orgId;
+  return await Communication.find(filter)
+    .populate("sender_id", "name email")
+    .sort({ created_at: 1 });
+};
+
+export const markBranchMessagesAsSeen = async (branchId, userId) => {
+  await Communication.updateMany(
+    { branch_id: branchId, sender_id: { $ne: userId }, status: "sent" },
+    { status: "seen", seen_at: new Date() }
+  );
 };
 
 export const getConversation = async (userId1, userId2, organizationId = null) => {

@@ -30,11 +30,17 @@ const userSchema = new mongoose.Schema(
       match: /^\S+@\S+\.\S+$/,
     },
     phone: { type: String, maxlength: 20 },
-    password: { type: String, required: true, maxlength: 255 },
+    password: {
+      type: String,
+      required: function () {
+        return !this.auth_type || this.auth_type === "local";
+      },
+      maxlength: 255,
+    },
     dob: { type: Date },
     auth_type: {
       type: String,
-      enum: ["local", "google", "github"],
+      enum: ["local", "google", "github", "facebook"],
       maxlength: 30,
       default: "local",
     },
@@ -62,6 +68,22 @@ const userSchema = new mongoose.Schema(
     otp_expiry: { type: Date, default: null },
     profileImage: { type: String, default: null },
     two_factor_enabled: { type: Boolean, default: false },
+    // Support-agent operational profile (skills + capacity + availability).
+    agent_profile: {
+      max_active_tickets: { type: Number, default: 10, min: 1 },
+      skills: [
+        {
+          name: { type: String, maxlength: 50 },
+          proficiency: { type: Number, min: 1, max: 5, default: 1 },
+        },
+      ],
+      status: {
+        type: String,
+        enum: ["ONLINE", "OFFLINE", "BUSY", "AWAY", "INACTIVE"],
+        default: "OFFLINE",
+      },
+      last_active_at: { type: Date, default: null },
+    },
   },
   { timestamps: { createdAt: "created_at", updatedAt: false } }
 );

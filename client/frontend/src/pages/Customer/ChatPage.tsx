@@ -1,28 +1,157 @@
-import { useEffect, useCallback, useRef, useState } from "react";
+import { useEffect, useCallback, useRef, useState, memo } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AppDispatch } from "@/store/store";
 import { useAuthContext } from "@/context/AuthContext";
-import { Loader2, AlertCircle, TicketCheck, XCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  Loader2, AlertCircle, Sparkles,
+  RefreshCw, CreditCard, ShieldCheck, Ticket
+} from "lucide-react";
 import { useChat } from "@/hooks/useChat";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { clearError } from "@/store/chatSlice";
 import { useSocket } from "@/context/SocketContext";
-import { TicketAPI, ChatAPI } from "@/api";
+import { ChatAPI } from "@/api";
 import ChatHeader from "@/components/chat/ChatHeader";
-import WelcomeScreen from "@/components/chat/WelcomeScreen";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
-import TypingIndicator from "@/components/chat/TypingIndicator";
+import EscalationDrawer from "@/components/ticket/EscalationDrawer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { useQueryClient } from "@tanstack/react-query";
 
+/* ─── Inline Welcome Shortcuts (rendered inside the message scroll area) ─── */
+const SHORTCUTS = [
+  {
+    icon: RefreshCw,
+    title: "Refund & Return Policy",
+    desc: "Check eligibility from docs",
+    query: "What are the refund and return policies according to our knowledge base?",
+    color: "emerald",
+  },
+  {
+    icon: CreditCard,
+    title: "Billing & Invoices",
+    desc: "Payment methods & receipts",
+    query: "Explain billing cycles, tax receipts, and payment method updates from the documentation.",
+    color: "cyan",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Security & 2FA Setup",
+    desc: "Multi-factor auth guide",
+    query: "Provide step-by-step documentation for configuring Two-Factor Authentication and password reset.",
+    color: "amber",
+  },
+  {
+    icon: Ticket,
+    title: "Create Support Ticket",
+    desc: "AI-guided incident logging",
+    query: "I need to file a formal support ticket. Please guide me through collecting the required incident details.",
+    color: "indigo",
+  },
+];
+
+const colorMap: Record<string, { border: string; iconBg: string; hover: string }> = {
+  emerald: { border: "border-emerald-500/25 hover:border-emerald-400/50", iconBg: "bg-emerald-500/10 text-emerald-400", hover: "hover:bg-emerald-500/5" },
+  cyan:    { border: "border-cyan-500/25 hover:border-cyan-400/50",       iconBg: "bg-cyan-500/10 text-cyan-400",       hover: "hover:bg-cyan-500/5" },
+  amber:   { border: "border-amber-500/25 hover:border-amber-400/50",     iconBg: "bg-amber-500/10 text-amber-400",     hover: "hover:bg-amber-500/5" },
+  indigo:  { border: "border-indigo-500/25 hover:border-indigo-400/50",   iconBg: "bg-indigo-500/10 text-indigo-400",   hover: "hover:bg-indigo-500/5" },
+};
+
+const InlineWelcome = memo(function InlineWelcome({
+  onAction, botName, firstName, isCreating,
+}: {
+  onAction: (query: string) => void;
+  botName: string;
+  firstName: string;
+  isCreating: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center px-4 py-8 sm:py-12 w-full max-w-xl mx-auto select-none">
+      {/* AI Badge */}
+      <motion.div
+        initial={{ scale: 0.85, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className="relative mb-4"
+      >
+        <div className="absolute w-20 h-20 rounded-full bg-primary/20 blur-2xl animate-pulse pointer-events-none left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+        <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary via-emerald-400 to-teal-400 p-[1.5px] shadow-[0_0_25px_rgba(16,185,129,0.3)]">
+          <div className="w-full h-full rounded-[13px] bg-neutral-950 flex items-center justify-center">
+            <Sparkles className="w-6 h-6 text-emerald-400" />
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Headline */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.06, duration: 0.25 }}
+        className="text-center mb-5 space-y-1"
+      >
+        <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground">
+          How can I help you, <span className="bg-gradient-to-r from-primary via-emerald-400 to-teal-400 bg-clip-text text-transparent">{firstName}</span>?
+        </h2>
+        <p className="text-[11px] text-muted-foreground max-w-sm mx-auto leading-relaxed">
+          Connected to verified knowledge docs · {botName}
+        </p>
+      </motion.div>
+
+      {/* Shortcut Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12, duration: 0.25 }}
+        className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full"
+      >
+        {SHORTCUTS.map((item, idx) => {
+          const Icon = item.icon;
+          const c = colorMap[item.color] || colorMap.emerald;
+          return (
+            <button
+              key={idx}
+              type="button"
+              disabled={isCreating}
+              onClick={() => onAction(item.query)}
+              className={`flex items-center gap-2.5 p-2.5 rounded-xl border bg-card/60 backdrop-blur-sm ${c.border} ${c.hover} text-left transition-all duration-150 active:scale-[0.97] group disabled:opacity-50 disabled:cursor-wait disabled:pointer-events-none`}
+            >
+              <div className={`p-1.5 rounded-lg ${c.iconBg} shrink-0 transition-transform group-hover:scale-110`}>
+                <Icon size={14} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-foreground group-hover:text-primary transition-colors truncate">{item.title}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{item.desc}</p>
+              </div>
+            </button>
+          );
+        })}
+      </motion.div>
+
+      {/* AI Processing Loader */}
+      {isCreating && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2.5 mt-4 px-4 py-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary"
+        >
+          <Loader2 size={14} className="animate-spin" />
+          <span className="text-xs font-semibold">Creating session &amp; connecting to AI engine...</span>
+        </motion.div>
+      )}
+    </div>
+  );
+});
+
+/* ─── Main ChatPage ─── */
 export default function ChatPage() {
   const location = useLocation();
   const navigate = useNavigate();
+
   const dispatch = useDispatch<AppDispatch>();
-  const { user, token } = useAuthContext();
+  const { user, token, orgSettings } = useAuthContext();
   const { socket } = useSocket();
   const queryClient = useQueryClient();
 
@@ -45,9 +174,8 @@ export default function ChatPage() {
   const isCreatingRef = useRef(false);
   const isMountedRef = useRef(true);
   const { containerRef, handleScroll } = useAutoScroll(messages);
-  const [escalating, setEscalating] = useState(false);
-  const [escalated, setEscalated] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [escalationDrawerOpen, setEscalationDrawerOpen] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Streaming & Live agent status checklist states
@@ -60,18 +188,27 @@ export default function ChatPage() {
   const [lastUserMessage, setLastUserMessage] = useState("");
 
   const chatId = location.state?.chatId || new URLSearchParams(location.search).get('id');
+  const botName = orgSettings?.chatbot_name || "Support AI";
+  const firstName = user?.name ? user.name.split(" ")[0] : "there";
+  const hasNoChat = !activeChat && !chatId;
 
   useEffect(() => {
     isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
+    return () => { isMountedRef.current = false; };
   }, []);
 
   useEffect(() => {
     if (!user?._id) return;
     loadUserChats();
   }, [user?._id, loadUserChats]);
+
+  const basePath = location.pathname.startsWith("/admin")
+    ? "/admin/chatbot"
+    : location.pathname.startsWith("/branch")
+    ? "/branch/chatbot"
+    : location.pathname.startsWith("/support")
+    ? "/support/chatbot"
+    : "/chat";
 
   useEffect(() => {
     if (!user?._id) return;
@@ -83,7 +220,7 @@ export default function ChatPage() {
         } catch (error) {
           console.error("Failed to load chat:", error);
           toast.error("Error", "Failed to load chat");
-          navigate("/chat", { replace: true });
+          navigate(basePath, { replace: true });
         }
       } else {
         resetMessages();
@@ -93,7 +230,7 @@ export default function ChatPage() {
     };
 
     loadSpecificChat();
-  }, [chatId, user?._id, loadMessages, resetMessages, selectChat, navigate]);
+  }, [chatId, user?._id, loadMessages, resetMessages, selectChat, navigate, basePath]);
 
   useEffect(() => {
     if (activeChat?._id && socket) {
@@ -105,9 +242,7 @@ export default function ChatPage() {
   }, [activeChat?._id, socket]);
 
   useEffect(() => {
-    return () => {
-      resetMessages();
-    };
+    return () => { resetMessages(); };
   }, [resetMessages]);
 
   useEffect(() => {
@@ -119,9 +254,10 @@ export default function ChatPage() {
 
   // Handle SSE response stream
   const handleSend = useCallback(
-    async (text: string, actionConfirmObj: any = null) => {
+    async (text: string, actionConfirmObj: any = null, targetChatId?: string) => {
       if (!text.trim()) return;
-      if (!activeChat?._id || !user?._id || isStreaming) {
+      const effectiveChatId = targetChatId || activeChat?._id;
+      if (!effectiveChatId || !user?._id || isStreaming) {
         toast.warning("Warning", "Please wait for the current message to complete");
         return;
       }
@@ -137,15 +273,16 @@ export default function ChatPage() {
       try {
         const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3030";
         const baseUrl = backendUrl.endsWith("/") ? backendUrl.slice(0, -1) : backendUrl;
+        const authToken = token || localStorage.getItem("token") || "";
 
         const response = await fetch(`${baseUrl}/chats/ai/stream`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+            "Authorization": authToken.startsWith("Bearer ") ? authToken : `Bearer ${authToken}`
           },
           body: JSON.stringify({
-            chatId: activeChat._id,
+            chatId: effectiveChatId,
             message: text,
             actionConfirm: actionConfirmObj
           })
@@ -158,6 +295,7 @@ export default function ChatPage() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let accumulatedStreamText = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -178,16 +316,49 @@ export default function ChatPage() {
                 setCurrentStatus(data.status);
                 setAgentStatusList((prev) => [...new Set([...prev, data.status])]);
               } else if (data.type === "token") {
-                setStreamingText((prev) => prev + data.token);
+                accumulatedStreamText += data.token;
+                setStreamingText(accumulatedStreamText);
               } else if (data.type === "confirmation") {
                 setPendingConfirm(data.pendingAction);
                 setIsStreaming(false);
                 return;
               } else if (data.type === "done") {
-                setStreamingCitations(data.citations || []);
-                queryClient.invalidateQueries({ queryKey: ["messages", activeChat._id] });
+                const finalText = data.text || accumulatedStreamText;
+                const citations = data.citations || [];
+                setStreamingCitations(citations);
+
+                // Seed React Query cache immediately so messages never vanish
+                queryClient.setQueryData(["messages", effectiveChatId], (old: any) => {
+                  const list = Array.isArray(old) ? [...old] : [];
+                  if (text && !list.some((m: any) => m.content === text && !m.is_ai)) {
+                    list.push({
+                      _id: `user-${Date.now()}`,
+                      content: text,
+                      is_ai: false,
+                      sender_id: user?._id,
+                      created_at: new Date().toISOString(),
+                    });
+                  }
+                  if (finalText) {
+                    list.push({
+                      _id: data.messageId || `ai-${Date.now()}`,
+                      content: finalText,
+                      is_ai: true,
+                      sender_id: "ai",
+                      confidence: data.confidence,
+                      citations: citations,
+                      quickActions: data.quickActions || [],
+                      escalation: data.escalation,
+                      created_at: new Date().toISOString(),
+                    });
+                  }
+                  return list;
+                });
+
                 setIsStreaming(false);
+                setStreamingText("");
                 setLastUserMessage("");
+                queryClient.invalidateQueries({ queryKey: ["messages", effectiveChatId] });
                 return;
               } else if (data.type === "error") {
                 throw new Error(data.message);
@@ -201,13 +372,14 @@ export default function ChatPage() {
         setIsStreaming(false);
       }
     },
-    [activeChat, user, token, isStreaming, queryClient]
+    [activeChat, user, token, isStreaming, queryClient, toast]
   );
 
   const handleStartWithMessage = useCallback(
     async (initialMessage: string) => {
-      if (!user?._id || !user?.organization_id?._id) {
-        toast.error("Error", "Unable to start chat");
+      const orgId = user?.organization_id?._id || user?.organization_id || "global";
+      if (!user?._id) {
+        toast.error("Error", "Please log in to start a chat");
         return;
       }
 
@@ -217,43 +389,33 @@ export default function ChatPage() {
       try {
         const chat = await startNewChat({
           user_id: user._id,
-          organization_id: user.organization_id._id,
+          organization_id: typeof orgId === "object" ? orgId._id : orgId,
           topic: initialMessage.substring(0, 50),
         });
 
         if (chat?._id) {
-          navigate("/chat", { 
+          selectChat(chat);
+          loadMessages(chat._id);
+          navigate(basePath, {
             state: { chatId: chat._id },
-            replace: true 
+            replace: true
           });
-          // Wait for mount then run stream
-          setTimeout(() => handleSend(initialMessage), 300);
+          // Immediately trigger AI response stream
+          handleSend(initialMessage, null, chat._id);
         }
-      } catch (err) {
-        toast.error("Error", "Failed to start chat");
+      } catch (err: any) {
+        toast.error("Error", err?.message || "Failed to start chat session");
       } finally {
         isCreatingRef.current = false;
       }
     },
-    [user, startNewChat, handleSend, navigate]
+    [user, startNewChat, selectChat, loadMessages, handleSend, navigate, toast, basePath]
   );
 
   const handleEscalate = useCallback(async () => {
-    if (!activeChat?._id || escalating || activeChat.status === "closed") {
-      return;
-    }
-
-    setEscalating(true);
-    try {
-      await TicketAPI.escalateFromChat({ chatId: activeChat._id });
-      setEscalated(true);
-      toast.success("Success", "Chat escalated to ticket");
-    } catch (error) {
-      toast.error("Error", "Failed to escalate chat");
-    } finally {
-      setEscalating(false);
-    }
-  }, [activeChat, escalating]);
+    if (!activeChat?._id) return;
+    setEscalationDrawerOpen(true);
+  }, [activeChat]);
 
   const handleEndChat = useCallback(async () => {
     if (!activeChat?._id) return;
@@ -261,30 +423,33 @@ export default function ChatPage() {
     try {
       await ChatAPI.close(activeChat._id);
       toast.success("Success", "Chat ended successfully");
-      navigate("/chat", { replace: true });
+      navigate(basePath, { replace: true });
       loadUserChats();
     } catch (err) {
       toast.error("Error", "Failed to end chat");
     }
-  }, [activeChat, loadUserChats, navigate]);
+  }, [activeChat, loadUserChats, navigate, basePath]);
 
   const handleBack = useCallback(() => {
-    navigate("/chat", { replace: true });
-  }, [navigate]);
+    navigate(basePath, { replace: true });
+  }, [navigate, basePath]);
 
-  // Combined messages to show streaming items
+  // Combined messages: prevent duplicate user message rendering
   const displayMessages = [...messages];
   if (isStreaming && lastUserMessage) {
-    // Add temporary user message
-    displayMessages.push({
-      _id: "temp-user",
-      content: lastUserMessage,
-      is_ai: false,
-      sender_id: user?._id,
-      created_at: new Date().toISOString()
-    });
+    const lastMsgInList = messages.length > 0 ? messages[messages.length - 1] : null;
+    const isAlreadyInList = lastMsgInList && !lastMsgInList.is_ai && lastMsgInList.content === lastUserMessage;
 
-    // Add temporary AI message showing current tokens
+    if (!isAlreadyInList) {
+      displayMessages.push({
+        _id: "temp-user",
+        content: lastUserMessage,
+        is_ai: false,
+        sender_id: user?._id,
+        created_at: new Date().toISOString()
+      });
+    }
+
     if (streamingText) {
       displayMessages.push({
         _id: "temp-ai",
@@ -297,27 +462,10 @@ export default function ChatPage() {
     }
   }
 
-  if (!activeChat && !loading && !messagesLoading && !chatId) {
-    return (
-      <div className="flex flex-col h-[calc(100vh-4rem)] bg-background dark:bg-gradient-to-b dark:from-background dark:to-background/80">
-        <ChatHeader 
-          activeChat={null} 
-          onBack={handleBack}
-        />
-        {error && (
-          <div className="mx-6 mt-3 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-xs text-destructive dark:bg-destructive/15 max-w-3xl self-center w-full">
-            <AlertCircle size={14} aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        )}
-        <WelcomeScreen onStartWithMessage={handleStartWithMessage} />
-      </div>
-    );
-  }
-
+  // Loading spinner
   if ((loading || messagesLoading) && isInitialLoad) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="flex items-center justify-center h-full w-full flex-1">
         <div className="flex flex-col items-center gap-3">
           <Loader2 size={28} className="animate-spin text-primary" aria-hidden="true" />
           <p className="text-sm text-muted-foreground">Loading chat...</p>
@@ -326,24 +474,33 @@ export default function ChatPage() {
     );
   }
 
+  /* ─── Single Unified Chat Layout ─── */
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background dark:bg-gradient-to-b dark:from-background dark:to-background/80">
-      <ChatHeader 
-        activeChat={activeChat} 
+    <div className="flex flex-col h-full w-full flex-1 bg-background relative overflow-hidden">
+      {/* Ambient Glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/8 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-cyan-500/8 rounded-full blur-[120px] pointer-events-none" />
+
+      {/* Header - always visible */}
+      <ChatHeader
+        activeChat={activeChat}
         onBack={chatId ? handleBack : undefined}
+        onOpenEscalation={activeChat ? () => setEscalationDrawerOpen(true) : undefined}
       />
 
+      {/* Error Banner */}
       {error && (
-        <div className="mx-6 mt-3 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-xs text-destructive dark:bg-destructive/15 max-w-3xl self-center w-full">
+        <div className="mx-4 mt-2 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2 text-xs text-destructive max-w-3xl self-center w-full shadow-sm shrink-0">
           <AlertCircle size={14} aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
 
+      {/* Scrollable Message Area (includes inline welcome when no chat) */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto relative z-[1]"
       >
         {messagesLoading && !isInitialLoad ? (
           <div className="flex items-center justify-center h-full">
@@ -353,32 +510,33 @@ export default function ChatPage() {
             </div>
           </div>
         ) : displayMessages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            {isStreaming ? (
-              <TypingIndicator />
-            ) : (
-              <p className="text-sm text-muted-foreground">Say hello to the AI assistant!</p>
-            )}
-          </div>
+          /* ─── Inline Welcome ─── */
+          <InlineWelcome
+            onAction={handleStartWithMessage}
+            botName={botName}
+            firstName={firstName}
+            isCreating={isStreaming || sending}
+          />
         ) : (
           <div className="py-2">
             {displayMessages.map((msg, idx) => (
               <ChatMessage
                 key={msg._id || `${msg.created_at || ""}-${idx}`}
                 message={msg}
-                isOwn={!msg.is_ai && msg.sender_id === user?._id}
+                isOwn={!msg.is_ai}
                 onEscalate={handleEscalate}
+                onQuickAction={(q) => handleSend(q)}
               />
             ))}
 
             {/* Agent Status Checklist */}
             {isStreaming && (
-              <div className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl mx-auto my-3 shadow-sm border-dashed">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <div className="flex flex-col gap-2 p-4 bg-card/80 backdrop-blur-sm border border-border/60 rounded-2xl max-w-xl mx-auto my-3 shadow-sm">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1.5">
                   <Loader2 size={12} className="animate-spin text-primary" />
-                  Agent Processing States
+                  Agent Processing
                 </div>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   {[
                     { label: "Analyzing Question", status: "Analyzing question" },
@@ -394,9 +552,9 @@ export default function ChatPage() {
                     return (
                       <div key={index} className="flex items-center gap-2">
                         <span className={`w-2 h-2 rounded-full ${
-                          isCurrent ? "bg-amber-500 animate-pulse scale-125" : isMatchedStatus ? "bg-emerald-500" : "bg-slate-350 dark:bg-slate-700"
+                          isCurrent ? "bg-amber-500 animate-pulse scale-125" : isMatchedStatus ? "bg-emerald-500" : "bg-muted-foreground/30"
                         }`} />
-                        <span className={isCurrent ? "font-semibold text-slate-850 dark:text-slate-100" : isMatchedStatus ? "text-slate-600 dark:text-slate-350" : "text-slate-400"}>
+                        <span className={isCurrent ? "font-semibold text-foreground" : isMatchedStatus ? "text-muted-foreground" : "text-muted-foreground/50"}>
                           {item.label}
                         </span>
                       </div>
@@ -408,12 +566,12 @@ export default function ChatPage() {
 
             {/* Pending Interactive Action Confirmation */}
             {pendingConfirm && (
-              <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-250 dark:border-amber-900/30 rounded-2xl my-4 max-w-xl mx-auto shadow-sm space-y-3">
+              <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl my-4 max-w-xl mx-auto shadow-sm space-y-3">
                 <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs uppercase tracking-wider">
                   <AlertCircle size={14} />
                   Action Confirmation Required
                 </div>
-                <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   {pendingConfirm.preview?.message}
                 </p>
                 <div className="flex items-center gap-2 justify-end pt-1">
@@ -422,7 +580,7 @@ export default function ChatPage() {
                       setPendingConfirm(null);
                       setLastUserMessage("");
                     }}
-                    className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 text-slate-500 rounded-xl text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                    className="px-3 py-1.5 border border-border text-muted-foreground rounded-xl text-xs font-medium hover:bg-muted transition-all"
                   >
                     Cancel
                   </button>
@@ -444,36 +602,11 @@ export default function ChatPage() {
         )}
       </div>
 
-      <div className="border-t bg-background/80 backdrop-blur-xl shrink-0">
-        {activeChat && messages.length > 0 && (
-          <div className="px-4 py-2 border-b flex gap-2">
-            <button
-              type="button"
-              onClick={handleEscalate}
-              disabled={escalating || escalated || activeChat.status === "closed"}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              {escalating ? (
-                <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-              ) : (
-                <TicketCheck size={14} aria-hidden="true" />
-              )}
-              {escalated ? "Escalated to Ticket" : "Escalate to Ticket"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmOpen(true)}
-              disabled={activeChat.status === "closed"}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              <XCircle size={14} aria-hidden="true" />
-              End Chat
-            </button>
-          </div>
-        )}
+      {/* Bottom Input Bar */}
+      <div className="bg-background/80 backdrop-blur-xl shrink-0 relative z-[2]">
         <ChatInput
-          onSend={(text) => handleSend(text)}
-          disabled={sending || aiThinking || isStreaming || loading || !activeChat}
+          onSend={(text) => hasNoChat ? handleStartWithMessage(text) : handleSend(text)}
+          disabled={sending || aiThinking || isStreaming || loading}
           chatId={activeChat?._id}
         />
       </div>
@@ -488,6 +621,21 @@ export default function ChatPage() {
         cancelLabel="Cancel"
         variant="danger"
       />
+
+      {/* Escalation Drawer */}
+      {activeChat && (
+        <EscalationDrawer
+          open={escalationDrawerOpen}
+          onClose={() => setEscalationDrawerOpen(false)}
+          chatId={activeChat._id}
+          conversationSnippet={messages.map((m: any) => `${m.is_ai ? 'AI' : 'User'}: ${m.content}`).slice(-6).join('\n\n')}
+          onEscalated={() => {
+            setEscalationDrawerOpen(false);
+            loadUserChats();
+            toast.success("Success", "Ticket created from conversation transcript");
+          }}
+        />
+      )}
     </div>
   );
 }

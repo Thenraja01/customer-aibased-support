@@ -30,12 +30,14 @@ export class OllamaProvider extends LLMProvider {
 
   // ── Health Check ─────────────────────────────────────────────────
 
-  async healthCheck() {
+  async healthCheck(options = {}) {
     const start = Date.now();
+    const url = options.baseUrl || options.base_url || this.baseUrl;
+    const model = options.model || this.modelName;
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(`${this.baseUrl}/api/tags`, { signal: controller.signal });
+      const res = await fetch(`${url}/api/tags`, { signal: controller.signal });
       clearTimeout(timer);
       const elapsed = Date.now() - start;
       if (!res.ok) {
@@ -43,19 +45,19 @@ export class OllamaProvider extends LLMProvider {
           provider: "ollama",
           status: "unhealthy",
           latencyMs: elapsed,
-          model: this.modelName,
+          model: model,
           error: `HTTP ${res.status}: ${res.statusText}`,
         };
       }
       const data = await res.json();
       const modelPresent = data.models?.some((m) =>
-        m.name.startsWith(this.modelName.split(":")[0])
+        m.name.startsWith(model.split(":")[0])
       );
       return {
         provider: "ollama",
         status: modelPresent ? "healthy" : "degraded",
         latencyMs: elapsed,
-        model: this.modelName,
+        model: model,
         details: { installedModels: data.models?.map((m) => m.name) || [] },
       };
     } catch (err) {
@@ -63,7 +65,7 @@ export class OllamaProvider extends LLMProvider {
         provider: "ollama",
         status: "unhealthy",
         latencyMs: Date.now() - start,
-        model: this.modelName,
+        model: model,
         error: err.message,
       };
     }
@@ -118,7 +120,7 @@ export class OllamaProvider extends LLMProvider {
 
   async #pullModel() {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5 * 60_000); // 5 min for pull
+    const timer = setTimeout(() => controller.abort(), 10 * 60_000); // 10 min for model pull
     try {
       const res = await fetch(`${this.baseUrl}/api/pull`, {
         method: "POST",
@@ -126,7 +128,7 @@ export class OllamaProvider extends LLMProvider {
         body: JSON.stringify({ name: this.modelName }),
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error(`Ollama pull failed: ${res.statusText}`);
+      if (!res.ok) throw new Error(`Model pull failed: ${res.status} ${res.statusText}`);
       // Consume the streaming response
       await res.text();
     } finally {
@@ -137,18 +139,17 @@ export class OllamaProvider extends LLMProvider {
   // ── Text generation ───────────────────────────────────────────────
 
   async generate(prompt, options = {}) {
-    // BUG FIX: do NOT pull model here — that would block the request for minutes.
-    // If model isn't ready yet, try anyway (Ollama may still serve if model exists
-    // from a previous run) and let the error propagate to the fallback chain.
+    const url = options.baseUrl || options.base_url || this.baseUrl;
+    const model = options.model || this.modelName;
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS);
 
-      const res = await fetch(`${this.baseUrl}/api/generate`, {
+      const res = await fetch(`${url}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: this.modelName,
+          model: model,
           prompt,
           stream: false,
           options: {

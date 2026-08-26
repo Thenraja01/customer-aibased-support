@@ -19,6 +19,7 @@ router.get("/:id/similar", checkRole(...ADMIN), knowledgeGapController.getSimila
 router.post("/:id/resolve/faq", checkRole(...ADMIN), knowledgeGapController.resolveWithFaq);
 router.post("/:id/resolve/document", checkRole(...ADMIN), knowledgeGapController.resolveWithDocument);
 router.post("/:id/resolve/link", checkRole(...ADMIN), knowledgeGapController.resolveWithLink);
+router.post("/:id/ai-draft", checkRole(...ADMIN), knowledgeGapController.generateAIDraft);
 router.post("/:id/retest", checkRole(...ADMIN), knowledgeGapController.retestGap);
 router.patch("/:id/status", checkRole(...ADMIN), knowledgeGapController.updateGapStatus);
 router.patch("/:id/resolve", checkRole(...ADMIN), knowledgeGapController.resolveGap);

@@ -1,12 +1,15 @@
 import KnowledgeGap from "./knowledgeGap.schema.js";
 import DocumentChunk from "../document/documentChunk.schema.js";
 import Document from "../document/document.schema.js";
+import Topic from "../topic/topic.schema.js";
+import { generateResponse } from "../llm/index.js";
 import * as docService from "../document/document.service.js";
 import * as faqService from "../faq/faq.service.js";
 import Faq from "../faq/faq.schema.js";
 import User from "../user/user.schema.js";
 import { broadcastNotification } from "../notification/notification.service.js";
 import * as ragService from "../rag/rag.service.js";
+import { rewriteQuery } from "../chat/queryRewrite.service.js";
 import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 const STOP_WORDS = new Set([
@@ -26,22 +29,49 @@ const extractKeywords = (text) => {
     .slice(0, 10);
 };
 
-const detectTopic = (keywords) => {
-  const topicMap = {
+const detectTopicDynamic = async (query, organizationId, keywords = []) => {
+  try {
+    const lowerQuery = (query || "").toLowerCase();
+    const topics = await Topic.find({ organization_id: organizationId, enabled: { $ne: false } }).lean();
+    
+    if (topics && topics.length > 0) {
+      let bestTopic = null;
+      let bestScore = 0;
+      for (const t of topics) {
+        const tName = (t.name || "").toLowerCase();
+        const tDesc = (t.description || "").toLowerCase();
+        let score = 0;
+        if (lowerQuery.includes(tName)) score += 5;
+        keywords.forEach((kw) => {
+          if (tName.includes(kw.toLowerCase())) score += 3;
+          if (tDesc.includes(kw.toLowerCase())) score += 1;
+        });
+        if (score > bestScore) {
+          bestScore = score;
+          bestTopic = t.name;
+        }
+      }
+      if (bestTopic && bestScore > 0) return bestTopic;
+    }
+  } catch (err) {
+    console.warn("[KnowledgeGap] Dynamic topic detection fallback:", err.message);
+  }
+
+  // Fallback to keyword heuristics
+  const lowerKeywords = keywords.map((k) => k.toLowerCase());
+  const fallbackMap = {
     billing: ["billing", "payment", "invoice", "charge", "subscription", "plan", "price", "cost", "refund", "credit"],
     account: ["account", "login", "password", "email", "profile", "settings", "register", "signup", "sign"],
     technical: ["error", "bug", "issue", "problem", "crash", "fail", "broken", "install", "setup", "config", "api"],
     shipping: ["shipping", "delivery", "track", "order", "package", "return", "ship", "warehouse"],
-    product: ["feature", "product", "service", "tool", "integration", "support", "update", "version"],
+    product: ["feature", "product", "service", "tool", "integration", "support", "update", "version", "warranty"],
     security: ["security", "privacy", "data", "encrypt", "auth", "permission", "access", "hack"],
     onboarding: ["how", "tutorial", "guide", "start", "begin", "learn", "doc", "manual"],
   };
 
-  const lowerKeywords = keywords.map((k) => k.toLowerCase());
   let bestTopic = "general";
   let bestScore = 0;
-
-  for (const [topic, triggers] of Object.entries(topicMap)) {
+  for (const [topic, triggers] of Object.entries(fallbackMap)) {
     const score = lowerKeywords.filter((k) => triggers.includes(k)).length;
     if (score > bestScore) {
       bestScore = score;
@@ -50,6 +80,72 @@ const detectTopic = (keywords) => {
   }
 
   return bestTopic;
+};
+
+export const generateAIGapDraft = async (gapId, orgId, type = "document") => {
+  const gap = await KnowledgeGap.findById(gapId).lean();
+  if (!gap) throw new Error("Knowledge gap not found");
+
+  const effectiveOrgId = orgId || gap.organization_id;
+
+  const relatedDocs = await Document.find({
+    organization_id: effectiveOrgId,
+    status: "published"
+  }).select("title description").limit(5).lean();
+
+  const docContext = relatedDocs.map((d) => `- ${d.title}: ${d.description || ''}`).join("\n");
+
+  const prompt = `You are an expert customer support knowledge author.
+A customer support knowledge gap was detected where the AI could not answer the customer's query.
+
+Customer Query: "${gap.query}"
+Topic: "${gap.topic || 'General'}"
+Existing Related Knowledge:
+${docContext || 'None available'}
+
+Generate a high-quality, professional knowledge base ${type === "faq" ? "FAQ (Question & Answer)" : "Document (Title, Summary, and Step-by-Step Policy/Guidance)"} that directly and accurately resolves this knowledge gap.
+
+Respond in JSON format only with NO surrounding markdown or explanations:
+{
+  "title": "Descriptive Document Title",
+  "category": "${gap.topic || 'General'}",
+  "content": "Comprehensive markdown content answering the customer query with requirements, step-by-step procedures, and policies",
+  "tags": ["tag1", "tag2"]
+}`;
+
+  const response = await generateResponse(prompt, "", {
+    organizationId: effectiveOrgId,
+  });
+
+  const rawText = response?.text || "";
+  const firstBrace = rawText.indexOf("{");
+  const lastBrace = rawText.lastIndexOf("}");
+  let result = null;
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    try {
+      result = JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
+    } catch {}
+  }
+
+  if (!result) {
+    result = {
+      title: `Resolution for: ${gap.query}`,
+      category: gap.topic || "General",
+      content: `### ${gap.query}\n\nThis knowledge entry resolves the customer inquiry regarding **${gap.query}**.\n\n#### Requirements & Process\n- Please follow standard verified organization procedures.`,
+      tags: gap.keywords || []
+    };
+  }
+
+  return result;
+};
+
+export const classifyFailureReason = ({ query, bestScore, matchedChunks, reason }) => {
+  if (reason === "role_not_authorized" || reason === "no_org") return "insufficient_permissions";
+  if (bestScore === 0 && matchedChunks === 0) return "missing_knowledge";
+  if (query.toLowerCase().includes("which one") || query.toLowerCase().includes("multiple")) return "ambiguous_entity";
+  if (bestScore > 0 && bestScore < 0.35) return "retrieval_failure";
+  if (query.toLowerCase().includes("why") || query.toLowerCase().includes("how is")) return "missing_relationship";
+  return "missing_entity";
 };
 
 export const logFailedQuery = async ({
@@ -61,9 +157,11 @@ export const logFailedQuery = async ({
   avgScore,
   matchedChunks,
   branchId = null,
+  failureReason = null,
 }) => {
   const keywords = extractKeywords(query);
-  const topic = detectTopic(keywords);
+  const topic = await detectTopicDynamic(query, organizationId, keywords);
+  const categorizedReason = failureReason || classifyFailureReason({ query, bestScore, matchedChunks });
 
   const filter = {
     organization_id: organizationId,
@@ -86,6 +184,7 @@ export const logFailedQuery = async ({
       existing.last_seen_at = new Date();
       existing.avg_score = (existing.avg_score + avgScore) / 2;
       if (bestScore > existing.best_score) existing.best_score = bestScore;
+      existing.failure_reason = categorizedReason;
       await existing.save();
       return existing;
     }
@@ -103,6 +202,7 @@ export const logFailedQuery = async ({
     keywords,
     topic,
     frequency: 1,
+    failure_reason: categorizedReason,
     last_seen_at: new Date(),
   });
 
@@ -356,21 +456,28 @@ export const addKnowledgeDocument = async (
   const fileBuffer = Buffer.from(content, "utf-8");
   const fileName = `${titleize(title)}.txt`;
 
+  const docAllowedRoles = allowedRoles && allowedRoles.length ? allowedRoles : ["customer", "support", "branch_admin", "admin"];
+
   const doc = await docService.createDocument(
     {
       user_id: userId,
       organization_id: orgId,
       branch_id: branchId || null,
       title,
-      description,
-      allowed_roles: allowedRoles || ["admin", "branch_admin", "support"],
+      description: description || content.slice(0, 500),
+      allowed_roles: docAllowedRoles,
+      assigned_role: "customer",
       visibility: visibility || (branchId ? "branch" : "organization"),
+      accessPolicy: {
+        audience: docAllowedRoles,
+        customerVisible: true,
+      },
     },
     userId,
     fileBuffer,
     fileName,
     "text/plain",
-    isAdmin
+    true
   );
 
   await resolveGap(gapId, "Added document knowledge", userId, {
@@ -414,6 +521,9 @@ export const retestGap = async (gapId, orgId, userId = null) => {
   const gap = await KnowledgeGap.findById(gapId).lean();
   if (!gap) throw new Error("Knowledge gap not found");
 
+  const effectiveOrgId = orgId || gap.organization_id;
+  const rewrittenQuery = await rewriteQuery(gap.query, effectiveOrgId).catch(() => gap.query);
+
   const accessScope = {
     roleName: "admin",
     roleFilter: ragService.getRoleFilter("admin"),
@@ -422,8 +532,8 @@ export const retestGap = async (gapId, orgId, userId = null) => {
   };
 
   const results = await ragService.searchWithScope(
-    gap.query,
-    orgId || gap.organization_id,
+    rewrittenQuery,
+    effectiveOrgId,
     accessScope,
     5,
     userId,

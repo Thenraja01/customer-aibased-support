@@ -53,24 +53,26 @@ export interface ApiResponse<T> {
 
 class AdminAPIClass {
   // Audit Logs
-  getAuditLogs(params: AuditLogFilters = {}): Promise<any> {
+  async getAuditLogs(params: AuditLogFilters = {}): Promise<any> {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         searchParams.append(key, String(value));
       }
     });
-    return AxiosInstance.get(`/admin/v1/audit-logs?${searchParams.toString()}`);
+    const res = await AxiosInstance.get(`/admin/v1/audit-logs?${searchParams.toString()}`);
+    return res.data;
   }
 
-  getAuditLogsPaginated(params: AuditLogFilters = {}): Promise<any> {
+  async getAuditLogsPaginated(params: AuditLogFilters = {}): Promise<any> {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         searchParams.append(key, String(value));
       }
     });
-    return AxiosInstance.get(`/audit-logs/paginated?${searchParams.toString()}`);
+    const res = await AxiosInstance.get(`/audit-logs/paginated?${searchParams.toString()}`);
+    return res.data;
   }
 
   // Dashboard
@@ -112,7 +114,7 @@ class AdminAPIClass {
   }
 
   // Users
-  getUsers(params: PaginationParams & { search?: string; status?: string; branchId?: string } = {}): Promise<any> {
+  getUsers(params: PaginationParams & { search?: string; status?: string; branchId?: string; role?: string } = {}): Promise<any> {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
@@ -346,8 +348,38 @@ class AdminAPIClass {
     return AxiosInstance.get(`/admin/v1/billing/invoices?${searchParams.toString()}`);
   }
 
+  downloadInvoiceUrl(invoiceId: string): string {
+    const token = localStorage.getItem("auth_token") || "";
+    return `/admin/v1/billing/invoices/${invoiceId}/download?token=${token}`;
+  }
+
   changePlan(plan: string): Promise<any> {
     return AxiosInstance.post("/admin/v1/billing/change-plan", { plan });
+  }
+
+  // SuperAdmin Billing & Plan Customization
+  getSuperAdminBillingOverview(): Promise<any> {
+    return AxiosInstance.get("/admin/v1/superadmin/billing/overview");
+  }
+
+  getSuperAdminInvoices(params: Record<string, unknown> = {}): Promise<any> {
+    return AxiosInstance.get("/admin/v1/superadmin/billing/invoices", { params });
+  }
+
+  getPlatformPlans(): Promise<any> {
+    return AxiosInstance.get("/admin/v1/superadmin/billing/plans");
+  }
+
+  savePlatformPlan(data: any): Promise<any> {
+    return AxiosInstance.post("/admin/v1/superadmin/billing/plans", data);
+  }
+
+  deletePlatformPlan(planKey: string): Promise<any> {
+    return AxiosInstance.delete(`/admin/v1/superadmin/billing/plans/${planKey}`);
+  }
+
+  testGuardrails(text: string): Promise<any> {
+    return AxiosInstance.post("/admin/v1/guardrails/test", { text });
   }
 
   // Analytics (own-org)

@@ -77,21 +77,17 @@ export const handleOAuthIdentity = async (identity, ctx = {}) => {
     const normalizedEmail = identity.email.toLowerCase().trim();
     user = await User.findOne({ email: normalizedEmail });
 
-    if (user && user.oauth && user.oauth.provider === identity.provider && user.oauth.provider_id === identity.providerId) {
-      // Same OAuth identity already linked — re-link safely.
+    if (user) {
+      // Link OAuth provider to existing user account
       user.oauth = {
         provider: identity.provider,
         provider_id: identity.providerId,
-        picture: identity.picture || null,
+        picture: identity.picture || user.oauth?.picture || null,
       };
       if (user.auth_type === "local") {
         user.auth_type = identity.provider;
       }
       await user.save();
-    } else if (user && !user.oauth) {
-      // Existing local account — do not auto-link OAuth credentials.
-      // The user must explicitly add OAuth from their account settings.
-      user = null;
     }
   }
 
@@ -171,14 +167,17 @@ export const completeOAuthRegistration = async ({ oauthToken, organization_id, r
     throw new Error("An account with this email already exists in this organization");
   }
 
+  const roleId = (role && role._id) ? role._id : (typeof role === "string" ? role : requested_role);
+  const roleName = (role && role.role_name) ? role.role_name : (typeof role === "string" ? role : "customer");
+
   const user = await User.create({
     organization_id: org._id,
     name: identity.name || normalizedEmail,
     email: normalizedEmail,
-    password: null,
-    auth_type: identity.provider,
+    role: typeof roleName === "string" ? roleName : "customer",
+    auth_type: identity.provider || "google",
     status: "pending",
-    requested_role_id: role._id,
+    requested_role_id: roleId,
     email_verified: true,
     email_verified_at: new Date(),
     oauth: {
@@ -191,7 +190,7 @@ export const completeOAuthRegistration = async ({ oauthToken, organization_id, r
   await RegistrationRequest.create({
     organization_id: org._id,
     user_id: user._id,
-    requested_role_id: role._id,
+    requested_role_id: roleId,
     name: user.name,
     email: normalizedEmail,
     provider: identity.provider,
@@ -203,6 +202,7 @@ export const completeOAuthRegistration = async ({ oauthToken, organization_id, r
     to: user.email,
     subject: "Registration received",
     html: `<p>Hi ${user.name},</p><p>Your registration with <b>${org.name}</b> is awaiting administrator approval. You will be able to log in once approved.</p>`,
+    organizationId: org._id,
   }).catch((err) => console.error("[OAuth] Email failed:", err.message));
 
   await audit({

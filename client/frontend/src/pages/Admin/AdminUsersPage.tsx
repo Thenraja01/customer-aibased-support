@@ -36,7 +36,7 @@ export default function AdminUsersPage() {
   const debouncedSearch = useDebounce(search, 400);
 
   useEffect(() => {
-    fetchUsers({ page, limit: 10, search: debouncedSearch, status: statusFilter, branchId: activeBranchId || undefined });
+    fetchUsers({ page, limit: 10, search: debouncedSearch, status: statusFilter, branchId: activeBranchId || undefined, role: "customer" });
   }, [page, debouncedSearch, statusFilter, activeBranchId, fetchUsers]);
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function AdminUsersPage() {
   }, [isBranchLocked, activeBranchId]);
 
   const refresh = useCallback(() => {
-    fetchUsers({ page, limit: 10, search, status: statusFilter, branchId: activeBranchId || undefined });
+    fetchUsers({ page, limit: 10, search, status: statusFilter, branchId: activeBranchId || undefined, role: "customer" });
   }, [fetchUsers, page, search, statusFilter, activeBranchId]);
 
   const handleCreate = async (data: any) => {

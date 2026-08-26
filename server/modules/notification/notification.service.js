@@ -206,10 +206,6 @@ export const broadcastToOrganization = async (data, organizationId, createdBy = 
     await deliveryService.sendPush(data, targetUsers);
   }
 
-  if (deliveryMethods.includes("sms")) {
-    await deliveryService.sendSMS(data, targetUsers);
-  }
-
   if (deliveryMethods.includes("system")) {
     await deliveryService.sendSystemAnnouncement(data, targetUsers);
   }
@@ -309,4 +305,37 @@ export const broadcastToAll = async (data) => {
   }
 
   return created;
+};
+
+export const notifyAdminsOnSystemError = async ({ organizationId, title, message, type = "error", link = "" }) => {
+  try {
+    const query = { role: { $in: ["admin", "super_admin", "branch_admin"] } };
+    if (organizationId) query.organization_id = organizationId;
+
+    const adminUsers = await User.find(query).select("_id").lean();
+    if (!adminUsers || adminUsers.length === 0) return [];
+
+    const notifications = adminUsers.map((u) => ({
+      user_id: u._id,
+      organization_id: organizationId || null,
+      title: title || "System Error Notification",
+      message: message || "An unexpected error occurred in the system.",
+      type: type,
+      link: link || "/admin/ai-intelligence",
+    }));
+
+    const created = await Notification.insertMany(notifications);
+    try {
+      const io = getIO();
+      created.forEach((notif) => {
+        io.to(`user:${notif.user_id}`).emit("notification", notif);
+      });
+    } catch {
+      // socket fallback
+    }
+    return created;
+  } catch (err) {
+    console.error("[NotifyAdmins] Error sending admin notification:", err.message);
+    return [];
+  }
 };

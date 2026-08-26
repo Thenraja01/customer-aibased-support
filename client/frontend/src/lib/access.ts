@@ -1,4 +1,4 @@
-import { getRoleName, ROLE_KEYS } from "./roles";
+import { getRoleName, normalizeRoleName, ROLE_KEYS } from "./roles";
 
 export type Portal = "customer" | "support" | "admin" | "superadmin" | "branch";
 
@@ -13,7 +13,7 @@ const PORTAL_ROUTES: Record<Portal, string> = {
 export function resolvePortal(user: any): Portal | null {
   if (!user) return null;
   
-  const roleName = getRoleName(user);
+  const roleName = normalizeRoleName(getRoleName(user));
   
   if (roleName === ROLE_KEYS.SUPER_ADMIN) return "superadmin";
   if (roleName === ROLE_KEYS.ADMIN) return "admin";

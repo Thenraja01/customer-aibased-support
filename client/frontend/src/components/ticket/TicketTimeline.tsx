@@ -93,7 +93,7 @@ export function TicketTimeline({ ticket, messages }: TicketTimelineProps) {
             </div>
           );
         })}
-        {messages.length > 0 && (
+        {Array.isArray(messages) && messages.length > 0 && (
           <div className="relative pl-6">
             <div
               className={cn(

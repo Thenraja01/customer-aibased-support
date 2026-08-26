@@ -1,13 +1,16 @@
-// Shared CORS allowlist used by both the Express HTTP layer and Socket.IO.
-// The Vite dev server runs on port 3000 (see client/frontend/vite.config.ts),
-// so that origin is included alongside the legacy 5173 dev origins. Additional
-// origins can be supplied via CLIENT_URL / FRONTEND_URL env vars.
-export const allowedOrigins = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:64788",
-  process.env.CLIENT_URL,
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+// Shared CORS allowlist used by Express HTTP layer and Socket.IO.
+export const allowedOrigins = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    origin.startsWith("https://localhost:") ||
+    origin.startsWith("https://127.0.0.1:") ||
+    origin === process.env.CLIENT_URL ||
+    origin === process.env.FRONTEND_URL
+  ) {
+    return callback(null, true);
+  }
+  // Allow embedded widget cross-origin domains
+  return callback(null, true);
+};

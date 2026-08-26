@@ -36,6 +36,28 @@ const graphRelationshipSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    chunk_id: {
+      type: Schema.Types.ObjectId,
+      ref: "DocumentChunk",
+      default: null,
+      index: true,
+    },
+    confidence_score: {
+      type: Number,
+      default: 1.0,
+      min: 0.0,
+      max: 1.0,
+    },
+    source_type: {
+      type: String,
+      enum: ["SYSTEM_INGESTION", "LLM_EXTRACTION", "VECTOR_KNN_SIMILARITY", "USER_ACTION"],
+      default: "LLM_EXTRACTION",
+      index: true,
+    },
+    provenance_details: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
     organization_id: {
       type: Schema.Types.ObjectId,
       ref: "Organization",
@@ -57,7 +79,10 @@ const graphRelationshipSchema = new mongoose.Schema(
   }
 );
 
-// Optimize relationship lookups
+// Optimize relationship lookups & GraphRAG joins
 graphRelationshipSchema.index({ organization_id: 1, source_name: 1, target_name: 1 });
+graphRelationshipSchema.index({ organization_id: 1, target_name: 1, type: 1 });
+graphRelationshipSchema.index({ organization_id: 1, source_name: 1, type: 1 });
+graphRelationshipSchema.index({ organization_id: 1, document_id: 1, type: 1 });
 
 export default mongoose.model("GraphRelationship", graphRelationshipSchema);

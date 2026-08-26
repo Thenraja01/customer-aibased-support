@@ -14,6 +14,8 @@ const sendDecisionEmail = async (user, orgName, approved, reason = "") => {
     html: approved
       ? `<p>Hi ${user.name},</p><p>Your registration with <b>${orgName}</b> has been approved. You can now log in.</p>`
       : `<p>Hi ${user.name},</p><p>Your registration with <b>${orgName}</b> was rejected${reason ? `: ${reason}` : ""}.</p>`,
+    organizationId: user.organization_id,
+    branchId: user.branch_id,
   }).catch((err) => console.error("[Approval] Email failed:", err.message));
 };
 

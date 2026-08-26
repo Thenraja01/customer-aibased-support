@@ -73,15 +73,17 @@ export const warmupEmbeddingModel = async () => {
   } finally {
     warmupInProgress = false;
   }
-};
+};const _queryEmbeddingCache = new Map();
+const MAX_EMBED_CACHE_SIZE = 5000;
 
-/**
- * Get a real semantic embedding from Ollama.
- * Returns null on any failure — NEVER returns a fake vector.
- */
 export const getEmbedding = async (text) => {
   if (!text || typeof text !== "string" || text.trim().length === 0) {
     return null;
+  }
+
+  const cacheKey = text.trim().toLowerCase();
+  if (_queryEmbeddingCache.has(cacheKey)) {
+    return _queryEmbeddingCache.get(cacheKey);
   }
 
   try {
@@ -108,18 +110,21 @@ export const getEmbedding = async (text) => {
     if (!data.embedding || !Array.isArray(data.embedding) || data.embedding.length === 0) {
       throw new Error("Ollama returned empty or invalid embedding");
     }
+
+    if (_queryEmbeddingCache.size >= MAX_EMBED_CACHE_SIZE) {
+      const firstKey = _queryEmbeddingCache.keys().next().value;
+      _queryEmbeddingCache.delete(firstKey);
+    }
+    _queryEmbeddingCache.set(cacheKey, data.embedding);
+
     return data.embedding;
   } catch (err) {
     console.error(`[OllamaEmbedding] Error:`, err.message);
     lastError = err.message;
-    return null;  // ← Always null on failure — never fake vectors
+    return null; 
   }
 };
 
-/**
- * Batch embedding — sequential to avoid overloading Ollama.
- * Returns null for any item that fails.
- */
 export const getEmbeddingBatch = async (texts) => {
   const results = [];
   for (const t of texts) {

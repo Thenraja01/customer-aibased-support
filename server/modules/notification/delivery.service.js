@@ -31,6 +31,8 @@ export const deliveryService = {
               ` : ""}
             </div>
           `,
+          organizationId: user.organization_id,
+          branchId: user.branch_id,
         });
       } catch (err) {
         console.error(`[Email Delivery] Failed for ${user.email}:`, err.message);
@@ -60,11 +62,7 @@ export const deliveryService = {
     }
   },
 
-  sendSMS: async (notificationData, recipients) => {
-    return { status: "not_configured", detail: "SMS Twilio service not configured" };
-  },
-
   sendSystemAnnouncement: async (notificationData, recipients) => {
     return { status: "success", detail: "System announcement created in database" };
-  }
+  },
 };

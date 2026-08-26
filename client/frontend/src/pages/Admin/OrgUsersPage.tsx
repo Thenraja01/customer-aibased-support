@@ -48,7 +48,7 @@ export default function OrgUsersPage() {
     if (!orgId) return;
     setLoading(true);
     try {
-      const params: any = { page, limit, search };
+      const params: any = { page, limit, search, role: "staff" };
       if (activeBranchId) {
         params.branchId = activeBranchId;
       }

@@ -54,11 +54,7 @@ const assertRoleBranchValid = async ({ role, branch_id, organization_id }) => {
 
 // ── Scope-aware queries ──────────────────────────────────────────────
 
-/**
- * Get all users, filtered by the caller's scope.
- * @param {Object} scope  req.scope from attachScope middleware
- */
-export const getAllUsers = async (scope = null) => {
+export const getAllUsers = async (scope = null, queryFilters = {}) => {
   const filter = {};
 
   if (scope && !scope.isSuperAdmin) {
@@ -69,6 +65,26 @@ export const getAllUsers = async (scope = null) => {
     if (!scope.isOrgAdmin && scope.branchId) {
       filter.branch_id = scope.branchId;
     }
+  }
+
+  if (queryFilters.role) {
+    if (queryFilters.role === "staff") {
+      filter.role = { $ne: "customer" };
+    } else {
+      filter.role = queryFilters.role;
+    }
+  }
+
+  if (queryFilters.status) {
+    filter.status = queryFilters.status;
+  }
+
+  if (queryFilters.search) {
+    const safe = escapeRegex(queryFilters.search);
+    filter.$or = [
+      { name: { $regex: safe, $options: "i" } },
+      { email: { $regex: safe, $options: "i" } }
+    ];
   }
 
   const users = await User.find(filter)

@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import {
   Search, Trash2, MessageSquare, ChevronLeft,
   ChevronRight, Eye, Filter, Loader2, User,
-  Calendar, Building2, Download
+  Calendar, Building2, Download, XCircle
 } from "lucide-react";
 import { AdminAPI } from "@/api/admin.api";
+import { ChatAPI } from "@/api/chat.api";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 
@@ -46,6 +47,8 @@ export default function ChatHistoryManagementPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [confirmCloseAll, setConfirmCloseAll] = useState(false);
+  const [closingAll, setClosingAll] = useState(false);
   const [exporting, setExporting] = useState(false);
   const limit = 10;
 
@@ -132,6 +135,20 @@ export default function ChatHistoryManagementPage() {
     }
   };
 
+  const handleCloseAll = async () => {
+    setConfirmCloseAll(false);
+    setClosingAll(true);
+    try {
+      await ChatAPI.closeAll();
+      toast.success("Closed All", "All active chat sessions have been closed.");
+      fetchChats();
+    } catch {
+      toast.error("Error", "Failed to close chat sessions.");
+    } finally {
+      setClosingAll(false);
+    }
+  };
+
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -192,11 +209,27 @@ export default function ChatHistoryManagementPage() {
             View, search, and manage all chat conversations.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || chats.length === 0} className="gap-2">
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
             Export
           </Button>
+
+          {confirmCloseAll ? (
+            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Close all active chats?</span>
+              <button onClick={() => setConfirmCloseAll(false)} className="px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted rounded-md">Cancel</button>
+              <button onClick={handleCloseAll} disabled={closingAll} className="px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/20 hover:bg-amber-500/30 rounded-md transition-colors">
+                {closingAll ? <Loader2 size={12} className="animate-spin" /> : "Confirm"}
+              </button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setConfirmCloseAll(true)} disabled={closingAll || chats.length === 0} className="gap-2 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">
+              <XCircle size={14} />
+              Close All
+            </Button>
+          )}
+
           {confirmDeleteAll ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Delete all matching chats?</span>

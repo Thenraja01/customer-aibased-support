@@ -87,4 +87,52 @@ export const updateOrganizationSettingsSchema = z.object({
         .optional(),
     })
     .optional(),
-  });
+  rag_config: z
+    .object({
+      chunk_size: z.number().int().min(50).max(8000).optional(),
+      chunk_overlap: z.number().int().min(0).max(2000).optional(),
+      top_k: z.number().int().min(1).max(100).optional(),
+      min_score: z.number().min(0).max(1).optional(),
+      bfs_max_depth: z.number().int().min(1).max(10).optional(),
+    })
+    .optional(),
+  smtp_config: z
+    .object({
+      host: z.string().optional(),
+      port: z.number().int().min(1).max(65535).optional(),
+      secure: z.boolean().optional(),
+      user: z.string().optional(),
+      pass: z.string().optional(),
+      from: z.string().optional(),
+      enabled: z.boolean().optional(),
+    })
+    .optional(),
+  ticket_form_config: z
+    .array(
+      z.object({
+        field_key: z.string(),
+        label: z.string(),
+        enabled: z.boolean(),
+        required: z.boolean(),
+        order: z.number().optional(),
+      })
+    )
+    .optional(),
+  sla_settings: z.record(z.any()).optional(),
+  auto_close_settings: z
+    .object({
+      enabled: z.boolean().optional(),
+      closing_period_hours: z.number().int().min(1).max(720).optional(),
+    })
+    .optional(),
+  llm_config: z
+    .object({
+      provider: z.string().optional(),
+      api_key: z.string().optional(),
+      model: z.string().optional(),
+      base_url: z.string().optional(),
+      temperature: z.number().optional(),
+      max_tokens: z.number().optional(),
+    })
+    .optional(),
+}).passthrough();

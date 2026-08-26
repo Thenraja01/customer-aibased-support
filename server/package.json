@@ -10,8 +10,10 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "seed": "node seed.js",
+    "storefront": "node ../scripts/serve-storefront.js",
+    "migrate:neo4j": "node scripts/migrate-neo4j-to-mongo.js",
     "sync-chunks": "node scripts/syncChunkStatus.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test \"tests/*.test.js\""
   },
   "dependencies": {
     "@chroma-core/default-embed": "^0.1.9",
@@ -33,7 +35,6 @@
     "mongoose": "^9.7.4",
     "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
-    "neo4j-driver": "^6.2.0",
     "nodemailer": "^9.0.3",
     "nodemon": "^3.1.14",
     "pdf-parse": "^2.4.5",

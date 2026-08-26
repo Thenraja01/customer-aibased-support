@@ -1,23 +1,6 @@
-// middleware/rbac.middleware.js
-//
-// Minimal, role-first RBAC helpers used for route protection:
-//
-//   authenticate()      → verify JWT (protect) and attach req.user
-//   checkRole("ADMIN")  → role-based gate for pages / modules / routes
-//   checkOrganization() → multi-tenant isolation
-//   checkOwnership()    → ownership validation for customer resources
-//
-// Super Admin is treated as a special role and always passes every gate.
 
 import { normalizeRoleName, isSuperAdmin, isNormalizedAdminRole } from "../utils/constants.js";
 import User from "../modules/user/user.schema.js";
-
-/**
- * Check that the authenticated user holds at least one of the given roles.
- * Role names are normalized (case-insensitive, spaces/underscores ignored).
- *
- * @param {...string} allowedRoles e.g. checkRole("super_admin", "admin")
- */
 export const checkRole = (...allowedRoles) => {
   const normalizedAllowed = allowedRoles.map(normalizeRoleName).filter(Boolean);
 

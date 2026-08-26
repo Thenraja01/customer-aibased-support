@@ -15,9 +15,7 @@ export const getAll = async (req, res) => {
   try {
     const scopedOrgId = req.scope?.isSuperAdmin ? null : req.scope?.organizationId;
     const requestedOrgId = req.query.organization_id || null;
-    // Only trust an explicit org filter when it is within the caller's own scope.
-    const orgId =
-      requestedOrgId && (req.scope?.isSuperAdmin || requestedOrgId === scopedOrgId)
+      const orgId = requestedOrgId && (req.scope?.isSuperAdmin || requestedOrgId === scopedOrgId)
         ? requestedOrgId
         : scopedOrgId;
     const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : req.scope?.branchId;

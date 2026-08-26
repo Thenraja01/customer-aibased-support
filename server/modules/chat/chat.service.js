@@ -77,7 +77,7 @@ export const countUserChats = async (userId, orgId = null) => {
 };
 
 export const getActiveChats = async (orgId = null, branchId = null) => {
-  const query = { status: "open" };
+  const query = { status: { $in: ["open", "escalated", "in_progress", "waiting_for_agent"] } };
   if (orgId) query.organization_id = orgId;
   if (branchId) query.branch_id = branchId;
   return await Chat.find(query)
@@ -119,5 +119,20 @@ export const closeInactiveChats = async () => {
 
 export const updateLastMessageTime = async (chatId) => {
   await Chat.findByIdAndUpdate(chatId, { last_message_at: new Date() });
+};
+
+export const deleteAllChats = async (userId, orgId = null) => {
+  const query = { user_id: userId };
+  if (orgId) query.organization_id = orgId;
+  const chats = await Chat.find(query).select("_id");
+  const chatIds = chats.map(c => c._id);
+  
+  await Chat.deleteMany(query);
+  await Promise.all([
+    Message.deleteMany({ chat_id: { $in: chatIds } }),
+    AISession.deleteMany({ chat_id: { $in: chatIds } }),
+    ChatMemory.deleteMany({ chat_id: { $in: chatIds } }),
+  ]);
+  return { deletedCount: chatIds.length, chatIds };
 };
 

@@ -1,14 +1,17 @@
 import { memo, useMemo, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Bot, User, Copy, ThumbsUp, ThumbsDown, Check, FileText } from "lucide-react";
+import { Bot, User, Copy, ThumbsUp, ThumbsDown, Check, FileText, LifeBuoy, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import type { ChatMessage as MessageType } from "@/types/chat";
 import DocumentViewer from "@/components/ui/DocumentViewer";
+import DocumentAPI from "@/api/document.api.js";
+import { useToast } from "@/components/ui/toast";
 
 interface ChatMessageProps {
   message: MessageType;
-  isOwn: boolean;
+  isOwn?: boolean;
   onEscalate?: () => void;
+  onQuickAction?: (query: string) => void;
 }
 
 function renderMarkdown(text: string) {
@@ -23,7 +26,7 @@ function renderMarkdown(text: string) {
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
 
   html = html.replace(/^### (.+)$/gm, '<h3 class="font-semibold text-sm mt-3 mb-1">$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2 class="font-semibold text-base mt-3 mb-1">$2</h2>');
+  html = html.replace(/^## (.+)$/gm, '<h2 class="font-semibold text-base mt-3 mb-1">$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1 class="font-bold text-lg mt-3 mb-1">$1</h1>');
 
   html = html.replace(/^[\-\*] (.+)$/gm, '<li class="ml-4 list-disc text-sm leading-relaxed">$1</li>');
@@ -34,24 +37,37 @@ function renderMarkdown(text: string) {
   return html;
 }
 
-const ChatMessage = memo(function ChatMessage({ message, isOwn, onEscalate }: ChatMessageProps) {
+const ChatMessage = memo(function ChatMessage({ message, isOwn: _isOwn, onEscalate, onQuickAction }: ChatMessageProps) {
   const isAI = message.is_ai;
+  const isUser = !isAI; // User message is ALWAYS on the right, AI message is ALWAYS on the left
   const { orgSettings } = useAuth();
-  const botName = orgSettings?.chatbot_name || "AI Assistant";
+  const toast = useToast();
+  const botName = orgSettings?.chatbot_name || "Support AI Copilot";
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
 
   const [selectedSource, setSelectedSource] = useState<any>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [showAllSources, setShowAllSources] = useState(false);
 
-  const handleSourceClick = useCallback((src: any) => {
-    const docId = src.documentId || src._id;
-    if (!docId) return;
-    const baseUrl = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
+  const handleSourceClick = useCallback(async (src: any) => {
+    const docId = src.documentId || src._id || src.id;
+    const title = src.title || src.documentName || "Source Document";
+
+    let resolvedUrl = src.url || src.file_url || "#";
+    if (docId && docId !== "source-doc") {
+      try {
+        resolvedUrl = await DocumentAPI.resolveDocumentUrl(docId);
+      } catch {
+        resolvedUrl = `/documents/${docId}/view`;
+      }
+    }
+
     setSelectedSource({
       id: docId,
-      title: src.title || "Source Document",
-      url: `${baseUrl}/documents/${docId}/view`,
+      title,
+      url: resolvedUrl,
+      citation: src,
     });
     setIsViewerOpen(true);
   }, []);
@@ -67,80 +83,121 @@ const ChatMessage = memo(function ChatMessage({ message, isOwn, onEscalate }: Ch
     setTimeout(() => setCopied(false), 2000);
   }, [message.content]);
 
-  // Extract sources if present in message metadata
+  const handleFeedback = useCallback(async (type: "up" | "down") => {
+    const newFeedback = feedback === type ? null : type;
+    setFeedback(newFeedback);
+    if (!newFeedback) return;
+
+    try {
+      const AxiosInstance = (await import("@/api/axiosInstance")).default;
+      await AxiosInstance.post("/feedback", {
+        chat_id: message.chat_id,
+        message_id: message._id,
+        rating: type === "up" ? 5 : 1,
+        was_helpful: type === "up",
+      });
+    } catch (err) {
+      console.warn("[ChatMessage] Feedback submit notice:", err);
+    }
+  }, [feedback, message]);
+
+  // Extract sources from message citations
   const sources = (message as any).citations || (message as any).sources || [];
 
   return (
-    <div className={cn("group py-1 px-4", isOwn ? "flex justify-end" : "flex justify-start")}>
-      <div className={cn("flex gap-3 max-w-[85%] sm:max-w-[75%]", isOwn && "flex-row-reverse")}>
+    <div className={cn("group py-2 px-4 w-full flex", isUser ? "justify-end" : "justify-start")}>
+      <div className={cn("flex gap-3 max-w-[88%] sm:max-w-[78%]", isUser && "flex-row-reverse")}>
         {/* Avatar */}
         <div
           className={cn(
-            "flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-1",
+            "flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-1 shadow-sm border",
             isAI
-              ? "bg-primary/10"
-              : "bg-muted"
+              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+              : "bg-primary/10 border-primary/20 text-primary"
           )}
         >
-          {isAI ? <Bot size={14} className="text-primary" /> : <User size={14} className="text-muted-foreground" />}
+          {isAI ? <Bot size={16} /> : <User size={16} />}
         </div>
 
-        {/* Content */}
+        {/* Message Body */}
         <div className="flex-1 min-w-0">
-          <div className={cn("text-[11px] font-medium mb-1", isOwn ? "text-right" : "text-left", "text-muted-foreground")}>
-            {isAI ? botName : "You"}
+          <div className={cn("text-[11px] font-semibold mb-1 flex items-center gap-2", isUser ? "justify-end text-muted-foreground" : "justify-start text-muted-foreground")}>
+            <span>{isAI ? botName : "You"}</span>
           </div>
 
           <div
             className={cn(
-              "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-              isOwn
-                ? "bg-primary text-primary-foreground rounded-br-md"
-                : "bg-card border border-border rounded-bl-md"
+              "rounded-2xl px-4 py-3 text-sm leading-relaxed transition-all shadow-sm",
+              isUser
+                ? "bg-primary text-primary-foreground font-medium rounded-br-sm shadow-md"
+                : "bg-card/90 backdrop-blur-xl border border-border/80 rounded-bl-sm text-foreground shadow-sm"
             )}
           >
             {isAI ? (
               (() => {
+                const textLower = (message.content || "").toLowerCase();
+                const isMissingInfo =
+                  textLower.includes("couldn't find") ||
+                  textLower.includes("could not find") ||
+                  textLower.includes("don't have") ||
+                  textLower.includes("do not have") ||
+                  textLower.includes("no information") ||
+                  textLower.includes("unavailable") ||
+                  textLower.includes("unable to find") ||
+                  textLower.includes("not found");
+
                 const confidence = (message as any).confidence;
                 const responseMode = (message as any).responseMode;
-                const isMedium = responseMode === "suggest_and_offer_human" || (typeof confidence === "number" && confidence >= 0.50 && confidence < 0.75);
-                const isLow = responseMode === "no_confidence" || (typeof confidence === "number" && confidence < 0.50);
+                const escalation = (message as any).escalation || {};
+                const isLowConfidence =
+                  isMissingInfo ||
+                  escalation.available ||
+                  feedback === "down" ||
+                  responseMode === "no_confidence" ||
+                  (typeof confidence === "number" && confidence < 0.75);
+
                 return (
                   <>
                     <div
                       className="prose prose-sm dark:prose-invert max-w-none text-[13.5px] leading-relaxed [&_pre]:my-2 [&_code]:text-xs [&_strong]:font-semibold [&_em]:italic [&_li]:my-0.5"
                       dangerouslySetInnerHTML={renderedContent!}
                     />
-                    {isMedium && (
-                      <div className="mt-2.5 pt-2.5 border-t border-border/40 dark:border-white/[0.05] flex flex-col gap-2">
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">
-                          ⚠️ This response has moderate relevance. Would you like to connect with a support agent?
+
+                    {/* Conditional Support & Escalation Card (Shown ONLY when confidence < 0.75, negative feedback 👎, or unresolved) */}
+                    {isLowConfidence && (
+                      <div className="mt-3.5 p-3.5 rounded-xl bg-card/80 border border-border/80 text-foreground flex flex-col gap-2.5 shadow-sm">
+                        <p className="text-[12px] text-muted-foreground leading-relaxed font-medium">
+                          Need more details or direct human assistance?
                         </p>
-                        {onEscalate && (
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={onEscalate}
-                            className="self-start text-[10.5px] font-semibold px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                            onClick={async () => {
+                              try {
+                                const { ChatAPI } = await import("@/api/chat.api.js");
+                                await ChatAPI.handoff(message.chat_id, "user_requested");
+                                toast.success("Support Request Initiated", "A live support specialist is joining your chat.");
+                              } catch (err: any) {
+                                toast.error("Handoff Error", err?.response?.data?.message || "Failed to initiate agent chat.");
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-black hover:bg-emerald-400 transition-all shadow-sm active:scale-95"
                           >
-                            Connect with Human Agent
+                            <Bot size={13} />
+                            Chat with Support Agent
                           </button>
-                        )}
-                      </div>
-                    )}
-                    {isLow && (
-                      <div className="mt-2.5 pt-2.5 border-t border-border/40 dark:border-white/[0.05] flex flex-col gap-2">
-                        <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
-                          ℹ️ The assistant is uncertain about this query. Escalate to a human representative?
-                        </p>
-                        {onEscalate && (
-                          <button
-                            type="button"
-                            onClick={onEscalate}
-                            className="self-start text-[10.5px] font-semibold px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                          >
-                            Escalate to Human Agent
-                          </button>
-                        )}
+
+                          {onEscalate && (
+                            <button
+                              type="button"
+                              onClick={onEscalate}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-muted hover:bg-muted/80 text-foreground border border-border/80 transition-all active:scale-95"
+                            >
+                              <LifeBuoy size={13} className="text-amber-500" />
+                              Raise a Ticket
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </>
@@ -153,62 +210,111 @@ const ChatMessage = memo(function ChatMessage({ message, isOwn, onEscalate }: Ch
             )}
           </div>
 
-          {/* Sources */}
+          {/* Structured Document Sources Bar */}
           {isAI && sources.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {sources.map((src: any, i: number) => (
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 mr-1">
+                Source:
+              </span>
+              {(showAllSources ? sources : sources.slice(0, 1)).map((src: any, i: number) => {
+                const docName = src.documentName || src.title || `Document ${i + 1}`;
+                const pageNum = src.pageNumber || (typeof src.chunkIndex === "number" ? src.chunkIndex + 1 : null);
+                const score = src.relevanceScore ?? src.score;
+                const matchPct = score ? Math.round(score * 100) : null;
+
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSourceClick(src)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-muted/60 border border-border/80 text-muted-foreground hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all active:scale-95 shadow-2xs"
+                  >
+                    <FileText size={12} className="text-primary shrink-0" />
+                    <span className="truncate max-w-[180px]">📄 {docName}</span>
+                    {pageNum && <span className="text-[10px] font-semibold text-muted-foreground/70">· Page {pageNum}</span>}
+                    {matchPct && (
+                      <span className="text-[9.5px] font-mono text-emerald-500 font-bold">
+                        ({matchPct}%)
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              {sources.length > 1 && (
                 <button
-                  key={i}
                   type="button"
-                  onClick={() => handleSourceClick(src)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-muted/50 border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  onClick={() => setShowAllSources(!showAllSources)}
+                  className="text-[10.5px] font-medium text-primary hover:underline ml-1 px-1.5 py-0.5 rounded bg-primary/5 hover:bg-primary/10 transition-colors"
                 >
-                  <FileText size={11} />
-                  <span className="truncate max-w-[120px]">{src.title || `Source ${i + 1}`}</span>
+                  {showAllSources ? "Show less" : `+${sources.length - 1} more`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Interactive Contextual Quick Actions */}
+          {isAI && Array.isArray((message as any).quickActions) && (message as any).quickActions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2 border-t border-border/40">
+              <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1 mr-1">
+                <Sparkles size={11} className="text-primary" /> Suggested:
+              </span>
+              {(message as any).quickActions.map((qa: any, qi: number) => (
+                <button
+                  key={qi}
+                  type="button"
+                  onClick={() => onQuickAction?.(qa.query || qa.label)}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all hover:scale-[1.02] active:scale-95 shadow-2xs cursor-pointer"
+                >
+                  {qa.label}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Meta row */}
-          <div className={cn("flex items-center gap-2 mt-1.5", isOwn ? "justify-end" : "justify-start")}>
-            <span className="text-[10px] text-muted-foreground/50">
+          {/* Meta & Interactive Toolbar */}
+          <div className={cn("flex items-center gap-2 mt-1.5", isUser ? "justify-end" : "justify-start")}>
+            <span className="text-[10px] text-muted-foreground/60 font-mono">
               {new Date(message.created_at).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
               })}
             </span>
 
-            {/* AI action buttons */}
+            {/* AI Action Tools (Helpful Feedback 👍 👎 shown on high-confidence messages) */}
             {isAI && (
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity bg-card/80 backdrop-blur-sm border border-border/50 rounded-lg px-2 py-1 shadow-2xs">
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="p-1 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground transition-colors"
+                  className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Copy message"
+                  title="Copy message"
                 >
                   {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                 </button>
+                <div className="h-3 w-[1px] bg-border/60 mx-0.5" />
+                <span className="text-[10px] text-muted-foreground/70 font-medium">Was this helpful?</span>
                 <button
                   type="button"
-                  onClick={() => setFeedback(feedback === "up" ? null : "up")}
+                  onClick={() => handleFeedback("up")}
                   className={cn(
                     "p-1 rounded-md hover:bg-muted transition-colors",
-                    feedback === "up" ? "text-emerald-500" : "text-muted-foreground/60 hover:text-foreground"
+                    feedback === "up" ? "text-emerald-500 font-bold" : "text-muted-foreground hover:text-foreground"
                   )}
                   aria-label="Helpful"
+                  title="Helpful"
                 >
                   <ThumbsUp size={12} />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFeedback(feedback === "down" ? null : "down")}
+                  onClick={() => handleFeedback("down")}
                   className={cn(
                     "p-1 rounded-md hover:bg-muted transition-colors",
-                    feedback === "down" ? "text-red-500" : "text-muted-foreground/60 hover:text-foreground"
+                    feedback === "down" ? "text-rose-500 font-bold" : "text-muted-foreground hover:text-foreground"
                   )}
                   aria-label="Not helpful"
+                  title="Not helpful"
                 >
                   <ThumbsDown size={12} />
                 </button>
@@ -217,12 +323,14 @@ const ChatMessage = memo(function ChatMessage({ message, isOwn, onEscalate }: Ch
           </div>
         </div>
       </div>
+
       {selectedSource && (
         <DocumentViewer
           title={selectedSource.title}
           fileUrl={selectedSource.url}
           isOpen={isViewerOpen}
           onClose={() => setIsViewerOpen(false)}
+          citation={selectedSource.citation}
         />
       )}
     </div>
@@ -230,3 +338,4 @@ const ChatMessage = memo(function ChatMessage({ message, isOwn, onEscalate }: Ch
 });
 
 export default ChatMessage;
+

@@ -21,6 +21,7 @@ const CustomerNotifications = lazy(() => import('@/pages/Customer/NotificationsP
 const CustomerChatHistory = lazy(() => import('@/pages/Customer/ChatHistoryPage'));
 const CustomerDocuments = lazy(() => import('@/pages/Customer/CustomerDocumentsPage'));
 const CustomerProfile = lazy(() => import('@/pages/Customer/ProfilePage'));
+const AIWorkspace = lazy(() => import('@/pages/ai/AIWorkspacePage'));
 
 // Support Pages
 const SupportDashboard = lazy(() => import('@/pages/Support/SupportDashboard'));
@@ -53,6 +54,24 @@ const AdminSettings = lazy(() => import('@/pages/Admin/OrganizationSettingsPage'
 const AdminSendNotification = lazy(() => import('@/pages/Admin/SendNotificationPage'));
 const AdminChatbot = lazy(() => import('@/pages/Customer/ChatPage'));
 const AdminCommunication = lazy(() => import('@/pages/Admin/AdminCommunicationPage'));
+const AdminTickets = lazy(() => import('@/pages/Admin/AdminTicketManagementPage'));
+const EscalatedTickets = lazy(() => import('@/pages/Admin/EscalatedTicketsPage'));
+const TicketTemplates = lazy(() => import('@/pages/Admin/TicketTemplatesPage'));
+const TicketFormCustomization = lazy(() => import('@/pages/Admin/TicketFormCustomizationPage'));
+
+// Branch Pages
+const BranchDashboard = lazy(() => import('@/pages/BranchAdmin/BranchAdminDashboard'));
+const BranchTickets = lazy(() => import('@/pages/BranchAdmin/BranchTicketsPage'));
+const TicketDetailPage = lazy(() => import('@/pages/Support/TicketDetailPage'));
+const BranchAgents = lazy(() => import('@/pages/BranchAdmin/BranchAgentsPage'));
+const BranchCustomers = lazy(() => import('@/pages/BranchAdmin/BranchCustomersPage'));
+const BranchKnowledge = lazy(() => import('@/pages/BranchAdmin/BranchKnowledgePage'));
+const BranchFAQ = lazy(() => import('@/pages/BranchAdmin/BranchFAQPage'));
+const BranchSLA = lazy(() => import('@/pages/BranchAdmin/BranchSLAPage'));
+const BranchAnalytics = lazy(() => import('@/pages/BranchAdmin/BranchAnalyticsPage'));
+const BranchNotifications = lazy(() => import('@/pages/BranchAdmin/BranchNotificationsPage'));
+const BranchSettings = lazy(() => import('@/pages/BranchAdmin/BranchSettingsPage'));
+const BranchProfile = lazy(() => import('@/pages/BranchAdmin/BranchProfilePage'));
 
 // SuperAdmin Pages
 const SuperAdminDashboard = lazy(() => import('@/pages/SuperAdmin/SuperAdminDashboard'));
@@ -63,12 +82,10 @@ const SuperAdminPendingOrgAdmins = lazy(() => import('@/pages/SuperAdmin/Pending
 const SuperAdminRoles = lazy(() => import('@/pages/SuperAdmin/RolesPage'));
 const SuperAdminAnalytics = lazy(() => import('@/pages/Admin/AIAnalyticsPage'));
 const SuperAdminChatHistory = lazy(() => import('@/pages/Admin/ChatHistoryManagementPage'));
-const SuperAdminCommunication = lazy(() => import('@/pages/SuperAdmin/SuperAdminCommunicationPage'));
 const SuperAdminSearch = lazy(() => import('@/pages/Admin/GlobalSearchPage'));
 const SuperAdminNotifications = lazy(() => import('@/pages/Admin/NotificationsPage'));
 const SuperAdminSendNotification = lazy(() => import('@/pages/SuperAdmin/SendNotificationPage'));
 const SuperAdminAuditLogs = lazy(() => import('@/pages/SuperAdmin/AuditLogsPage'));
-const SuperAdminAppSettings = lazy(() => import('@/pages/SuperAdmin/AppSettingsPage'));
 
 // Mapping registry
 export const pageRegistry: Record<ActiveView, React.LazyExoticComponent<any> | null> = {
@@ -91,6 +108,7 @@ export const pageRegistry: Record<ActiveView, React.LazyExoticComponent<any> | n
   "support-notifications": SupportNotifications,
   "support-chat": SupportChat,
   "support-chat-history": SupportChatHistory,
+  "support-profile": CustomerProfile,
 
   // Admin
   "admin-dashboard": AdminDashboard,
@@ -113,10 +131,15 @@ export const pageRegistry: Record<ActiveView, React.LazyExoticComponent<any> | n
   "admin-send-notification": AdminSendNotification,
   "admin-chatbot": AdminChatbot,
   "admin-communication": AdminCommunication,
+  "admin-profile": CustomerProfile,
+  "admin-tickets": AdminTickets,
+  "admin-tickets-escalated": EscalatedTickets,
+  "admin-tickets-templates": TicketTemplates,
+  "admin-tickets-form-customization": TicketFormCustomization,
   
-  // Stubs for others (can be extended as needed)
-  "admin-ai-analytics": null,
-  "admin-ai-sessions": null,
+  // Analytics & Sessions
+  "admin-ai-analytics": SuperAdminAnalytics,
+  "admin-ai-sessions": AdminChatHistory,
   
   // SuperAdmin
   "superadmin-dashboard": SuperAdminDashboard,
@@ -127,17 +150,35 @@ export const pageRegistry: Record<ActiveView, React.LazyExoticComponent<any> | n
   "superadmin-roles": SuperAdminRoles,
   "superadmin-ai-analytics": SuperAdminAnalytics,
   "superadmin-chat-history": SuperAdminChatHistory,
-  "superadmin-communication": SuperAdminCommunication,
+  "superadmin-communication": null,
   "superadmin-search": SuperAdminSearch,
   "superadmin-notifications": SuperAdminNotifications,
   "superadmin-notifications-send": SuperAdminSendNotification,
   "superadmin-audit-logs": SuperAdminAuditLogs,
-  "superadmin-app-settings": SuperAdminAppSettings,
+  "superadmin-profile": CustomerProfile,
+  "superadmin-tickets": AdminTickets,
+  "superadmin-tickets-escalated": EscalatedTickets,
+  "superadmin-tickets-templates": TicketTemplates,
+  "superadmin-tickets-form-customization": TicketFormCustomization,
 
-  // Branch Stubs
-  "branch-dashboard": null,
-  "branch-documents": null,
-  "branch-branches": null,
+  // Branch
+  "branch-dashboard": BranchDashboard,
+  "branch-tickets": BranchTickets,
+  "branch-ticket-detail": TicketDetailPage,
+  "support-ticket-detail": TicketDetailPage,
+  "customer-ticket-detail": TicketDetailPage,
+  "branch-agents": BranchAgents,
+  "branch-customers": BranchCustomers,
+  "branch-knowledge": BranchKnowledge,
+  "branch-faq": BranchFAQ,
+  "branch-sla": BranchSLA,
+  "branch-analytics": BranchAnalytics,
+  "branch-notifications": BranchNotifications,
+  "branch-settings": BranchSettings,
+  "branch-documents": BranchKnowledge,
+  "branch-branches": AdminBranches,
+  "branch-profile": BranchProfile,
+  "ai-workspace": AIWorkspace,
 };
 
 interface PageRegistryComponentProps {

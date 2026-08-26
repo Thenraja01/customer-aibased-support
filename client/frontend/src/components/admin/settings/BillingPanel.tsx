@@ -68,7 +68,16 @@ export default function BillingPanel() {
     return <div className="text-sm text-muted-foreground py-8 text-center">Loading billing...</div>;
   }
 
-  const currentPlan = PLANS.find((p) => p.value === billing?.plan) || PLANS[0];
+  const displayPlans = (billing?.available_plans && billing.available_plans.length > 0)
+    ? billing.available_plans.map((p: any) => ({
+        value: p.plan_key,
+        label: p.name,
+        price: p.price_usd,
+        blurb: p.blurb || `${Number(p.ai_requests_limit).toLocaleString()} AI req/mo • ${Math.round((p.storage_limit_bytes || 524288000) / (1024 * 1024))}MB`,
+      }))
+    : PLANS;
+
+  const currentPlan = displayPlans.find((p: any) => p.value === billing?.plan) || displayPlans[0] || PLANS[0];
 
   return (
     <div className="space-y-6">
@@ -135,7 +144,7 @@ export default function BillingPanel() {
           <p className="text-sm font-semibold">Change Plan</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4">
-          {PLANS.filter((p) => p.value !== "free").map((p) => {
+          {displayPlans.filter((p: any) => p.value !== "free").map((p: any) => {
             const isCurrent = billing?.plan === p.value;
             return (
               <div key={p.value} className="rounded-lg border dark:border-white/[0.06] p-4 flex flex-col gap-1">
@@ -171,14 +180,24 @@ export default function BillingPanel() {
                 <div>
                   <p className="text-sm font-medium">{inv.invoice_number}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(inv.created_at).toLocaleDateString()} · {inv.plan} plan{inv.notes ? ` · ${inv.notes}` : ""}
+                    {new Date(inv.created_at).toLocaleDateString()} · <span className="capitalize">{inv.plan}</span> plan{inv.notes ? ` · ${inv.notes}` : ""}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold">{fmtMoney(inv.amount_usd)}</p>
-                  <Badge variant={inv.status === "paid" ? "default" : inv.status === "failed" ? "destructive" : "secondary"}>
-                    {inv.status}
-                  </Badge>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">{fmtMoney(inv.amount_usd)}</p>
+                    <Badge variant={inv.status === "paid" ? "default" : inv.status === "failed" ? "destructive" : "secondary"}>
+                      {inv.status}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs text-primary"
+                    onClick={() => window.open(AdminAPI.downloadInvoiceUrl(inv._id), "_blank")}
+                  >
+                    <Download size={14} />
+                  </Button>
                 </div>
               </div>
             ))}

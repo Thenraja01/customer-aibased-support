@@ -15,7 +15,8 @@ import ChatInput from "@/components/chat/ChatInput";
 import TypingIndicator from "@/components/chat/TypingIndicator";
 
 export default function SupportChatHistoryView() {
-  const { id } = useParams();
+  const { id, chatId } = useParams();
+  const targetId = id || chatId;
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useAuthContext();
   const { socket } = useSocket();
@@ -37,11 +38,11 @@ export default function SupportChatHistoryView() {
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    if (!targetId) return;
     (async () => {
       setLoading(true);
       try {
-        const res = await ChatAPI.getById(id);
+        const res = await ChatAPI.getById(targetId);
         if (res.data.success) {
           dispatch(setActiveChat(res.data.data));
         } else {
@@ -53,7 +54,7 @@ export default function SupportChatHistoryView() {
         setLoading(false);
       }
     })();
-  }, [id, dispatch]);
+  }, [targetId, dispatch]);
 
   useEffect(() => {
     if (activeChat?._id) {
@@ -87,7 +88,13 @@ export default function SupportChatHistoryView() {
     if (!text.trim()) return;
     if (!activeChat?._id || !user?._id || sending || aiThinking) return;
     try {
-      await sendWithAI(activeChat._id, user._id, text);
+      if (activeChat.is_escalated || activeChat.status === "escalated" || activeChat.status === "in_progress") {
+        const { MessageAPI } = await import("@/api/message.api.js");
+        await MessageAPI.send({ chat_id: activeChat._id, content: text, sender_id: user._id });
+        loadMessages(activeChat._id);
+      } else {
+        await sendWithAI(activeChat._id, user._id, text);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -159,7 +166,7 @@ export default function SupportChatHistoryView() {
               <ChatMessage
                 key={msg._id || `${msg.created_at || ""}-${idx}`}
                 message={msg}
-                isOwn={msg.sender_id === user?._id}
+                isOwn={!msg.is_ai}
               />
             ))}
             {(sending || aiThinking) && <TypingIndicator />}

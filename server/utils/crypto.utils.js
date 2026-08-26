@@ -2,17 +2,11 @@ import crypto from "crypto";
 import env from "../config/env.js";
 
 const ALGORITHM = "aes-256-cbc";
-// Derive a 32-byte key from JWT_SECRET by hashing it
 const ENCRYPTION_KEY = crypto
   .createHash("sha256")
   .update(env.JWT_SECRET || "fallback-secret-for-encryption-key-generation-only")
   .digest();
 
-/**
- * Encrypts plaintext string using AES-256-CBC
- * @param {string} text - The plaintext to encrypt
- * @returns {string} - The encrypted string format "iv:ciphertext"
- */
 export const encrypt = (text) => {
   if (!text) return null;
   const iv = crypto.randomBytes(16);
@@ -22,11 +16,6 @@ export const encrypt = (text) => {
   return `${iv.toString("hex")}:${encrypted}`;
 };
 
-/**
- * Decrypts encrypted string format "iv:ciphertext" using AES-256-CBC
- * @param {string} cipherText - The text to decrypt
- * @returns {string} - The decrypted plaintext
- */
 export const decrypt = (cipherText) => {
   if (!cipherText) return null;
   try {

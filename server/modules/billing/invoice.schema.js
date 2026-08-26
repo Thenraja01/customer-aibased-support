@@ -1,12 +1,5 @@
 import mongoose, { Schema } from "mongoose";
 
-/**
- * Invoice — billing record for an organization plan.
- *
- * An invoice is created whenever an organization changes plan (pro-rated /
- * immediate). It is NOT tied to an external payment gateway; the gateway
- * integration is intentionally abstracted behind `payment_method`.
- */
 const invoiceSchema = new mongoose.Schema(
   {
     organization_id: {

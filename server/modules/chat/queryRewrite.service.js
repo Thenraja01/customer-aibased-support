@@ -18,6 +18,14 @@ const COMMON_SPELLING = {
   purchse: "purchase",
   featre: "feature",
   technicall: "technical",
+  warrenty: "warranty",
+  warrent: "warranty",
+  warenty: "warranty",
+  warent: "warranty",
+  clain: "claim",
+  clainm: "claim",
+  claime: "claim",
+  guarentee: "guarantee",
 };
 
 const SYNONYM_MAP = {
@@ -29,6 +37,8 @@ const SYNONYM_MAP = {
   account: ["profile", "login", "signin", "credentials"],
   bug: ["error", "issue", "problem", "not working", "broken"],
   feature: ["capability", "function", "tool", "product"],
+  warranty: ["guarantee", "claim", "coverage", "hardware warranty"],
+  claim: ["warranty claim", "file claim", "replacement", "repair request"],
 };
 
 const STOP_WORDS = new Set([

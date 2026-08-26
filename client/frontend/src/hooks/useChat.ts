@@ -31,7 +31,10 @@ export function useChat() {
     queryFn: async () => {
       if (!activeChat?._id) return [];
       const res = await MessageAPI.getByChat(activeChat._id);
-      return res.data?.data || res.data || [];
+      const raw = res.data?.data || res.data;
+      if (Array.isArray(raw)) return raw;
+      if (Array.isArray(raw?.messages)) return raw.messages;
+      return [];
     },
     enabled: !!activeChat?._id,
   });

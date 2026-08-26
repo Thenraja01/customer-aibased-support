@@ -8,17 +8,21 @@ export class GeminiProvider extends LLMProvider {
 
   constructor() {
     super();
-    this.modelName = process.env.LLM_MODEL || "gemini-2.0-flash";
+    this.modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
   }
 
   isAvailable() {
     return true; // availability is checked request-time based on options.apiKey or env.GEMINI_API_KEY
   }
 
+  _apiKey(options = {}) {
+    return options.apiKey || options.api_key || options.gemini_api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  }
+
   // ── Health Check ─────────────────────────────────────────────────
 
   async healthCheck(options = {}) {
-    const apiKey = options.apiKey || process.env.GEMINI_API_KEY;
+    const apiKey = this._apiKey(options);
     if (!apiKey) {
       return {
         provider: "gemini",
@@ -56,7 +60,7 @@ export class GeminiProvider extends LLMProvider {
   }
 
   async generate(prompt, options = {}) {
-    const apiKey = options.apiKey || process.env.GEMINI_API_KEY;
+    const apiKey = this._apiKey(options);
     if (!apiKey) {
       console.warn("[GeminiProvider] No API key available for request");
       return null;

@@ -123,26 +123,27 @@ export default function AuditLogsPage() {
   const hasActiveFilters = actionFilter || tableFilter || userFilter || fromDate || toDate || searchQuery;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Audit Logs</h1>
-          <p className="text-muted-foreground">
-            {isSuperAdmin
-              ? "Track all system activity and changes across all organizations."
-              : "Track all system activity and changes within your organization."}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport} disabled={isExporting || loading}>
-            <Download className="mr-2 h-4 w-4" />
-            {isExporting ? "Exporting..." : "Export CSV"}
-          </Button>
-          <Button variant="outline" onClick={() => handleFetch()} disabled={loading}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
+    <div className="space-y-4">
+      {/* Page Top Section: Title & Description with reserved right space */}
+      <div className="page-top relative pt-4 pr-[320px]">
+        <h1 className="text-3xl font-bold">Audit Logs</h1>
+        <p className="text-muted-foreground mt-1">
+          {isSuperAdmin
+            ? "Track all system activity and changes across all organizations."
+            : "Track all system activity and changes within your organization."}
+        </p>
+      </div>
+
+      {/* Page Actions Section: Export CSV & Refresh */}
+      <div className="page-actions flex justify-end items-center gap-2 mt-2 mb-4">
+        <Button variant="outline" onClick={handleExport} disabled={isExporting || loading}>
+          <Download className="mr-2 h-4 w-4" />
+          {isExporting ? "Exporting..." : "Export CSV"}
+        </Button>
+        <Button variant="outline" onClick={() => handleFetch()} disabled={loading}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Refresh
+        </Button>
       </div>
 
       <form onSubmit={handleSearch} className="space-y-4">

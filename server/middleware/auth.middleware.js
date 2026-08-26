@@ -11,10 +11,10 @@ import {
 } from "../modules/user-role/userRole.service.js";
 import { getCache } from "../config/redis.js";
 import { hasAllPermissions, hasPermission, WILDCARD } from "../utils/permissions.js";
+import { normalizeRoleName } from "../utils/constants.js";
 import { verifyAccessToken } from "../modules/auth/token.service.js";
 
-const USER_CACHE_TTL_MS = 60 * 1000; // 60s
-
+const USER_CACHE_TTL_MS = 60 * 1000; 
 export const invalidateUserCache = async (userId) => {
   const cache = getCache();
   await cache.del(`user:${userId}`);
@@ -282,20 +282,42 @@ export const ownerOrAdmin = (getResourceOwnerId) => {
 
 export const selfOrAdminByChatOwner = (paramName = "chatId") => {
   return async (req, res, next) => {
-    const chatId = req.params[paramName];
-    const userId = req.user?.userId;
-    const isAdmin = hasPermission(req.user?.permissions, WILDCARD) ||
-      hasPermission(req.user?.permissions, "user.view");
     if (!req.user) {
       return res.status(401).json({ success: false, message: "Unauthorized: User not authenticated" });
     }
-    if (isAdmin) return next();
+
+    const chatId = req.params[paramName];
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
+    const rawOrgId = req.scope?.organizationId || req.user?.organizationId || req.user?.organization_id;
+    const userOrgId = typeof rawOrgId === "object" && rawOrgId?._id ? rawOrgId._id : rawOrgId;
+    const roleName = req.user?.roleName || req.user?.role || (typeof req.user?.role_id === "object" ? req.user?.role_id?.name || req.user?.role_id?.role_name : req.user?.role_id);
+    const normalizedRole = normalizeRoleName(roleName);
+
+    const isStaffOrAdmin = ["super_admin", "admin", "branch_admin", "support"].includes(normalizedRole) ||
+      hasPermission(req.user?.permissions, WILDCARD) ||
+      hasPermission(req.user?.permissions, "user.view");
+
     try {
       const Chat = mongoose.model("Chat");
-      const chat = await Chat.findById(chatId).select("user_id organization_id").lean();
-      if (chat && chat.user_id?.toString() === userId?.toString()) return next();
-      if (chat && chat.organization_id?.toString() !== req.user.organizationId) {
+      const chat = await Chat.findById(chatId).select("user_id customer_id organization_id").lean();
+      if (!chat) {
+        return res.status(404).json({ success: false, message: "Chat session not found" });
+      }
+
+      // 1. Cross-tenant check for non-superadmin
+      if (normalizedRole !== "super_admin" && chat.organization_id && userOrgId && chat.organization_id.toString() !== userOrgId.toString()) {
         return res.status(403).json({ success: false, message: "Forbidden: Cross-tenant access denied" });
+      }
+
+      // 2. Staff and Admins within the organization can view any chat in their org
+      if (isStaffOrAdmin) {
+        return next();
+      }
+
+      // 3. Customers can view their own chat
+      const chatOwnerId = chat.user_id || chat.customer_id;
+      if (chatOwnerId && chatOwnerId.toString() === userId?.toString()) {
+        return next();
       }
     } catch {
       /* fall through */

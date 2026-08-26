@@ -10,6 +10,7 @@ export const useAdminUsers = () => {
     search?: string;
     status?: string;
     branchId?: string;
+    role?: string;
   } | undefined>(undefined);
   const [shouldFetch, setShouldFetch] = useState(false);
 
@@ -57,6 +58,7 @@ export const useAdminUsers = () => {
       search?: string;
       status?: string;
       branchId?: string;
+      role?: string;
     }) => {
       setParams(newParams);
       setShouldFetch(true);

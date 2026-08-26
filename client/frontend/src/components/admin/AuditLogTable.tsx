@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Eye, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { AuditLogEntry } from "@/api/admin.api";
 
 interface Props {
@@ -92,9 +92,8 @@ export default function AuditLogTable({ logs, onViewDetail }: Props) {
           {logs.map((log) => {
             const isExpanded = expandedRows.has(log._id);
             return (
-              <>
+              <Fragment key={log._id}>
                 <tr
-                  key={log._id}
                   className="border-b hover:bg-muted/50 transition-colors cursor-pointer"
                   onClick={() => toggleRow(log._id)}
                 >
@@ -193,7 +192,7 @@ export default function AuditLogTable({ logs, onViewDetail }: Props) {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </tbody>

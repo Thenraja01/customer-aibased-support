@@ -35,12 +35,9 @@ import { getResponseCache, setResponseCache } from "../../services/promptCache.s
 
 const MIN_RAG_SCORE = Number(process.env.LLM_MIN_RAG_SCORE) || 0.35;
 const MAX_CONV_CHARS = Number(process.env.LLM_MAX_CONV_CHARS) || 3000;
-// BUG FIX: FAQ minimum score — was hardcoded 0.3 in prompt.js filter, causing false positives
 const FAQ_MIN_SCORE = Number(process.env.FAQ_MIN_SCORE) || 0.6;
 
 const systemPrompt = process.env.LLM_SYSTEM_PROMPT || SYSTEM_PROMPT;
-
-// ── Rate limiting (Redis-backed for multi-process safety) ─────────────
 
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60 * 1000;
 const RATE_LIMIT_MAX_MESSAGES = 20;
@@ -67,37 +64,46 @@ const checkRateLimit = async (key) => {
         return { allowed: true, remaining };
       }
     }
-    // New window
     const fresh = { windowStart: now, count: 1 };
     await cache.set(redisKey, JSON.stringify(fresh), RATE_LIMIT_WINDOW_MS);
     return { allowed: true, remaining: RATE_LIMIT_MAX_MESSAGES - 1 };
   } catch {
-    // Cache error → allow request (fail open, non-critical)
-    return { allowed: true, remaining: RATE_LIMIT_MAX_MESSAGES };
+       return { allowed: true, remaining: RATE_LIMIT_MAX_MESSAGES };
   }
 };
 
-// ── Intent detection ──────────────────────────────────────────────────
-
 const detectIntent = (text) => {
   const lower = text.toLowerCase().trim();
-  const cleaned = lower.replace(/[^\w\s]/g, "");
+  const words = lower.replace(/[^\w\s]/g, " ").split(/\s+/).filter(Boolean);
+  const wordSet = new Set(words);
 
   if (lower.includes("?")) return "question";
 
+  const greetings = ["hi", "hello", "hey", "good morning", "good evening", "good afternoon", "howdy", "sup"];
   if (
-    ["hi", "hello", "hey", "good morning", "good evening", "good afternoon", "howdy", "sup"].some(
-      (g) => cleaned === g || cleaned.startsWith(g + " ")
-    )
+    greetings.some((g) => {
+      if (g.includes(" ")) return lower.startsWith(g);
+      return wordSet.has(g);
+    })
   ) {
     return "greeting";
   }
 
-  if (["thank you", "thanks", "thx", "ty", "appreciate"].some((t) => cleaned.includes(t))) {
+  const thanksPhrases = ["thank you", "thank u", "appreciate it", "much appreciated", "many thanks"];
+  const thanksWords = ["thanks", "thx", "ty", "appreciate", "kudos"];
+  if (
+    thanksPhrases.some((t) => lower.includes(t)) ||
+    thanksWords.some((t) => wordSet.has(t))
+  ) {
     return "thanks";
   }
 
-  if (["bye", "goodbye", "see you", "see ya", "talk later"].some((b) => cleaned.includes(b))) {
+  const farewellPhrases = ["see you", "see ya", "talk later", "have a good day", "have a nice day"];
+  const farewellWords = ["bye", "goodbye", "cya"];
+  if (
+    farewellPhrases.some((b) => lower.includes(b)) ||
+    farewellWords.some((b) => wordSet.has(b))
+  ) {
     return "farewell";
   }
 
@@ -154,36 +160,60 @@ const formatRAGContext = (documentResults, docTitles, similarityThreshold = MIN_
   if (!documentResults || documentResults.length === 0) return null;
 
   const sorted = [...documentResults].sort((a, b) => b.score - a.score);
-  const bestScore = sorted[0].score;
-  const minScore = Math.max(similarityThreshold, bestScore * 0.6);
+  const bestScore = sorted[0]?.score || 0;
+  const minScore = Math.min(similarityThreshold, Math.max(0.04, bestScore * 0.25));
 
   let relevant = sorted.filter((r) => r.score >= minScore).slice(0, 5);
-  if (relevant.length === 0) relevant = sorted.slice(0, 1);
+  if (relevant.length === 0) relevant = sorted.slice(0, 3);
 
   return relevant
     .map((r) => {
       const docId = r.document_id?.toString();
-      const title = docTitles[docId] || "Untitled";
-      return `[Source: ${title}] ${r.content}`;
+      const title = docTitles[docId] || r.title || r.document_name || "Knowledge Base Document";
+      return `[Source: ${title}]\n${r.content}`;
     })
     .join("\n\n");
 };
 
 /**
  * Build citation list from RAG results for the API response.
- * Returned to the client — not injected into the LLM prompt.
+ * Deduplicates by documentId so customers see clean unique sources.
  */
 const buildCitations = (documentResults, docTitles, similarityThreshold = MIN_RAG_SCORE) => {
   if (!documentResults || documentResults.length === 0) return [];
-  return documentResults
-    .filter((r) => r.score >= similarityThreshold)
-    .slice(0, 5)
-    .map((r) => ({
+  const sorted = [...documentResults].sort((a, b) => b.score - a.score);
+  const bestScore = sorted[0]?.score || 0;
+  
+  // Require reasonable relevance (at least 0.20 or 50% of the best candidate score)
+  const minScore = Math.max(0.18, bestScore * 0.5);
+
+  const seenDocs = new Set();
+  const uniqueCitations = [];
+
+  for (const r of sorted) {
+    if (r.score < minScore && uniqueCitations.length > 0) continue;
+    const docId = r.document_id?.toString() || r.title || r.file_name;
+    if (docId && seenDocs.has(docId)) continue;
+    if (docId) seenDocs.add(docId);
+
+    const docName = docTitles[r.document_id?.toString()] || r.title || r.file_name || "Official Documentation";
+    uniqueCitations.push({
       documentId: r.document_id?.toString(),
-      title: docTitles[r.document_id?.toString()] || "Untitled",
+      documentName: docName,
+      title: docName,
+      chunkId: r._id?.toString(),
+      chunkIndex: r.chunk_index ?? 0,
+      pageNumber: r.page_number || (typeof r.chunk_index === "number" ? r.chunk_index + 1 : 1),
       score: parseFloat((r.score || 0).toFixed(4)),
-      excerpt: (r.content || "").slice(0, 200),
-    }));
+      relevanceScore: parseFloat((r.score || 0).toFixed(4)),
+      excerpt: (r.content || r.text_content || "").slice(0, 300),
+      file_url: `/documents/${r.document_id?.toString()}/view`
+    });
+
+    if (uniqueCitations.length >= 2) break;
+  }
+
+  return uniqueCitations;
 };
 
 const formatMemoryContext = (memoryResults) => {
@@ -231,14 +261,24 @@ const GOLDEN_REPLIES = {
 
 // ── Main AI message processor ─────────────────────────────────────────
 
-export const processAIMessage = async ({
-  chatId,
-  userId,
-  userMessage,
-  organizationId,
-  roleName,
-  roleId,
-}) => {
+export const processAIMessage = async (params = {}) => {
+  const chatId = params.chatId || params.chat_id;
+  const userId = params.userId || params.user_id;
+  const userMessage = params.userMessage || params.content || params.message || params.prompt || "";
+  const organizationId = params.organizationId || params.organization_id;
+  const roleName = params.roleName || params.role_name;
+  const roleId = params.roleId || params.role_id;
+  const reqModel = params.model;
+  const reqProvider = params.provider;
+  const Chat = mongoose.model("Chat");
+  if (chatId) {
+    const chatDoc = await Chat.findById(chatId).lean();
+    if (chatDoc && chatDoc.status === "HUMAN_ACTIVE") {
+      console.log(`[AIChat] Chat ${chatId} is actively handled by a live human agent — skipping AI.`);
+      return { content: "", is_ai: false, is_escalated: true, suppressedAI: true };
+    }
+  }
+
   const intent = detectIntent(userMessage);
 
   let effectiveOrgId = organizationId;
@@ -637,7 +677,8 @@ export const processAIMessage = async ({
   const docTitles = await getDocumentTitles([...docIds]);
 
   const orgSettings = currentOrg?.ai_settings || {};
-  const similarityThreshold = activeConfig?.configuration?.similarity_threshold ?? orgSettings.similarity_threshold ?? MIN_RAG_SCORE;
+  const rawThreshold = activeConfig?.configuration?.similarity_threshold ?? orgSettings.similarity_threshold ?? MIN_RAG_SCORE;
+  const similarityThreshold = Math.min(rawThreshold, 0.20);
 
   // Priority 5: When access is restricted but org HAS docs, never say "use general knowledge"
   let ragCtx;
@@ -696,8 +737,8 @@ export const processAIMessage = async ({
     : fullPrompt;
 
   // ── LLM call ──────────────────────────────────────────────────────
-  const provider = activeConfig ? activeConfig.provider : undefined;
-  const model = activeConfig ? activeConfig.model : undefined;
+  const provider = reqProvider || (activeConfig ? activeConfig.provider : undefined);
+  const model = reqModel || (activeConfig ? activeConfig.model : undefined);
   const configSettings = {
     temperature: activeConfig?.configuration?.temperature ?? orgSettings.temperature ?? 0.7,
     maxTokens: activeConfig?.configuration?.max_tokens ?? orgSettings.max_tokens ?? 2048,
@@ -749,21 +790,11 @@ export const processAIMessage = async ({
     }
   }
 
-  // ── Low-confidence: create support ticket ─────────────────────────
-  if (responseMode.mode === "no_confidence" && effectiveOrgId && effectiveUserId) {
-    ticketService
-      .createTicket(
-         {
-          user_id: effectiveUserId,
-          organization_id: effectiveOrgId,
-          subject: `Low-confidence query: ${userMessage.substring(0, 50)}`,
-          description: `The AI assistant could not confidently answer this query.\n\nQuery: ${userMessage}\n\nAI Response: ${finalResponse}`,
-          category: "question",
-          priority: "medium",
-        },
-        effectiveOrgId
-      )
-      .catch(() => null);
+  // ── Low-confidence: mark escalation recommended (Do NOT auto-create ticket) ───────
+  const isLowConfidence = responseMode.mode === "no_confidence" || confidenceResult.confidence < 0.45;
+  if (isLowConfidence && chatId) {
+    const Chat = mongoose.model("Chat");
+    await Chat.findByIdAndUpdate(chatId, { low_confidence: true }).catch(() => null);
   }
 
   // ── Cache the response ────────────────────────────────────────────
@@ -944,3 +975,66 @@ export const processAIMessage = async ({
     fromCache: false,
   };
 };
+
+/**
+ * Generates a 2-sentence summary of customer conversation history for human agent handoff.
+ */
+export const generateChatSummary = async (chatId) => {
+  if (!chatId) return "Customer requested live support assistance.";
+  try {
+    const messages = await Message.find({ chat_id: chatId }).sort({ created_at: 1 }).limit(10).lean();
+    if (messages.length === 0) return "New live support session initiated.";
+
+    const text = messages.map((m) => `${m.sender_type || (m.is_ai ? "AI" : "User")}: ${m.content}`).join("\n");
+    const prompt = `Summarize the following customer support conversation in exactly 2 concise sentences for the human agent:\n\n${text}\n\nSummary:`;
+    const summary = await generateResponse(prompt, { maxTokens: 150, temperature: 0.3 });
+    return summary?.trim() || "Customer is seeking live agent support regarding their recent inquiry.";
+  } catch {
+    return "Customer requested live support assistance.";
+  }
+};
+
+/**
+ * Generates 3 AI suggested responses based on knowledge base & context for human agents.
+ */
+export const generateSuggestedReplies = async (chatId) => {
+  if (!chatId) return [];
+  try {
+    const lastUserMsg = await Message.findOne({ chat_id: chatId, is_ai: false }).sort({ created_at: -1 }).lean();
+    const query = lastUserMsg?.content || "How can you help me?";
+
+    const ragResults = await ragService.searchWithScope(null, query, "support", { maxChunks: 3 });
+    const context = (ragResults.document_results || []).map((c) => c.text).join("\n\n");
+
+    const prompt = `Based on company context:\n"${context}"\n\nGenerate 3 short, distinct candidate responses for a support agent answering: "${query}".\nFormat as JSON array of 3 strings: ["reply1", "reply2", "reply3"]`;
+    const raw = await generateResponse(prompt, { maxTokens: 300, temperature: 0.5 });
+    
+    const parsed = JSON.parse(raw.substring(raw.indexOf("["), raw.lastIndexOf("]") + 1));
+    return Array.isArray(parsed) ? parsed : [
+      "Thank you for contacting support! I am reviewing your request right now.",
+      "I understand your issue and am happy to assist you with this immediately.",
+      "Let me check our policy details for you right away."
+    ];
+  } catch {
+    return [
+      "Thank you for reaching out! I am checking that for you right now.",
+      "I understand your concern and am here to help resolve this quickly.",
+      "Let me gather the details to resolve your inquiry."
+    ];
+  }
+};
+
+/**
+ * Adjusts tone of support agent reply (Empathetic, Concise, Professional).
+ */
+export const polishReply = async (draftText, tone = "empathetic") => {
+  if (!draftText) return "";
+  try {
+    const prompt = `Rewrite the following support agent message to be strictly ${tone} and professional:\n\n"${draftText}"\n\nPolished Version:`;
+    const polished = await generateResponse(prompt, { maxTokens: 250, temperature: 0.4 });
+    return polished?.trim() || draftText;
+  } catch {
+    return draftText;
+  }
+};
+

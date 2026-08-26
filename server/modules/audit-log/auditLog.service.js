@@ -4,6 +4,19 @@ export const logAction = async (data) => {
   return await AuditLog.create(data);
 };
 
+export const logSecurityViolation = async ({ userId, tenantId, attemptedTenantId, action = "CROSS_TENANT_ACCESS_ATTEMPT", details = "" }) => {
+  return await AuditLog.create({
+    user_id: userId,
+    organization_id: tenantId,
+    action: action,
+    table_name: "SECURITY_EVENT",
+    status: "DENIED",
+    new_values: { attempted_tenant: attemptedTenantId, details },
+  }).catch(() => null);
+};
+
+export const createAuditLog = logAction;
+
 export const getAllLogs = async (query = {}) => {
   return await AuditLog.find(query)
     .populate("user_id", "name email")

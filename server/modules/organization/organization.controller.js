@@ -56,3 +56,12 @@ export const remove = async (req, res) => {
     res.status(status).json({ success: false, message: error.message });
   }
 };
+
+export const removeAll = async (req, res) => {
+  try {
+    const result = await orgService.deleteAllOrganizations();
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

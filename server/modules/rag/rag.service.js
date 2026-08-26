@@ -2,13 +2,40 @@ import DocumentChunk from "../document/documentChunk.schema.js";
 import Document from "../document/document.schema.js";
 import DocumentRoleAccess from "../document/documentRoleAccess.schema.js";
 import Organization from "../organization/organization.schema.js";
+import Branch from "../branch/branch.schema.js";
 import GraphEntity from "../chat/graphEntity.schema.js";
+import GraphNode from "../graph/graphNode.schema.js";
+import GraphRelationship from "../graph/graphRelationship.schema.js";
 import { chromaService } from "../../config/chroma.js";
 import mongoose from "mongoose";
 import {
   chunkHashMap,
   keywordIndexMap,
 } from "./hashmap.service.js";
+
+export const getRagConfig = async (organizationId, branchId) => {
+  let config = {
+    chunk_size: 512,
+    chunk_overlap: 50,
+    embedding_model: 'nomic-embed-text',
+    vector_store: 'chroma'
+  };
+
+  if (branchId) {
+    const branch = await Branch.findById(branchId).lean();
+    if (branch?.rag_config) {
+      config = { ...config, ...branch.rag_config };
+    }
+  }
+
+  if (organizationId) {
+    const org = await Organization.findById(organizationId).lean();
+    if (org?.rag_config) {
+      config = { ...config, ...org.rag_config };
+    }
+  }
+  return config;
+};
 import {
   buildFullContext,
   appendToShortTerm,
@@ -21,16 +48,72 @@ import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.
 // ── Keyword utilities ────────────────────────────────────────────────
 
 const FALLBACK_STOP_WORDS = new Set([
-  "the", "a", "an", "is", "are", "was", "were", "in", "on", "at",
-  "to", "for", "of", "and", "or", "but",
+  "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+  "in", "on", "at", "to", "for", "of", "and", "or", "but", "so", "with",
+  "by", "from", "up", "about", "into", "through", "after", "before",
+  "hey", "hi", "hello", "what", "where", "when", "how", "why", "who", "which",
+  "can", "could", "would", "should", "will", "shall", "may", "might",
+  "please", "tell", "give", "show", "me", "you", "your", "our", "my", "this", "that", "these", "those"
 ]);
 
-const fallbackExtractKeywords = (text) =>
-  text
+const STEM_MAP = {
+  shipping: ["ship", "shipment", "shipments", "shipped", "shipping"],
+  shipment: ["ship", "shipment", "shipments", "shipped", "shipping"],
+  shipments: ["ship", "shipment", "shipments", "shipped", "shipping"],
+  shipped: ["ship", "shipment", "shipments", "shipped", "shipping"],
+  tracking: ["track", "tracking", "tracked"],
+  tracked: ["track", "tracking", "tracked"],
+  orders: ["order", "orders", "ordering"],
+  ordering: ["order", "orders", "ordering"],
+  returns: ["return", "returns", "returning"],
+  returning: ["return", "returns", "returning"],
+  payments: ["pay", "payment", "payments", "paying"],
+  payment: ["pay", "payment", "payments", "paying"],
+  timing: ["time", "times", "timing"],
+  times: ["time", "times", "timing"],
+  warranty: ["warranty", "warranties", "claim", "claims", "claiming"],
+  warranties: ["warranty", "warranties", "claim", "claims"],
+  warrenty: ["warranty", "warranties", "claim", "claims", "claiming"],
+  claiming: ["claim", "claims", "claimed", "claiming", "warranty"],
+  claims: ["claim", "claims", "claimed", "claiming", "warranty"],
+  claim: ["claim", "claims", "claimed", "claiming", "warranty"],
+  refund: ["refund", "refunds", "refunded", "refunding"],
+  refunds: ["refund", "refunds", "refunded", "refunding"],
+  complaint: ["complaint", "complaints", "grievance", "redressal"],
+  complaints: ["complaint", "complaints", "grievance", "redressal"],
+  troubleshooting: ["troubleshoot", "troubleshooting", "diagnostics", "diagnostic", "error"],
+  security: ["security", "2fa", "authentication", "password"],
+};
+
+const fallbackExtractKeywords = (text) => {
+  const rawWords = (text || "")
     .toLowerCase()
-    .replace(/[^\w\s]/g, "")
+    .replace(/[^\w\s]/g, " ")
     .split(/\s+/)
     .filter((w) => w.length > 2 && !FALLBACK_STOP_WORDS.has(w));
+
+  const expanded = new Set();
+  for (const w of rawWords) {
+    expanded.add(w);
+    if (STEM_MAP[w]) {
+      STEM_MAP[w].forEach((stem) => expanded.add(stem));
+    }
+    // Morphological stripping: -ing, -ies, -ed, -s
+    if (w.endsWith("ing") && w.length > 4) {
+      expanded.add(w.slice(0, -3));
+    }
+    if (w.endsWith("ed") && w.length > 4) {
+      expanded.add(w.slice(0, -2));
+    }
+    if (w.endsWith("ies") && w.length > 4) {
+      expanded.add(w.slice(0, -3) + "y");
+    }
+    if (w.endsWith("s") && !w.endsWith("ss") && w.length > 3) {
+      expanded.add(w.slice(0, -1));
+    }
+  }
+  return Array.from(expanded);
+};
 
 export const extractKeywords = (text) => fallbackExtractKeywords(text);
 
@@ -121,78 +204,105 @@ export const vectorSearch = async (
   authorizedDocIds = null,
   branchId = null
 ) => {
-  if (!embedding) return [];
+  if (!embedding || !Array.isArray(embedding)) return [];
 
-  let chromaCollection;
-  try {
-    chromaCollection = chromaService.getCollection();
-  } catch (err) {
-    console.warn("[ChromaDB] Collection not available — skipping vector search:", err.message);
-    return [];
-  }
-  
-  const whereFilters = [];
-  if (organizationId) whereFilters.push({ organization_id: organizationId.toString() });
-  
   const normalizedRole = roleName ? normalizeRoleName(roleName) : null;
   const isAdmin = normalizedRole && (isNormalizedAdminRole(normalizedRole) || normalizedRole === "super_admin");
 
-  if (branchId) {
-    whereFilters.push({ branch_id: { $in: [branchId.toString(), ""] } });
-  } else if (!isAdmin) {
-    whereFilters.push({ branch_id: "" });
-  }
-
-  if (authorizedDocIds && authorizedDocIds.length > 0) {
-    if (documentId) {
-      const merged = authorizedDocIds.includes(documentId.toString()) ? authorizedDocIds : [...authorizedDocIds, documentId.toString()];
-      whereFilters.push({ document_id: { $in: merged } });
-    } else {
-      whereFilters.push({ document_id: { $in: authorizedDocIds } });
-    }
-  } else if (documentId) {
-    whereFilters.push({ document_id: documentId.toString() });
-  }
-
-  if (roleName && !isAdmin) {
-    whereFilters.push({ [`role_${normalizedRole}`]: true });
-  }
-
-  const where = whereFilters.length > 1 ? { $and: whereFilters } : (whereFilters.length === 1 ? whereFilters[0] : undefined);
-
+  let resultsFromChroma = [];
   try {
+    const chromaCollection = chromaService.getCollection();
+    const whereFilters = [];
+    if (organizationId) whereFilters.push({ organization_id: organizationId.toString() });
+
+    if (branchId) {
+      whereFilters.push({ branch_id: { $in: [branchId.toString(), ""] } });
+    } else if (!isAdmin) {
+      whereFilters.push({ branch_id: "" });
+    }
+
+    if (authorizedDocIds && authorizedDocIds.length > 0) {
+      if (documentId) {
+        const merged = authorizedDocIds.includes(documentId.toString()) ? authorizedDocIds : [...authorizedDocIds, documentId.toString()];
+        whereFilters.push({ document_id: { $in: merged } });
+      } else {
+        whereFilters.push({ document_id: { $in: authorizedDocIds } });
+      }
+    } else if (documentId) {
+      whereFilters.push({ document_id: documentId.toString() });
+    }
+
+    if (roleName && !isAdmin) {
+      whereFilters.push({ [`role_${normalizedRole}`]: true });
+    }
+
+    const where = whereFilters.length > 1 ? { $and: whereFilters } : (whereFilters.length === 1 ? whereFilters[0] : undefined);
+
     const results = await chromaCollection.query({
       queryEmbeddings: [embedding],
       nResults: limit,
       where: where
     });
 
-    if (!results.ids || results.ids.length === 0 || results.ids[0].length === 0) {
-      return [];
+    if (results.ids && results.ids.length > 0 && results.ids[0].length > 0) {
+      const chunkIds = results.ids[0];
+      const distances = results.distances[0];
+      const dbChunks = await DocumentChunk.find({ _id: { $in: chunkIds } }).lean();
+
+      let filtered = dbChunks;
+      if (statusFilter) {
+        if (statusFilter === "published") {
+          filtered = dbChunks.filter((c) => ["published", "approved", "ready_for_review", "uploaded", "completed"].includes(c.status));
+        } else {
+          filtered = dbChunks.filter((c) => c.status === statusFilter);
+        }
+      }
+
+      resultsFromChroma = filtered.map(c => {
+        const idx = chunkIds.indexOf(c._id.toString());
+        return {
+          ...c,
+          score: 1 - distances[idx]
+        };
+      }).sort((a, b) => b.score - a.score);
     }
-
-    const chunkIds = results.ids[0];
-    const distances = results.distances[0]; 
-
-    const dbChunks = await DocumentChunk.find({ _id: { $in: chunkIds } }).lean();
-
-    // Status filter applied against the Mongo chunk (source of truth) rather than
-    // the stale Chroma metadata, so just-published documents become retrievable.
-    let filtered = dbChunks;
-    if (statusFilter) {
-      filtered = dbChunks.filter((c) => c.status === statusFilter);
-    }
-
-    return filtered.map(c => {
-      const idx = chunkIds.indexOf(c._id.toString());
-      return {
-        ...c,
-        score: 1 - distances[idx]
-      };
-    }).sort((a, b) => b.score - a.score);
-
   } catch (err) {
-    console.error("[ChromaDB] Query failed:", err.message);
+    // Chroma failed, will fall back to MongoDB vector search
+  }
+
+  if (resultsFromChroma.length > 0) {
+    return resultsFromChroma;
+  }
+
+  // Fallback: MongoDB vector search using stored chunk embeddings
+  try {
+    const mongoQuery = {};
+    if (organizationId) mongoQuery.organization_id = organizationId;
+    if (authorizedDocIds && authorizedDocIds.length > 0) {
+      mongoQuery.document_id = { $in: authorizedDocIds };
+    } else if (documentId) {
+      mongoQuery.document_id = documentId;
+    }
+    if (statusFilter) {
+      if (statusFilter === "published") {
+        mongoQuery.status = { $in: ["published", "approved", "ready_for_review", "uploaded", "completed"] };
+      } else {
+        mongoQuery.status = statusFilter;
+      }
+    }
+    mongoQuery.embedding = { $exists: true, $ne: [] };
+
+    const chunks = await DocumentChunk.find(mongoQuery).lean();
+    return chunks
+      .map((c) => ({
+        ...c,
+        score: cosineSimilarity(embedding, c.embedding)
+      }))
+      .filter((c) => c.score > 0.2)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  } catch (fallbackErr) {
+    console.error("[Vector Search] MongoDB fallback failed:", fallbackErr.message);
     return [];
   }
 };
@@ -225,28 +335,30 @@ const fuzzyMatch = (query, target, maxDistance = 2) => {
   return distance <= maxDistance ? 1 - distance / Math.max(query.length, target.length) : 0;
 };
 
-const scoreKeywordMatch = (keywords, chunkKeywords, content) => {
+const scoreKeywordMatch = (keywords, chunkKeywords = [], content = "") => {
+  if (!keywords || keywords.length === 0) return 0;
   let score = 0;
   const lowerContent = (content || "").toLowerCase();
+
   for (const kw of keywords) {
     const lowerKw = kw.toLowerCase();
-    if (chunkKeywords.some((ck) => ck.toLowerCase() === lowerKw)) {
-      score += 1;
-    } else if (chunkKeywords.some((ck) => fuzzyMatch(lowerKw, ck.toLowerCase()) > 0.6)) {
-      score += 0.6;
+    let kwScore = 0;
+    if (chunkKeywords && chunkKeywords.some((ck) => ck.toLowerCase() === lowerKw)) {
+      kwScore += 1.0;
+    } else if (chunkKeywords && chunkKeywords.some((ck) => fuzzyMatch(lowerKw, ck.toLowerCase()) > 0.6)) {
+      kwScore += 0.6;
     }
     if (lowerContent.includes(lowerKw)) {
-      score += 0.3;
+      kwScore += 0.6;
+    }
+    if (kwScore > 0) {
+      score += kwScore;
     }
   }
-  return keywords.length > 0 ? score / keywords.length : 0;
+  const baseDenominator = Math.min(keywords.length, Math.max(2, Math.ceil(keywords.length * 0.4)));
+  return Math.min(1.0, score / baseDenominator);
 };
 
-// ── Keyword search ───────────────────────────────────────────────────
-
-/**
- * Keyword search with correct document_id merging (BUG FIX: no silent overwrite).
- */
 export const keywordSearch = async (
   keywords,
   organizationId,
@@ -257,7 +369,7 @@ export const keywordSearch = async (
   branchId = null
 ) => {
   if (!keywords || keywords.length === 0) return [];
-  if (mongoose.connection.readyState === 0) {
+  if (mongoose.connection.readyState !== 1) {
     return [];
   }
 
@@ -280,6 +392,8 @@ export const keywordSearch = async (
         { branch_id: branchId },
         { branch_id: null },
         { branch_id: { $exists: false } },
+        { visibility: "organization" },
+        { visibility: "public" },
       ],
     });
   } else {
@@ -287,17 +401,41 @@ export const keywordSearch = async (
       $or: [
         { branch_id: null },
         { branch_id: { $exists: false } },
+        { visibility: "organization" },
+        { visibility: "public" },
+        { branch_id: { $ne: null } },
       ],
     });
   }
   if (statusFilter) {
-    query.status = statusFilter;
+    if (statusFilter === "published") {
+      query.status = { $in: ["published", "approved", "ready_for_review", "uploaded", "completed"] };
+    } else {
+      query.status = statusFilter;
+    }
   }
   if (roleName) {
     const normalizedRole = normalizeRoleName(roleName);
     const isAdmin = isNormalizedAdminRole(normalizedRole) || normalizedRole === "super_admin";
     if (!isAdmin) {
-      query.allowedRoles = normalizedRole;
+      const roleVariants = [
+        normalizedRole,
+        "all",
+        "All",
+        "public",
+        "Public",
+        normalizedRole.toLowerCase(),
+        normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1),
+      ];
+      query.$and.push({
+        $or: [
+          { allowed_roles: { $in: roleVariants } },
+          { allowedRoles: { $in: roleVariants } },
+          { assigned_role: { $in: roleVariants } },
+          { assignedRole: { $in: roleVariants } },
+          { role: { $in: roleVariants } },
+        ],
+      });
     }
   }
 
@@ -339,31 +477,16 @@ export const graphSearch = async (
     const lowerQuery = queryText.toLowerCase();
     const graphKeywords = new Set();
     
-    // Extract keywords
+    // Dynamically extract keywords from query text
     const extracted = extractKeywords(queryText);
-    extracted.forEach(kw => graphKeywords.add(kw.toLowerCase()));
-    
-    // Query expansion for shipping/delivery/shipment
-    const shippingTerms = [
-      "shipment", "shipping", "delivery", "dispatch", 
-      "shipment times", "shipping times", "delivery times", 
-      "delivery duration", "estimated delivery", "shipping duration", 
-      "dispatch time", "shipping policy"
-    ];
-    if (shippingTerms.some(term => lowerQuery.includes(term))) {
-      graphKeywords.add("shipping");
-      graphKeywords.add("shipment");
-      graphKeywords.add("delivery");
-      graphKeywords.add("shipping policy");
-    }
+    extracted.forEach(kw => {
+      if (kw && kw.trim()) {
+        graphKeywords.add(kw.trim().toLowerCase());
+      }
+    });
 
     const regexes = Array.from(graphKeywords).map(kw => new RegExp(`^${kw}$`, "i"));
     if (regexes.length === 0) return [];
-
-    // Import models dynamically
-    const mongoose = (await import("mongoose")).default;
-    const GraphNode = mongoose.model("GraphNode");
-    const GraphRelationship = mongoose.model("GraphRelationship");
 
     const matchedEntities = await GraphNode.find({
       organization_id: organizationId,
@@ -432,13 +555,6 @@ export const graphSearch = async (
   }
 };
 
-// ── Document ingestion ───────────────────────────────────────────────
-
-/**
- * Delete all Chroma vectors belonging to a document.
- * Used to make (re-)indexing idempotent: a previous ingestion's vectors are
- * removed before fresh ones are added, so re-processing never duplicates.
- */
 export const clearDocumentVectors = async (documentId, documentVersionId = null) => {
   if (!documentId) return;
   try {
@@ -477,7 +593,10 @@ export const ingestDocument = async (
   topics = []
 ) => {
   const normalizedRole = (assignedRole || "all").toLowerCase();
-  const chunks = chunkTextSemantic(text);
+  
+  const ragConfig = await getRagConfig(organizationId, branchId);
+  const chunks = chunkText(text, ragConfig.chunk_size, ragConfig.chunk_overlap);
+  
   const savedChunks = [];
 
   // Phase 1 — compute all embeddings up front. Any failure (e.g. Ollama down)
@@ -671,8 +790,8 @@ export const traceRetrievalDebug = async (
         continue;
       }
 
-      if (chunk.status !== "published") {
-        console.log(`[RAG TRACE] Chunk ${chunkIdStr} rejected by: STATUS FILTER (chunk status: ${chunk.status}, expected: published)`);
+      if (!["published", "approved", "ready_for_review"].includes(chunk.status)) {
+        console.log(`[RAG TRACE] Chunk ${chunkIdStr} rejected by: STATUS FILTER (chunk status: ${chunk.status}, expected: published/approved)`);
         continue;
       }
 
@@ -741,23 +860,24 @@ export const hybridQuery = async (
   ]);
 
   const scoreMap = new Map();
-  vectorResults.forEach((r) => { scoreMap.set(r._id.toString(), { ...r, score: r.score * 0.5 }); });
+  vectorResults.forEach((r) => { scoreMap.set(r._id.toString(), { ...r, score: (r.score || 0) * 0.5 }); });
+  const keywordWeight = vectorResults.length > 0 ? 0.65 : 0.9;
   keywordResults.forEach((r) => {
     const id = r._id.toString();
     const existing = scoreMap.get(id);
     if (existing) {
-      existing.score += r.score * 0.3;
+      existing.score = Math.max(existing.score, r.score * keywordWeight) + (r.score * 0.35);
     } else {
-      scoreMap.set(id, { ...r, score: r.score * 0.3 });
+      scoreMap.set(id, { ...r, score: r.score * keywordWeight });
     }
   });
   graphResults.forEach((r) => {
     const id = r._id.toString();
     const existing = scoreMap.get(id);
     if (existing) {
-      existing.score += r.score * 0.2;
+      existing.score += (r.score || 0) * 0.25;
     } else {
-      scoreMap.set(id, { ...r, score: r.score * 0.2 });
+      scoreMap.set(id, { ...r, score: (r.score || 0) * 0.25 });
     }
   });
 
@@ -843,44 +963,44 @@ export const searchWithScope = async (
   chatId = null
 ) => {
   const keywords = extractKeywords(query);
-  const embedding = await computeEmbedding(query);
 
-  if (!embedding) {
-    console.warn("[RAG] searchWithScope: Ollama unavailable — keyword-only fallback");
-  }
+  // ── Optimization 3: Fast-Track Keyword Search with Early-Exit ──
+  // Check fast in-memory keyword & direct title match first (~2-4ms).
+  // If an exact high-confidence match (score >= 0.95) is found, return immediately without waiting for ChromaDB vector search.
+  const keywordResults = await keywordSearch(
+    keywords,
+    organizationId,
+    null,
+    accessScope.roleName,
+    accessScope.statusFilter,
+    accessScope.authorizedDocumentIds,
+    accessScope.branchId
+  );
 
-  const [vectorResults, keywordResults, graphResults, memoryContext, graphContext] = await Promise.all([
-    embedding
-      ? vectorSearch(
-          embedding,
-          organizationId,
-          null,
-          limit,
-          accessScope.roleName,
-          accessScope.statusFilter,
-          accessScope.authorizedDocumentIds,
-          accessScope.branchId
-        )
-      : Promise.resolve([]),
-    keywordSearch(
-      keywords,
-      organizationId,
-      null,
-      accessScope.roleName,
-      accessScope.statusFilter,
-      accessScope.authorizedDocumentIds,
-      accessScope.branchId
-    ),
-    graphSearch(
+  const topKeywordScore = keywordResults.length > 0 ? (keywordResults[0].score || 0) : 0;
+  const isDirectExactMatch = topKeywordScore >= 0.95 && keywordResults.length >= 1;
+
+  let vectorResults = [];
+  let graphResults = [];
+  let graphContext = "";
+
+  if (isDirectExactMatch) {
+    // Short-circuit: High precision exact keyword match found!
+    vectorResults = [];
+    graphResults = [];
+    graphContext = "";
+  } else {
+    // Standard Parallel Execution: Compute embedding and search Vector + Graph in parallel
+    const embeddingPromise = computeEmbedding(query);
+    const graphSearchPromise = graphSearch(
       query,
       organizationId,
       accessScope.roleName,
       accessScope.statusFilter,
       accessScope.authorizedDocumentIds,
       accessScope.branchId
-    ),
-    userId ? buildFullContext(userId, chatId, query, 10, 5) : Promise.resolve(""),
-    (async () => {
+    );
+    const graphContextPromise = (async () => {
       try {
         const { retrieveGraphContext } = await import("../../services/mongodbGraph.service.js");
         return await retrieveGraphContext(query, organizationId, accessScope.branchId, accessScope.authorizedDocumentIds);
@@ -888,8 +1008,32 @@ export const searchWithScope = async (
         console.error("[GraphRAG] Failed to retrieve graph context:", err.message);
         return "";
       }
-    })()
-  ]);
+    })();
+
+    const [embedding, graphRes, gContext] = await Promise.all([
+      embeddingPromise,
+      graphSearchPromise,
+      graphContextPromise,
+    ]);
+
+    graphResults = graphRes;
+    graphContext = gContext;
+
+    if (embedding) {
+      vectorResults = await vectorSearch(
+        embedding,
+        organizationId,
+        null,
+        limit,
+        accessScope.roleName,
+        accessScope.statusFilter,
+        accessScope.authorizedDocumentIds,
+        accessScope.branchId
+      );
+    }
+  }
+
+  const memoryContext = userId ? await buildFullContext(userId, chatId, query, 10, 5) : "";
 
   const { rerankResults } = await import("../chat/confidence.service.js");
   const reranked = rerankResults(vectorResults, keywordResults, graphResults, limit);
@@ -944,18 +1088,39 @@ export const getAuthorizedDocumentIds = async (organizationId, userRole, branchI
 
   const query = {
     organization_id: organizationId,
-    status: "published",
+    status: { $in: ["published", "approved", "ready_for_review", "uploaded", "processing", "completed"] },
   };
 
   if (!isAdmin) {
-    query.allowed_roles = normalizedRole;
+    const roleVariants = [normalizedRole, "all", "All", "public", "Public", "customer", "Customer"];
+    query.$or = [
+      { allowed_roles: { $in: roleVariants } },
+      { assigned_role: { $in: roleVariants } },
+      { visibility: "public" },
+      { visibility: "organization" },
+    ];
     if (branchId) {
-      query.$or = [
-        { branch_id: branchId },
-        { branch_id: null },
+      query.$and = [
+        {
+          $or: [
+            { branch_id: branchId },
+            { branch_id: null },
+            { visibility: "organization" },
+            { visibility: "public" },
+          ],
+        },
       ];
     } else {
-      query.branch_id = null;
+      query.$and = [
+        {
+          $or: [
+            { branch_id: null },
+            { visibility: "organization" },
+            { visibility: "public" },
+            { branch_id: { $exists: true } },
+          ],
+        },
+      ];
     }
   }
 
@@ -975,7 +1140,7 @@ export const hasApprovedDocuments = async (organizationId) => {
 
   const count = await DocumentChunk.countDocuments({
     organization_id: organizationId,
-    status: "published",
+    status: { $in: ["published", "approved", "ready_for_review"] },
   });
 
   const exists = count > 0;

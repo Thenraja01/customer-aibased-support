@@ -87,6 +87,19 @@ export default function OrganizationDetailsPage() {
           similarity_threshold: org.ai_settings?.similarity_threshold ?? 0.75,
           max_tokens: org.ai_settings?.max_tokens ?? 2048,
           response_style: org.ai_settings?.response_style || "balanced",
+          // LLM Config
+          provider: org.llm_config?.provider || "ollama",
+          model_name: org.llm_config?.model_name || "llama3.2:3b",
+          gemini_api_key: org.llm_config?.gemini_api_key || "",
+          groq_api_key: org.llm_config?.groq_api_key || "",
+          openai_api_key: org.llm_config?.openai_api_key || "",
+          // RAG Config
+          chunk_size: org.rag_config?.chunk_size ?? 500,
+          chunk_overlap: org.rag_config?.chunk_overlap ?? 100,
+          bfs_max_depth: org.rag_config?.bfs_max_depth ?? 2,
+          bfs_max_nodes: org.rag_config?.bfs_max_nodes ?? 30,
+          rag_top_k: org.rag_config?.top_k ?? 5,
+          query_cache_ttl_ms: org.rag_config?.query_cache_ttl_ms ?? 600000,
         });
 
         setChatbotForm({
@@ -208,8 +221,6 @@ export default function OrganizationDetailsPage() {
         {[
           { id: "general", label: "General Info", icon: Building2 },
           { id: "branding", label: "Branding", icon: Image },
-          { id: "subscription", label: "Subscription", icon: Shield },
-          { id: "storage", label: "Storage", icon: HardDrive },
           { id: "ai_config", label: "AI Config", icon: Bot },
           { id: "chatbot", label: "Chatbot", icon: MessageSquare },
           { id: "working_hours", label: "Working Hours", icon: Clock },
@@ -418,66 +429,200 @@ export default function OrganizationDetailsPage() {
         </div>
       )}
 
-      {/* Tab 5: AI Configuration */}
+      {/* Tab: AI Configuration */}
       {activeTab === "ai_config" && (
         <div className="rounded-lg border bg-card p-5 sm:p-6 space-y-6">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <Bot className="text-primary" size={18} /> AI Configuration
+            <Bot className="text-primary" size={18} /> AI & RAG Configuration
           </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Custom System Prompt</label>
-              <Textarea
-                value={aiForm.customPrompt}
-                onChange={(e) => setAiForm({ ...aiForm, customPrompt: e.target.value })}
-                rows={4}
-                placeholder="Enter custom instructions for RAG LLM response generation..."
-                className="mt-1"
-              />
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-6">
+            {/* System Prompt & Basic Parameters */}
+            <div className="space-y-4 border-b pb-6 dark:border-white/[0.06]">
+              <h3 className="text-sm font-bold text-foreground">General Prompt Settings</h3>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Temperature ({aiForm.temperature})</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1.5"
-                  step="0.05"
-                  value={aiForm.temperature}
-                  onChange={(e) => setAiForm({ ...aiForm, temperature: parseFloat(e.target.value) })}
-                  className="w-full mt-2"
+                <label className="text-xs font-semibold text-muted-foreground uppercase">Custom System Prompt</label>
+                <Textarea
+                  value={aiForm.customPrompt}
+                  onChange={(e) => setAiForm({ ...aiForm, customPrompt: e.target.value })}
+                  rows={3}
+                  placeholder="Enter custom instructions for RAG LLM response generation..."
+                  className="mt-1"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Similarity Threshold ({aiForm.similarity_threshold})</label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="0.95"
-                  step="0.01"
-                  value={aiForm.similarity_threshold}
-                  onChange={(e) => setAiForm({ ...aiForm, similarity_threshold: parseFloat(e.target.value) })}
-                  className="w-full mt-2"
-                />
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Temperature ({aiForm.temperature})</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.05"
+                    value={aiForm.temperature}
+                    onChange={(e) => setAiForm({ ...aiForm, temperature: parseFloat(e.target.value) })}
+                    className="w-full mt-2"
+                  />
+                </div>
 
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Response Style</label>
-                <select
-                  value={aiForm.response_style}
-                  onChange={(e) => setAiForm({ ...aiForm, response_style: e.target.value })}
-                  className="w-full mt-1 p-2 rounded-lg border bg-background text-sm"
-                >
-                  <option value="concise">Concise</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="detailed">Detailed</option>
-                </select>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Similarity Threshold ({aiForm.similarity_threshold})</label>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="0.95"
+                    step="0.01"
+                    value={aiForm.similarity_threshold}
+                    onChange={(e) => setAiForm({ ...aiForm, similarity_threshold: parseFloat(e.target.value) })}
+                    className="w-full mt-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Response Style</label>
+                  <select
+                    value={aiForm.response_style}
+                    onChange={(e) => setAiForm({ ...aiForm, response_style: e.target.value })}
+                    className="w-full mt-1 p-2 rounded-lg border bg-background text-sm"
+                  >
+                    <option value="concise">Concise</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="detailed">Detailed</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end">
+            {/* LLM Provider Integration Section */}
+            <div className="space-y-4 border-b pb-6 dark:border-white/[0.06]">
+              <h3 className="text-sm font-bold text-foreground">LLM Model & Provider Integration</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">AI Provider</label>
+                  <select
+                    value={aiForm.provider}
+                    onChange={(e) => setAiForm({ ...aiForm, provider: e.target.value })}
+                    className="w-full mt-1 p-2 rounded-lg border bg-background text-sm font-medium"
+                  >
+                    <option value="ollama">Ollama (Local / Open Source)</option>
+                    <option value="gemini">Google Gemini AI</option>
+                    <option value="groq">Groq Cloud (Qwen/Llama)</option>
+                    <option value="openai">OpenAI (GPT-4 / GPT-3.5)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Model Name</label>
+                  <Input
+                    value={aiForm.model_name}
+                    onChange={(e) => setAiForm({ ...aiForm, model_name: e.target.value })}
+                    placeholder="e.g. llama3.2:3b, gemini-1.5-flash, qwen/qwen3.6-27b"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Gemini API Key</label>
+                  <Input
+                    type="password"
+                    value={aiForm.gemini_api_key}
+                    onChange={(e) => setAiForm({ ...aiForm, gemini_api_key: e.target.value })}
+                    placeholder="AIzaSy..."
+                    className="mt-1 font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Groq API Key</label>
+                  <Input
+                    type="password"
+                    value={aiForm.groq_api_key}
+                    onChange={(e) => setAiForm({ ...aiForm, groq_api_key: e.target.value })}
+                    placeholder="gsk_..."
+                    className="mt-1 font-mono text-xs"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">OpenAI API Key</label>
+                  <Input
+                    type="password"
+                    value={aiForm.openai_api_key}
+                    onChange={(e) => setAiForm({ ...aiForm, openai_api_key: e.target.value })}
+                    placeholder="sk-..."
+                    className="mt-1 font-mono text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* RAG Chunk & Retrieval Tuning Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-foreground">RAG Chunking & Vector Retrieval Settings</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Chunk Size (chars)</label>
+                  <Input
+                    type="number"
+                    value={aiForm.chunk_size}
+                    onChange={(e) => setAiForm({ ...aiForm, chunk_size: parseInt(e.target.value) || 500 })}
+                    className="mt-1 font-mono text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Chunk Overlap (chars)</label>
+                  <Input
+                    type="number"
+                    value={aiForm.chunk_overlap}
+                    onChange={(e) => setAiForm({ ...aiForm, chunk_overlap: parseInt(e.target.value) || 100 })}
+                    className="mt-1 font-mono text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Top-K Chunks Returned</label>
+                  <Input
+                    type="number"
+                    value={aiForm.rag_top_k}
+                    onChange={(e) => setAiForm({ ...aiForm, rag_top_k: parseInt(e.target.value) || 5 })}
+                    className="mt-1 font-mono text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Graph BFS Max Depth</label>
+                  <Input
+                    type="number"
+                    value={aiForm.bfs_max_depth}
+                    onChange={(e) => setAiForm({ ...aiForm, bfs_max_depth: parseInt(e.target.value) || 2 })}
+                    className="mt-1 font-mono text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Graph BFS Max Nodes</label>
+                  <Input
+                    type="number"
+                    value={aiForm.bfs_max_nodes}
+                    onChange={(e) => setAiForm({ ...aiForm, bfs_max_nodes: parseInt(e.target.value) || 30 })}
+                    className="mt-1 font-mono text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Query Cache TTL (ms)</label>
+                  <Input
+                    type="number"
+                    value={aiForm.query_cache_ttl_ms}
+                    onChange={(e) => setAiForm({ ...aiForm, query_cache_ttl_ms: parseInt(e.target.value) || 600000 })}
+                    className="mt-1 font-mono text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4">
               <Button
                 onClick={() =>
                   handleSaveSettings({
@@ -489,11 +634,26 @@ export default function OrganizationDetailsPage() {
                       max_tokens: aiForm.max_tokens,
                       response_style: aiForm.response_style,
                     },
+                    llm_config: {
+                      provider: aiForm.provider,
+                      model_name: aiForm.model_name,
+                      gemini_api_key: aiForm.gemini_api_key,
+                      groq_api_key: aiForm.groq_api_key,
+                      openai_api_key: aiForm.openai_api_key,
+                    },
+                    rag_config: {
+                      chunk_size: aiForm.chunk_size,
+                      chunk_overlap: aiForm.chunk_overlap,
+                      bfs_max_depth: aiForm.bfs_max_depth,
+                      bfs_max_nodes: aiForm.bfs_max_nodes,
+                      top_k: aiForm.rag_top_k,
+                      query_cache_ttl_ms: aiForm.query_cache_ttl_ms,
+                    },
                   })
                 }
                 disabled={saving}
               >
-                <Save size={14} className="mr-1.5" /> Save AI Configuration
+                <Save size={14} className="mr-1.5" /> Save AI & RAG Configuration
               </Button>
             </div>
           </div>

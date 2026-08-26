@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import { FileText, Search, Download } from "lucide-react";
+import { FileText, Search, Eye } from "lucide-react";
 import { DocumentAPI } from "@/api";
+import DocumentViewer from "@/components/ui/DocumentViewer";
 
 export default function SupportDocumentsPage() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [viewingDoc, setViewingDoc] = useState<any>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -33,13 +36,9 @@ export default function SupportDocumentsPage() {
     }
   };
 
-  const handleDownload = async (docId: string) => {
-    try {
-      const url = await DocumentAPI.resolveDocumentUrl(docId);
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      console.error("Failed to resolve document URL:", err);
-    }
+  const handleOpenDocument = (doc: any) => {
+    setViewingDoc(doc);
+    setIsViewerOpen(true);
   };
 
   return (
@@ -104,15 +103,27 @@ export default function SupportDocumentsPage() {
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => handleDownload(doc._id)}
+                  onClick={() => handleOpenDocument(doc)}
                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                 >
-                  <Download size={12} /> Download
+                  <Eye size={12} /> View File
                 </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {viewingDoc && (
+        <DocumentViewer
+          title={viewingDoc.title}
+          fileUrl={viewingDoc.file_url}
+          isOpen={isViewerOpen}
+          onClose={() => {
+            setViewingDoc(null);
+            setIsViewerOpen(false);
+          }}
+        />
       )}
     </div>
   );

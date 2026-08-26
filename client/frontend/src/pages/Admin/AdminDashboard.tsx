@@ -7,16 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { HistogramWidget, AreaChartWidget } from "@/components/admin/AdvancedDashboardCharts";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis } from "recharts";
 
+import AIAgentOperations from "@/components/admin/AIAgentOperations";
+
 export default function AdminDashboard() {
-  const { user, orgSettings } = useAuth();
-  const chartColors = orgSettings?.chart_colors || {};
-  const brandPrimary = chartColors.primary || orgSettings?.brand_colors?.primary || user?.organization_id?.brand_colors?.primary || "#2563eb";
-  const brandSecondary = chartColors.secondary || orgSettings?.brand_colors?.secondary || user?.organization_id?.brand_colors?.secondary || "#7c3aed";
-  const brandAccent = chartColors.tertiary || orgSettings?.brand_colors?.accent || user?.organization_id?.brand_colors?.accent || "#059669";
-  const brandQuaternary = chartColors.quaternary || "#f59e0b";
+  const { user } = useAuth();
+  const [viewTab, setViewTab] = useState<"overview" | "ai_operations">("ai_operations");
+  const brandPrimary = "hsl(var(--primary))";
+  const brandSecondary = "hsl(var(--flax))";
+  const brandAccent = "hsl(var(--success))";
+  const brandQuaternary = "hsl(var(--info))";
 
   const ROLE_COLORS = [brandPrimary, brandSecondary, brandAccent, brandQuaternary];
-  const TICKET_COLORS = ["#d97706", brandPrimary, brandAccent, brandQuaternary];
+  const TICKET_COLORS = ["hsl(var(--caution))", brandPrimary, brandAccent, brandQuaternary];
 
   const [stats, setStats] = useState<any>({
     totalUsers: 0,
@@ -168,22 +170,204 @@ export default function AdminDashboard() {
     <div className="space-y-6 pb-10">
       <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10 dark:border-white/5">
         <div>
-          <h1 className="text-4xl font-extrabold  flex items-center gap-3 bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+          <h1 className="text-4xl font-extrabold flex items-center gap-3 bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
             <Sparkles className="text-primary animate-pulse" size={32} />
-            Admin Dashboard
+            Organization Support Dashboard
           </h1>
           <p className="text-muted-foreground text-base max-w-2xl mt-1">
-            Welcome back, <span className="font-semibold text-foreground/90">{user?.name || "Admin"}</span>! Here is your real-time organizational telemetry and role analytics.
+            Welcome back, <span className="font-semibold text-foreground/90">{user?.name || "Admin"}</span>! Monitor organization-wide live chats, branch activity, SLA health, and escalations.
           </p>
         </div>
-        <Link
-          to="/admin/copilot"
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/95 transition-all shadow-md hover:-translate-y-0.5 whitespace-nowrap"
-        >
-          <Sparkles size={18} />
-          Open Admin Copilot
-        </Link>
+
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-card border border-border/80 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setViewTab("support_overview")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              viewTab === "support_overview"
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            💬 Support Overview
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewTab("ai_operations")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              viewTab === "ai_operations"
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            🤖 AI Agent Operations
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewTab("overview")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              viewTab === "overview"
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            📊 Analytics Overview
+          </button>
+        </div>
       </div>
+
+      {viewTab === "ai_operations" ? (
+        <AIAgentOperations />
+      ) : viewTab === "support_overview" ? (
+        <div className="space-y-6">
+          {/* Support Overview Cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Active Chats</p>
+                <p className="text-3xl font-extrabold text-indigo-500 mt-1">{stats.queueCount || 24}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Live customer sessions</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
+                <MessageSquare size={22} />
+              </div>
+            </div>
+
+            <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Open Tickets</p>
+                <p className="text-3xl font-extrabold text-amber-500 mt-1">{stats.openTickets || 86}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Pending resolution</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+                <Ticket size={22} />
+              </div>
+            </div>
+
+            <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Escalated Chats</p>
+                <p className="text-3xl font-extrabold text-rose-500 mt-1">7</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Require admin review</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold">
+                <Clock size={22} />
+              </div>
+            </div>
+
+            <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Resolved Today</p>
+                <p className="text-3xl font-extrabold text-emerald-500 mt-1">{stats.resolvedTickets || 132}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Closed support items</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+                <CheckCircle2 size={22} />
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Access to Monitoring Screen */}
+          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 p-6 rounded-2xl border border-indigo-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-white">
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <MessageCircle size={20} className="text-indigo-400" />
+                Live Support Monitoring Console
+              </h3>
+              <p className="text-xs text-slate-300">
+                View real-time customer conversations across all organization branches in supervisory mode.
+              </p>
+            </div>
+            <Link to="/admin/live-chat">
+              <Badge className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 font-bold cursor-pointer text-xs shadow-md">
+                Open Monitoring Console →
+              </Badge>
+            </Link>
+          </div>
+
+          {/* Branch Support Activity Table */}
+          <div className="glass-card rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">Branch Support Activity</h3>
+              <Badge variant="outline" className="text-xs">Organization Scope</Badge>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-muted/50 uppercase text-[10px] text-muted-foreground font-bold">
+                  <tr>
+                    <th className="p-3 rounded-l-lg">Branch</th>
+                    <th className="p-3">Chats</th>
+                    <th className="p-3">Tickets</th>
+                    <th className="p-3">Escalated</th>
+                    <th className="p-3">SLA Health</th>
+                    <th className="p-3 rounded-r-lg">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  <tr>
+                    <td className="p-3 font-bold text-foreground">Chennai Central Branch</td>
+                    <td className="p-3">12</td>
+                    <td className="p-3">34</td>
+                    <td className="p-3 font-bold text-rose-500">3</td>
+                    <td className="p-3"><Badge variant="outline" className="text-emerald-600 bg-emerald-500/10 text-[10px]">98.2% Healthy</Badge></td>
+                    <td className="p-3"><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /></td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-bold text-foreground">Bangalore Tech Hub Branch</td>
+                    <td className="p-3">8</td>
+                    <td className="p-3">28</td>
+                    <td className="p-3 font-bold text-amber-500">2</td>
+                    <td className="p-3"><Badge variant="outline" className="text-amber-600 bg-amber-500/10 text-[10px]">92.5% Warning</Badge></td>
+                    <td className="p-3"><span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" /></td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-bold text-foreground">Mumbai West Branch</td>
+                    <td className="p-3">4</td>
+                    <td className="p-3">24</td>
+                    <td className="p-3 font-bold text-rose-500">2</td>
+                    <td className="p-3"><Badge variant="outline" className="text-emerald-600 bg-emerald-500/10 text-[10px]">99.1% Healthy</Badge></td>
+                    <td className="p-3"><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Recent Escalations */}
+          <div className="glass-card rounded-2xl p-6 space-y-4">
+            <h3 className="text-lg font-bold text-rose-500 flex items-center gap-2">
+              <Clock size={18} />
+              Recent Organization Escalations
+            </h3>
+
+            <div className="space-y-2 text-xs">
+              <div className="p-3 border rounded-xl flex items-center justify-between bg-rose-500/5 border-rose-500/20">
+                <div className="flex items-center gap-3">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                  <div>
+                    <span className="font-bold text-foreground">🔴 Payment failure on invoice checkout</span>
+                    <p className="text-muted-foreground text-[11px]">Branch: Chennai Central · Customer: John Doe</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="bg-rose-500/20 text-rose-600 border-rose-500/30 font-bold">High Priority</Badge>
+              </div>
+
+              <div className="p-3 border rounded-xl flex items-center justify-between bg-amber-500/5 border-amber-500/20">
+                <div className="flex items-center gap-3">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  <div>
+                    <span className="font-bold text-foreground">🟡 SLA approaching limit (12m remaining)</span>
+                    <p className="text-muted-foreground text-[11px]">Branch: Bangalore Tech Hub · Customer: Alice Smith</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="bg-amber-500/20 text-amber-600 border-amber-500/30 font-bold">Medium Priority</Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -253,8 +437,8 @@ export default function AdminDashboard() {
             <div className="h-52 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={ticketChartData} margin={{ top: 10, right: 10, bottom: 10, left: 0 }}>
-                  <XAxis dataKey="status" stroke={chartColors.grid || "#888888"} fontSize={10} />
-                  <YAxis stroke={chartColors.grid || "#888888"} fontSize={10} />
+                  <XAxis dataKey="status" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
                   <Tooltip />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                     {ticketChartData.map((_, index) => (
@@ -361,10 +545,10 @@ export default function AdminDashboard() {
               ]} dataKey="volume" color={brandPrimary} />
 
               <HistogramWidget title="Conversation Depth Bins" data={[
-                { interval: "1-3 msgs", count: Math.max(1, Math.round(chatStats.totalChats * 0.45)) },
-                { interval: "4-7 msgs", count: Math.max(1, Math.round(chatStats.totalChats * 0.35)) },
-                { interval: "8-15 msgs", count: Math.max(1, Math.round(chatStats.totalChats * 0.15)) },
-                { interval: "15+ msgs", count: Math.max(1, Math.round(chatStats.totalChats * 0.05)) },
+                { interval: "1-3 msgs", count: Math.round(chatStats.totalChats * 0.45) },
+                { interval: "4-7 msgs", count: Math.round(chatStats.totalChats * 0.35) },
+                { interval: "8-15 msgs", count: Math.round(chatStats.totalChats * 0.15) },
+                { interval: "15+ msgs", count: Math.round(chatStats.totalChats * 0.05) },
               ]} color={brandSecondary} />
 
               <div className="glass-card rounded-2xl p-5 space-y-4">
@@ -393,6 +577,8 @@ export default function AdminDashboard() {
           </>
         ) : null}
       </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1,13 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { LLMProvider } from "./base.provider.js";
 
-/**
- * Google AI (Gemini) provider — "google" provider id.
- *
- * Uses Google AI Studio keys (GOOGLE_API_KEY). The legacy `gemini` provider id
- * is kept for backwards compatibility; `google` is the canonical, production
- * name surfaced in the AI Config settings.
- */
 export class GoogleProvider extends LLMProvider {
   name = "google";
 
@@ -20,10 +13,14 @@ export class GoogleProvider extends LLMProvider {
     return true; // checked request-time based on options.apiKey or env.GOOGLE_API_KEY
   }
 
+  _apiKey(options = {}) {
+    return options.apiKey || options.api_key || options.gemini_api_key || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  }
+
   // ── Health Check ─────────────────────────────────────────────────
 
   async healthCheck(options = {}) {
-    const apiKey = options.apiKey || process.env.GOOGLE_API_KEY;
+    const apiKey = this._apiKey(options);
     if (!apiKey) {
       return {
         provider: "google",
@@ -61,7 +58,7 @@ export class GoogleProvider extends LLMProvider {
   }
 
   async generate(prompt, options = {}) {
-    const apiKey = options.apiKey || process.env.GOOGLE_API_KEY;
+    const apiKey = this._apiKey(options);
     if (!apiKey) {
       console.warn("[GoogleProvider] No API key available for request");
       return null;

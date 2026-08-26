@@ -7,6 +7,8 @@ import { GrokProvider } from "./providers/grok.provider.js";
 import { ClaudeProvider } from "./providers/claude.provider.js";
 import { FallbackProvider } from "./providers/fallback.provider.js";
 import { checkOutputGuardrails } from "../chat/guardrails.service.js";
+import Organization from "../organization/organization.schema.js";
+import Branch from "../branch/branch.schema.js";
 
 const providers = [
   new OllamaProvider(),
@@ -18,7 +20,7 @@ const providers = [
   new FallbackProvider(),
 ];
 
-const preferredName = (env.LLM_PROVIDER || "ollama").toLowerCase();
+let preferredName = (env.LLM_PROVIDER || "ollama").toLowerCase();
 
 // ── Thinking-tag cleanup (BUG FIX: correct regex) ────────────────────
 // Removes <thinking>...</thinking> blocks that some models output before their answer.
@@ -35,12 +37,35 @@ const cleanResponse = (text) => {
 // ── LLM generation with provider fallback chain ───────────────────────
 
 export const generateResponse = async (prompt, userMessage, options = {}) => {
-  const { organizationId, temperature, maxTokens, provider: customProvider } = options;
+  const { organizationId, branchId, temperature, maxTokens, provider: customProvider } = options;
 
-  const activeProvider = (customProvider || preferredName).toLowerCase();
+  let dbConfig = null;
+  if (branchId) {
+    const branch = await Branch.findById(branchId).lean();
+    if (branch?.llm_config?.provider) {
+      dbConfig = branch.llm_config;
+    }
+  }
+  if (!dbConfig && organizationId) {
+    const org = await Organization.findById(organizationId).lean();
+    if (org?.llm_config?.provider) {
+      dbConfig = org.llm_config;
+    }
+  }
+
+  const rawProv = customProvider || dbConfig?.provider || preferredName || "ollama";
+  const activeProvider = (typeof rawProv === "string" ? rawProv : String(rawProv)).toLowerCase();
+  
+  // Create an options object with the DB config if present
+  const mergedOptions = { 
+    ...dbConfig,
+    ...options, 
+    apiKey: options.apiKey || dbConfig?.api_key,
+    model: options.model || dbConfig?.model,
+  };
 
   const preferred = providers.find(
-    (p) => p.name === activeProvider && p.isAvailable?.() !== false
+    (p) => p.name === activeProvider && p.isAvailable?.(mergedOptions) !== false
   );
   const others = providers.filter((p) => p !== preferred && p.name !== "fallback");
   const fallback = providers.find((p) => p.name === "fallback");
@@ -64,7 +89,7 @@ export const generateResponse = async (prompt, userMessage, options = {}) => {
 
     try {
       const providerStart = Date.now();
-      const result = await provider.generate(prompt, { ...options, userMessage });
+      const result = await provider.generate(prompt, { ...mergedOptions, userMessage });
       const elapsed = Date.now() - providerStart;
       const preview = result == null
         ? "NULL"
@@ -78,6 +103,18 @@ export const generateResponse = async (prompt, userMessage, options = {}) => {
       }
     } catch (err) {
       console.error(`[LLM] Provider "${provider.name}" threw:`, err.message);
+      try {
+        const { notifyAdminsOnSystemError } = await import("../notification/notification.service.js");
+        await notifyAdminsOnSystemError({
+          organizationId: organizationId || null,
+          title: `LLM Provider Alert (${provider.name})`,
+          message: `Provider "${provider.name}" encountered an error: ${err.message}. System safely failed over.`,
+          type: "warning",
+          link: "/admin/ai-intelligence",
+        });
+      } catch {
+        // notification fallback
+      }
     }
   }
 
@@ -86,8 +123,26 @@ export const generateResponse = async (prompt, userMessage, options = {}) => {
   );
 
   if (!rawResponse || rawResponse.trim().length === 0) {
+    try {
+      const { notifyAdminsOnSystemError } = await import("../notification/notification.service.js");
+      await notifyAdminsOnSystemError({
+        organizationId: organizationId || null,
+        title: "All LLM Providers Unavailable",
+        message: "All configured LLM models failed to generate content. Activated rule-based FallbackProvider.",
+        type: "error",
+        link: "/admin/ai-intelligence",
+      });
+    } catch {
+      // notification fallback
+    }
+
+    const fallbackProv = providers.find((p) => p.name === "fallback");
+    let fallbackText = null;
+    if (fallbackProv) {
+      fallbackText = await fallbackProv.generate(prompt, { ...mergedOptions, userMessage }).catch(() => null);
+    }
     return {
-      text: "I'm sorry, I'm having trouble processing your request right now. Please try again later.",
+      text: fallbackText || "I'm sorry, I'm having trouble processing your request right now. Please try again later.",
       provider: "fallback",
     };
   }
@@ -120,7 +175,13 @@ export const generateResponse = async (prompt, userMessage, options = {}) => {
 
 // ── Health Check Exports ─────────────────────────────────────────────────
 
-export const getActiveProvider = () => {
+export const setActiveProvider = (name) => {
+  if (name && typeof name === "string") {
+    preferredName = name.toLowerCase();
+  }
+};
+
+export const getActiveProvider = (organizationId) => {
   return preferredName;
 };
 
@@ -132,13 +193,28 @@ export const getActiveModel = () => {
   return provider?.modelName || env.LLM_MODEL || "llama3.2:3b";
 };
 
-export const healthCheck = async () => {
+export const healthCheck = async (options = {}) => {
   const results = await Promise.all(
     providers
       .filter((p) => p.name !== "fallback")
       .map(async (p) => {
         if (typeof p.healthCheck === "function") {
-          return await p.healthCheck();
+          const pOptions = { ...options };
+          if (p.name === "groq") {
+            pOptions.apiKey = options.groq_api_key || (options.provider === "groq" ? (options.apiKey || options.api_key) : undefined);
+          } else if (p.name === "gemini" || p.name === "google") {
+            pOptions.apiKey = options.gemini_api_key || (options.provider === p.name ? (options.apiKey || options.api_key) : undefined);
+          } else if (p.name === "grok") {
+            pOptions.apiKey = options.grok_api_key || (options.provider === "grok" ? (options.apiKey || options.api_key) : undefined);
+          } else if (p.name === "claude") {
+            pOptions.apiKey = options.claude_api_key || (options.provider === "claude" ? (options.apiKey || options.api_key) : undefined);
+          } else if (options.provider === p.name) {
+            pOptions.apiKey = options.apiKey || options.api_key;
+          }
+          if (options.provider === p.name && (options.model || options.model_name)) {
+            pOptions.model = options.model || options.model_name;
+          }
+          return await p.healthCheck(pOptions);
         }
         return {
           provider: p.name,

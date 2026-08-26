@@ -7,12 +7,13 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AuthAPI } from "@/api/auth.api.js";
 import { AdminAPI } from "@/api";
 import { UsersAPI } from "@/api/user.api.js";
 import { requestForToken } from "@/config/firebase";
 import { AUTH_TOKEN_EVENT } from "@/api/axiosInstance";
-import { fetchTenantSettings, applyBrandColors } from "@/hooks/useTenant";
+import { fetchTenantSettings } from "@/hooks/useTenant";
 import {
   safeGetItem,
   safeSetItem,
@@ -75,6 +76,7 @@ function normalizeUser(user: any) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const isMountedRef = useRef(true);
   const isCreatingRef = useRef(false);
 
@@ -160,12 +162,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?._id]);
 
   useEffect(() => {
-    if (orgSettings?.brand_colors) {
-      applyBrandColors(orgSettings.brand_colors);
-    }
-  }, [orgSettings]);
-
-  useEffect(() => {
     setLoading(false);
   }, []);
 
@@ -185,9 +181,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTenant(data);
           if (!orgSettings) {
             setOrgSettings(data);
-          }
-          if (data.brand_colors) {
-            applyBrandColors(data.brand_colors);
           }
         }
         setTenantLoading(false);
@@ -357,13 +350,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Failed to clear localStorage during logout:", error);
     }
 
+    try {
+      queryClient.clear();
+    } catch {
+      /* ignore if queryClient not active */
+    }
+
     setToken(null);
     setRefreshToken(null);
     setUser(null);
     setOrgSettings(null);
     setTenant(null);
     setAuthError(null);
-  }, [refreshToken]);
+  }, [refreshToken, queryClient]);
 
 
 

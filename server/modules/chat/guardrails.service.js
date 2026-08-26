@@ -255,8 +255,45 @@ export const checkOutputGuardrails = async (response, organizationId) => {
   };
 };
 
+/**
+ * Interactive Diagnostic Simulator:
+ * Runs input checks, prompt injection scanners, and PII/leak guardrails on test text.
+ */
+export const simulateGuardrailsTest = async (testText, organizationId = null) => {
+  const [inputResult, injectionResult, outputResult] = await Promise.all([
+    checkInputGuardrails(testText, organizationId),
+    Promise.resolve(detectPromptInjection(testText)),
+    checkOutputGuardrails(testText, organizationId),
+  ]);
+
+  const piiDetected = [];
+  for (const { name, pattern } of PII_PATTERNS) {
+    if (pattern.test(testText)) {
+      piiDetected.push(name);
+    }
+  }
+
+  const overallSafe = inputResult.passed && !injectionResult.isInjected && outputResult.violations.filter(v => v.rule !== "internal_info_leak").length === 0;
+
+  return {
+    sampleText: testText,
+    overallSafe,
+    riskScore: injectionResult.isInjected ? 85 : (!inputResult.passed ? 65 : (piiDetected.length > 0 ? 45 : 5)),
+    inputAnalysis: inputResult,
+    injectionAnalysis: injectionResult,
+    outputAnalysis: outputResult,
+    piiDetected,
+    builtInPatterns: {
+      blockedTopicsCount: BLOCKED_SENSITIVE_TOPICS.length,
+      injectionRulesCount: PROMPT_INJECTION_PATTERNS.length,
+      piiFiltersCount: PII_PATTERNS.length,
+    },
+  };
+};
+
 export default {
   checkInputGuardrails,
   detectPromptInjection,
   checkOutputGuardrails,
+  simulateGuardrailsTest,
 };

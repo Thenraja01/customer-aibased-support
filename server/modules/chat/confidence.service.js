@@ -1,9 +1,9 @@
 import { extractKeywords } from "../rag/rag.service.js";
 
 const DEFAULT_THRESHOLDS = {
-  high: 0.9,
-  medium: 0.6,
-  low: 0.3,
+  high: 0.7,
+  medium: 0.3,
+  low: 0.15,
 };
 
 export const computeConfidence = (ragResults, faqs, query) => {
@@ -27,12 +27,13 @@ export const computeConfidence = (ragResults, faqs, query) => {
   const queryKeywords = extractKeywords(query || "");
   const coverageRatio = queryKeywords.length > 0 ? matchCount / queryKeywords.length : 0;
 
-  const confidence = Math.min(
-    bestRagScore * 0.5 +
-      faqScore * 0.3 +
-      Math.min(coverageRatio, 1) * 0.2,
-    1.0
-  );
+  let confidence = 0;
+  if (hasMatches) {
+    confidence = Math.max(bestRagScore, faqScore, bestRagScore * 0.7 + Math.min(coverageRatio, 1) * 0.3);
+  } else if (faqScore > 0) {
+    confidence = faqScore;
+  }
+  confidence = Math.min(confidence, 1.0);
 
   return {
     confidence,
@@ -47,8 +48,8 @@ export const computeConfidence = (ragResults, faqs, query) => {
 
 export const determineResponseMode = (confidenceResult, orgSettings = {}) => {
   const thresholds = {
-    high: orgSettings?.confidence_threshold?.high ?? DEFAULT_THRESHOLDS.high,
-    medium: orgSettings?.confidence_threshold?.medium ?? DEFAULT_THRESHOLDS.medium,
+    high: Math.min(orgSettings?.confidence_threshold?.high ?? DEFAULT_THRESHOLDS.high, DEFAULT_THRESHOLDS.high),
+    medium: Math.min(orgSettings?.confidence_threshold?.medium ?? DEFAULT_THRESHOLDS.medium, DEFAULT_THRESHOLDS.medium),
   };
 
   const { confidence } = confidenceResult;
@@ -70,32 +71,40 @@ export const determineResponseMode = (confidenceResult, orgSettings = {}) => {
   };
 };
 
-export const rerankResults = (vectorResults, keywordResults, graphResults = [], limit = 5) => {
+export const rerankResults = (
+  vectorResults,
+  keywordResults,
+  graphResults = [],
+  limit = 5,
+  weights = { vector: 0.45, bm25: 0.35, graph: 0.20 }
+) => {
   const scoreMap = new Map();
 
   vectorResults.forEach((r) => {
+    const vScore = r.score || 0;
     scoreMap.set(r._id.toString(), {
       ...r,
-      vectorScore: r.score || 0,
+      vectorScore: vScore,
       keywordScore: 0,
       graphScore: 0,
-      score: (r.score || 0) * 0.5,
+      score: vScore * weights.vector,
     });
   });
 
   keywordResults.forEach((r) => {
     const id = r._id.toString();
+    const kScore = r.score || 0;
     const existing = scoreMap.get(id);
     if (existing) {
-      existing.keywordScore = r.score || 0;
-      existing.score = existing.score + (r.score || 0) * 0.3;
+      existing.keywordScore = kScore;
+      existing.score += kScore * weights.bm25;
     } else {
       scoreMap.set(id, {
         ...r,
         vectorScore: 0,
-        keywordScore: r.score || 0,
+        keywordScore: kScore,
         graphScore: 0,
-        score: (r.score || 0) * 0.3,
+        score: kScore * weights.bm25,
       });
     }
   });
@@ -103,17 +112,18 @@ export const rerankResults = (vectorResults, keywordResults, graphResults = [], 
   if (Array.isArray(graphResults)) {
     graphResults.forEach((r) => {
       const id = r._id.toString();
+      const gScore = r.score || 0;
       const existing = scoreMap.get(id);
       if (existing) {
-        existing.graphScore = r.score || 0;
-        existing.score = existing.score + (r.score || 0) * 0.2;
+        existing.graphScore = gScore;
+        existing.score += gScore * weights.graph;
       } else {
         scoreMap.set(id, {
           ...r,
           vectorScore: 0,
           keywordScore: 0,
-          graphScore: r.score || 0,
-          score: (r.score || 0) * 0.2,
+          graphScore: gScore,
+          score: gScore * weights.graph,
         });
       }
     });

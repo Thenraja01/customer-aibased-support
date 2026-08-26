@@ -29,6 +29,7 @@ import {
   VerificationStatusBadge,
   isDocumentStuck,
 } from "./StatusBadges";
+import { useEffect, useState } from "react";
 
 const formatFileSize = (bytes?: number | null) => {
   if (!bytes || bytes <= 0) return "—";
@@ -144,13 +145,90 @@ export default function DocumentDetailSheet({
   onUploadVersion,
   onRetryIngestion,
   onRefreshStatus,
-}: DocumentDetailSheetProps) {
+  onUpdateMetadata,
+  branches = [],
+  documentTypes = [],
+}: DocumentDetailSheetProps & {
+  onUpdateMetadata?: (docId: string, metadata: any) => Promise<void>;
+  branches?: any[];
+  documentTypes?: any[];
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newCommentText, setNewCommentText] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  const handleAddComment = async () => {
+    if (!newCommentText.trim() || !doc?._id) return;
+    setSubmittingComment(true);
+    try {
+      if (!doc.comments) doc.comments = [];
+      doc.comments.push({
+        text: newCommentText.trim(),
+        created_at: new Date().toISOString(),
+        user_name: "Admin",
+      });
+      if (onUpdateMetadata) {
+        await onUpdateMetadata(doc._id, { comments: doc.comments });
+      }
+      setNewCommentText("");
+    } catch {
+      /* ignore */
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editBranchId, setEditBranchId] = useState("");
+  const [editDocTypeId, setEditDocTypeId] = useState("");
+  const [editRoles, setEditRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (doc) {
+      setEditTitle(doc.title || "");
+      setEditDesc(doc.description || "");
+      setEditBranchId(typeof doc.branch_id === "object" ? doc.branch_id?._id || "all" : doc.branch_id || "all");
+      setEditDocTypeId(typeof doc.document_type_id === "object" ? doc.document_type_id?._id || "" : doc.document_type_id || "");
+      const roles = Array.isArray(doc.allowed_roles) && doc.allowed_roles.length > 0
+        ? doc.allowed_roles
+        : [doc.assigned_role || "customer"];
+      setEditRoles(roles);
+    }
+  }, [doc]);
+
   if (!doc) return null;
 
   const status = doc.status;
   const canReview = status === "pending_approval" || status === "pending";
   const canPublish = status === "approved";
   const canArchive = status === "published";
+
+  const handleSaveMetadata = async () => {
+    if (!onUpdateMetadata) return;
+    setSaving(true);
+    try {
+      await onUpdateMetadata(doc._id, {
+        title: editTitle,
+        description: editDesc,
+        branch_id: editBranchId,
+        document_type: editDocTypeId || undefined,
+        allowed_roles: editRoles,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Failed to update metadata:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleRole = (r: string) => {
+    setEditRoles((prev) =>
+      prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]
+    );
+  };
 
   const metaRows: { label: string; value: string; icon: any }[] = [
     {
@@ -165,7 +243,7 @@ export default function DocumentDetailSheet({
     },
     {
       label: "Visibility",
-      value: doc.visibility || doc.assigned_role || "—",
+      value: Array.isArray(doc.allowed_roles) && doc.allowed_roles.length > 0 ? doc.allowed_roles.join(", ") : (doc.visibility || doc.assigned_role || "customer"),
       icon: Shield,
     },
     {
@@ -200,10 +278,22 @@ export default function DocumentDetailSheet({
       <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <div className="pr-6">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <DocumentStatusBadge status={status} />
-              <IndexStatusBadge doc={doc} />
-              <VerificationStatusBadge verifications={verifications} documentId={doc._id} />
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <DocumentStatusBadge status={status} />
+                <IndexStatusBadge doc={doc} />
+                <VerificationStatusBadge verifications={verifications} documentId={doc._id} />
+              </div>
+              {onUpdateMetadata && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="h-7 text-xs px-2.5"
+                >
+                  {isEditing ? "Cancel Edit" : "Edit Metadata"}
+                </Button>
+              )}
             </div>
             {isDocumentStuck(doc) && (
               <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2.5">
@@ -223,10 +313,98 @@ export default function DocumentDetailSheet({
                 </div>
               </div>
             )}
-            <SheetTitle className="text-lg leading-tight pr-8">{doc.title}</SheetTitle>
-            <SheetDescription className="pr-8">
-              {doc.description || "No description provided."}
-            </SheetDescription>
+
+            {isEditing ? (
+              <div className="mt-3 p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full text-sm rounded-lg border border-border px-3 py-1.5 bg-background text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Description</label>
+                  <textarea
+                    value={editDesc}
+                    rows={2}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    className="w-full text-sm rounded-lg border border-border px-3 py-1.5 bg-background text-foreground"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Branch Scope</label>
+                    <select
+                      value={editBranchId}
+                      onChange={(e) => setEditBranchId(e.target.value)}
+                      className="w-full text-xs rounded-lg border border-border px-2 py-1.5 bg-background text-foreground"
+                    >
+                      <option value="all">All Branches (Global)</option>
+                      {branches.map((b) => (
+                        <option key={b._id} value={b._id}>
+                          {b.name || b.branch_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Document Type</label>
+                    <select
+                      value={editDocTypeId}
+                      onChange={(e) => setEditDocTypeId(e.target.value)}
+                      className="w-full text-xs rounded-lg border border-border px-2 py-1.5 bg-background text-foreground"
+                    >
+                      <option value="">Default / None</option>
+                      {documentTypes.map((dt) => (
+                        <option key={dt._id} value={dt._id}>
+                          {dt.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1.5">Role Visibility</label>
+                  <div className="flex flex-wrap gap-2">
+                    {["admin", "branch_admin", "support", "customer"].map((r) => {
+                      const checked = editRoles.includes(r);
+                      return (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => toggleRole(r)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            checked
+                              ? "bg-primary text-primary-foreground border-primary font-medium"
+                              : "bg-muted text-muted-foreground border-border"
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="pt-2 flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleSaveMetadata} disabled={saving}>
+                    {saving ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <SheetTitle className="text-lg leading-tight pr-8">{doc.title}</SheetTitle>
+                <SheetDescription className="pr-8">
+                  {doc.description || "No description provided."}
+                </SheetDescription>
+              </>
+            )}
           </div>
         </SheetHeader>
 
@@ -277,12 +455,49 @@ export default function DocumentDetailSheet({
             </div>
           </div>
 
-          {/* Comments (degraded) */}
-          <div className="rounded-lg border border-dashed border-border px-4 py-3">
-            <p className="text-sm font-semibold">Comments</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Comments and collaborative notes are not yet available for documents.
-            </p>
+          {/* Interactive Document Notes & Comments */}
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3 shadow-sm">
+            <h4 className="text-sm font-semibold text-foreground flex items-center justify-between">
+              <span>Document Notes & Comments</span>
+              <span className="text-xs text-muted-foreground font-mono">
+                {doc?.comments?.length || 0} comment(s)
+              </span>
+            </h4>
+
+            {/* Existing Comments List */}
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+              {(!doc?.comments || doc.comments.length === 0) ? (
+                <p className="text-xs text-muted-foreground italic text-center py-2 border border-dashed rounded-lg bg-muted/20">
+                  No internal comments posted yet. Add a note below for collaborative review.
+                </p>
+              ) : (
+                doc.comments.map((c: any, i: number) => (
+                  <div key={i} className="p-2.5 rounded-lg border border-border bg-muted/30 text-xs space-y-1">
+                    <div className="flex items-center justify-between font-semibold">
+                      <span className="text-primary">{c.user_name || "Admin"}</span>
+                      <span className="text-[10px] text-muted-foreground">{new Date(c.created_at || Date.now()).toLocaleString()}</span>
+                    </div>
+                    <p className="text-foreground">{c.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add New Comment */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <textarea
+                rows={2}
+                placeholder="Add collaborative note or review comment..."
+                value={newCommentText}
+                onChange={(e) => setNewCommentText(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <div className="flex justify-end">
+                <Button size="sm" onClick={handleAddComment} disabled={!newCommentText.trim() || submittingComment} className="h-7 text-xs px-3">
+                  {submittingComment ? "Posting..." : "Post Comment"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 

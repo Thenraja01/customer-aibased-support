@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Bell, CheckCheck, Trash2, RefreshCw, Filter, BellOff, Info, AlertTriangle, MessageSquare, FileText
 } from "lucide-react";
@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationAPI } from "@/api/notification.api.js";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationDetailModal } from "@/components/NotificationDetailModal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type FilterTab = "all" | "unread";
@@ -52,6 +53,7 @@ export default function NotificationsPage() {
   const [clearing, setClearing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+  const [selectedNotif, setSelectedNotif] = useState<any>(null);
 
   useEffect(() => {
     loadNotifications();
@@ -62,15 +64,14 @@ export default function NotificationsPage() {
     ? notifications.filter((n: any) => !n.read)
     : notifications;
 
-  const handleMarkRead = (id: string) => {
+  const handleMarkRead = useCallback((id: string) => {
     markRead(id);
-    loadUnreadCount();
-  };
+    setSelectedNotif((prev: any) => (prev && prev._id === id ? { ...prev, read: true, is_read: true } : prev));
+  }, [markRead]);
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = useCallback(() => {
     markAllRead();
-    loadUnreadCount();
-  };
+  }, [markAllRead]);
 
   const handleDelete = async (id: string) => {
     setDeleting(id);
@@ -210,8 +211,14 @@ export default function NotificationsPage() {
           {(filtered as any[]).map((notif) => (
             <div
               key={notif._id}
+              onClick={() => {
+                setSelectedNotif(notif);
+                if (!notif.read) {
+                  handleMarkRead(notif._id);
+                }
+              }}
               className={cn(
-                "group relative rounded-xl border bg-card p-4 transition-all duration-200 hover:shadow-md",
+                "group relative rounded-xl border bg-card p-4 transition-all duration-200 hover:shadow-md cursor-pointer",
                 !notif.read
                   ? "border-primary/30 bg-primary/[0.03] dark:bg-primary/[0.06]"
                   : "hover:bg-muted/30 dark:hover:bg-white/[0.02]"
@@ -248,7 +255,7 @@ export default function NotificationsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                   {!notif.read && (
                     <button
                       title="Mark as read"
@@ -279,6 +286,12 @@ export default function NotificationsPage() {
         variant="danger"
         onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
         onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
+      <NotificationDetailModal
+        notification={selectedNotif}
+        onClose={() => setSelectedNotif(null)}
+        onMarkRead={handleMarkRead}
+        onDelete={handleDelete}
       />
     </div>
   );

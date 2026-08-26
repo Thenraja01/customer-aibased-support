@@ -25,7 +25,7 @@ export const submitFeedback = async (data, organizationId) => {
 
   const aiSession = await AISession.findOne({ chat_id: chat_id }).select("rag_quality").lean();
 
-  return await Feedback.create({
+  const feedbackDoc = await Feedback.create({
     chat_id,
     message_id,
     user_id,
@@ -36,6 +36,27 @@ export const submitFeedback = async (data, organizationId) => {
     rag_score: aiSession?.rag_quality?.bestScore || null,
     rag_fallback_used: aiSession?.rag_quality?.fallbackUsed || false,
   });
+
+  // Continuous Accuracy & Model Learning: If answer was marked unhelpful (👎), record in Knowledge Gap
+  if (was_helpful === false && message?.content) {
+    try {
+      const { logFailedQuery } = await import("../knowledge-gap/knowledgeGap.service.js");
+      await logFailedQuery({
+        organizationId,
+        userId: user_id,
+        chatId: chat_id,
+        query: message.content.slice(0, 300),
+        bestScore: aiSession?.rag_quality?.bestScore || 0,
+        avgScore: aiSession?.rag_quality?.bestScore || 0,
+        matchedChunks: 0,
+        failureReason: "unhelpful_ai_response",
+      });
+    } catch (err) {
+      console.warn("[FeedbackService] KnowledgeGap logging notice:", err.message);
+    }
+  }
+
+  return feedbackDoc;
 };
 
 export const getFeedbackByChat = async (chatId, organizationId) => {
@@ -63,4 +84,16 @@ export const getFeedbackStats = async (organizationId) => {
     helpfulCount,
     unhelpfulCount: total - helpfulCount,
   };
+};
+
+export const submitCsatSurvey = async ({ chatId, rating, comment, organizationId }) => {
+  if (!chatId || !rating) throw new Error("chatId and rating are required");
+  const feedbackDoc = await Feedback.create({
+    chat_id: chatId,
+    organization_id: organizationId || null,
+    rating,
+    comment: comment || "",
+    was_helpful: rating >= 4,
+  });
+  return feedbackDoc;
 };

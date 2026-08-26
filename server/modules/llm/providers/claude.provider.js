@@ -2,12 +2,6 @@ import { LLMProvider } from "./base.provider.js";
 
 const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 
-/**
- * Anthropic Claude provider — Messages API.
- *
- * Uses an ANTHROPIC_API_KEY / CLAUDE_API_KEY and any claude-* model id.
- * Implemented with native fetch (no extra SDK dependency).
- */
 export class ClaudeProvider extends LLMProvider {
   name = "claude";
 
@@ -17,11 +11,11 @@ export class ClaudeProvider extends LLMProvider {
   }
 
   isAvailable() {
-    return true; // checked request-time based on options.apiKey or env
+    return true;
   }
 
   _apiKey(options = {}) {
-    return options.apiKey || process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+    return options.apiKey || options.api_key || options.claude_api_key || process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
   }
 
   async _call(messages, options, maxTokens) {

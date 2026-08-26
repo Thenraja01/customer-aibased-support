@@ -46,9 +46,10 @@ import {
 
 const statusFilters = [
   { value: "", label: "All" },
-  { value: "draft", label: "Draft" },
-  { value: "pending", label: "Pending" },
+  { value: "published", label: "Published" },
   { value: "approved", label: "Approved" },
+  { value: "pending", label: "Pending" },
+  { value: "draft", label: "Draft" },
   { value: "rejected", label: "Rejected" },
 ];
 

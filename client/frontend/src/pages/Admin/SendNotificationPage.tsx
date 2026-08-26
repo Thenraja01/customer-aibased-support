@@ -26,7 +26,7 @@ const DELIVERY_METHODS = [
 ];
 
 const STATIC_TEMPLATES = [
-  { id: "maint", name: "🔧 System Maintenance", title: "Upcoming System Maintenance", message: "The platform will undergo scheduled maintenance on Sunday from 2:00 AM to 4:00 AM UTC.", type: "warning" as const, ctaText: "View Schedule", ctaUrl: "https://example.com/maintenance" },
+  { id: "maint", name: "🔧 System Maintenance", title: "Upcoming System Maintenance", message: "The platform will undergo scheduled maintenance on Sunday from 2:00 AM to 4:00 AM UTC.", type: "warning" as const, ctaText: "View Schedule", ctaUrl: "/notifications" },
   { id: "feat", name: "✨ New Feature Announcement", title: "New Feature Available", message: "You can now secure your account with Two-Factor Authentication. Enable it in your profile settings.", type: "success" as const, ctaText: "Enable 2FA", ctaUrl: "/profile" },
   { id: "sec", name: "🔒 Security Alert", title: "Security Alert: Update Password", message: "We recommend periodically updating your account password to maintain maximum security.", type: "error" as const, ctaText: "Update Now", ctaUrl: "/profile" },
 ];

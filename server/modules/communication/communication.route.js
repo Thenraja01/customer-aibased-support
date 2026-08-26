@@ -15,17 +15,21 @@ router.use(tenantIsolation);
 
 router.post("/send", communicationController.send);
 router.post("/send/org", checkRole(...ADMIN), communicationController.sendToOrg);
+router.post("/send/branch", checkRole(...STAFF), communicationController.sendToBranch);
 
 router.get("/conversation/:userId", checkRole(...STAFF), communicationController.getConversation);
 router.get("/org-conversations", checkRole(...ADMIN), communicationController.getOrgConversations);
 router.get("/org/:orgId", checkRole(...STAFF), communicationController.getOrgMessages);
+router.get("/branch/:branchId", checkRole(...STAFF), communicationController.getBranchMessages);
 router.get("/my-org", communicationController.getMyOrgMessages);
+router.get("/my-branch", checkRole(...STAFF), communicationController.getMyBranchMessages);
 router.get("/unread/count", communicationController.getUnreadCount);
 router.get("/unread", communicationController.getUnread);
 router.get("/partners", checkRole(...ADMIN), communicationController.getPartners);
 
 router.patch("/:id/read", communicationController.markRead);
 router.patch("/org/:orgId/seen", checkRole(...ADMIN), communicationController.markOrgSeen);
+router.patch("/branch/:branchId/seen", checkRole(...STAFF), communicationController.markBranchSeen);
 router.patch("/read-all", communicationController.markAllRead);
 
 export default router;

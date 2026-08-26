@@ -17,14 +17,23 @@ export const determineAccessScope = async (userId, organizationId, roleName, rol
     return scope;
   }
 
-  const normalizedRole = normalizeRoleName(roleName);
+  const normalizedRole = normalizeRoleName(roleName || "customer");
+  const roleVariants = [
+    normalizedRole,
+    normalizedRole.toLowerCase(),
+    normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1),
+    "all",
+    "All",
+    "public",
+    "Public",
+  ];
 
   if (!normalizedRole || normalizedRole === "public") {
     scope.scopeLevel = "anonymous";
     const publicChunks = await DocumentChunk.find({
       organization_id: organizationId,
-      status: "approved",
-      assigned_role: { $in: ["all", "public"] },
+      status: { $in: ["approved", "published"] },
+      assigned_role: { $in: ["all", "All", "public", "Public"] },
     })
       .select("document_id")
       .lean();
@@ -32,13 +41,18 @@ export const determineAccessScope = async (userId, organizationId, roleName, rol
     scope.canViewAll = scope.authorizedDocumentIds.length > 0;
     scope.accessibleRoles = ["all", "public"];
     scope.scopeLevel = "public";
+    scope.knowledgeBaseScope = {
+      roleFilter: { $in: ["all", "All", "public", "Public"] },
+      authorizedDocumentIds: scope.authorizedDocumentIds,
+      statusFilter: { $in: ["approved", "published"] },
+    };
     return scope;
   }
 
   if (isNormalizedAdminRole(normalizedRole)) {
     const adminDocIds = await DocumentChunk.find({
       organization_id: organizationId,
-      status: "approved",
+      status: { $in: ["approved", "published"] },
     })
       .select("document_id")
       .lean();
@@ -46,13 +60,18 @@ export const determineAccessScope = async (userId, organizationId, roleName, rol
     scope.canViewAll = true;
     scope.accessibleRoles = ["all", normalizedRole, "public", "customer", "support"];
     scope.scopeLevel = "org";
+    scope.knowledgeBaseScope = {
+      roleFilter: { $in: ["all", "All", normalizedRole, "public", "customer", "support"] },
+      authorizedDocumentIds: scope.authorizedDocumentIds,
+      statusFilter: { $in: ["approved", "published"] },
+    };
     return scope;
   }
 
   const assignedRoleDocs = await DocumentChunk.find({
     organization_id: organizationId,
-    status: "approved",
-    assigned_role: { $in: [normalizedRole, "all", "public"] },
+    status: { $in: ["approved", "published"] },
+    assigned_role: { $in: roleVariants },
   })
     .select("document_id")
     .lean();
@@ -63,9 +82,9 @@ export const determineAccessScope = async (userId, organizationId, roleName, rol
   scope.scopeLevel = "role";
 
   scope.knowledgeBaseScope = {
-    roleFilter: { $in: [normalizedRole, "all", "public"] },
+    roleFilter: { $in: roleVariants },
     authorizedDocumentIds: scope.authorizedDocumentIds,
-    statusFilter: "approved",
+    statusFilter: { $in: ["approved", "published"] },
   };
 
   return scope;

@@ -150,6 +150,18 @@ export const retestGap = async (req, res) => {
   }
 };
 
+export const generateAIDraft = async (req, res) => {
+  try {
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
+    const orgId = isSuperAdmin ? (req.query.organizationId || req.user?.organizationId) : req.user?.organizationId;
+    const type = req.query.type || "document";
+    const draft = await knowledgeGapService.generateAIGapDraft(req.params.id, orgId, type);
+    res.status(200).json({ success: true, data: draft });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 export const dismissGap = async (req, res) => {
   try {
     const gap = await knowledgeGapService.dismissGap(req.params.id, req.user?._id);

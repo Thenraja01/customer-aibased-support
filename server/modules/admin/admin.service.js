@@ -112,9 +112,16 @@ export const getAllOrgsPaginated = async (page = 1, limit = 10, search = "", org
   };
 };
 
-export const getOrgUsers = async (orgId, page = 1, limit = 10, branchId = null, search = "") => {
+export const getOrgUsers = async (orgId, page = 1, limit = 10, branchId = null, search = "", role = null) => {
   const query = { organization_id: orgId };
   if (branchId) query.branch_id = branchId;
+  if (role) {
+    if (role === "staff") {
+      query.role = { $ne: "customer" };
+    } else {
+      query.role = role;
+    }
+  }
   if (search) {
     const safe = escapeRegex(search);
     query.$or = [
@@ -139,7 +146,7 @@ export const getOrgUsers = async (orgId, page = 1, limit = 10, branchId = null, 
   };
 };
 
-export const getAllUsersPaginated = async (page = 1, limit = 10, search = "", status = "", organizationId = null, branchId = null) => {
+export const getAllUsersPaginated = async (page = 1, limit = 10, search = "", status = "", organizationId = null, branchId = null, role = null) => {
   const query = {};
   if (organizationId) {
     const orgIds = await getOrgAndDescendants(organizationId);
@@ -154,6 +161,13 @@ export const getAllUsersPaginated = async (page = 1, limit = 10, search = "", st
     ];
   }
   if (status) query.status = status;
+  if (role) {
+    if (role === "staff") {
+      query.role = { $ne: "customer" };
+    } else {
+      query.role = role;
+    }
+  }
   const [total, users] = await Promise.all([
     User.countDocuments(query),
     User.find(query)
@@ -520,13 +534,21 @@ export const updateGlobalSettings = async (data) => {
   return settings;
 };
 
+import { DEFAULT_TICKET_FORM_CONFIG } from "../../utils/constants.js";
+
 export const getOrganizationSettings = async (orgId) => {
   const org = await Organization.findById(orgId).lean();
   if (!org) throw new Error("Organization not found");
+  if (!org.ticket_form_config || org.ticket_form_config.length === 0) {
+    org.ticket_form_config = DEFAULT_TICKET_FORM_CONFIG;
+  }
   return org;
 };
 
 export const updateOrganizationSettings = async (orgId, data) => {
+  if (data && (data.domain === "" || (typeof data.domain === "string" && !data.domain.trim()))) {
+    delete data.domain;
+  }
   const org = await Organization.findByIdAndUpdate(orgId, data, {
     new: true,
     runValidators: true,
@@ -1470,4 +1492,3 @@ export const exportAuditLogs = async (filters = {}, scope = {}) => {
 
   return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
 };
-

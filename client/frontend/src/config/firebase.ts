@@ -48,9 +48,9 @@ export const requestForToken = async (): Promise<string | null> => {
     // Push registration is optional for app functionality; a missing/invalid
     // VAPID key or unavailable push service must not spam errors.
     if (err?.name === "AbortError" || err?.code === "messaging/token-unsubscribe-failed") {
-      console.warn("Firebase push token registration unavailable:", err?.message);
+      console.debug("Firebase push token registration unavailable:", err?.message);
     } else {
-      console.error("An error occurred while retrieving token.", err);
+      console.debug("Optional push token unavailable:", err?.message);
     }
     return null;
   }

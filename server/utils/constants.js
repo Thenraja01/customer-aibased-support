@@ -46,26 +46,19 @@ export const roleLevel = (roleName) => {
     : HIGHEST_ROLE_LEVEL;
 };
 
-/**
- * True when `roleName` is at-or-above `requiredLevel` (i.e. has equal or
- * more privilege). A level 0 super admin satisfies any required level.
- */
 export const roleAtOrAboveLevel = (roleName, requiredLevel) => {
   return roleLevel(roleName) <= requiredLevel;
 };
 
-/**
- * All roles that have at least the privilege of the given level. Used to
- * expand `restrict("admin")` style gates into a full allow-list.
- */
 export const rolesAtOrAboveLevel = (requiredLevel) =>
   Object.values(ROLE_KEYS).filter(
     (key) => roleLevel(key) <= requiredLevel
   );
 
-export const TICKET_CATEGORIES = ["bug", "feature_request", "question", "billing", "account", "complaint", "refund", "technical_issue", "sales_inquiry", "password_reset", "other"];
-export const TICKET_STATUSES = ["open", "pending", "assigned", "in_progress", "waiting_for_customer", "resolved", "closed"];
+export const TICKET_CATEGORIES = ["bug", "feature_request", "question", "billing", "account", "complaint", "refund", "technical_issue", "technical", "sales_inquiry", "password_reset", "general", "other"];
+export const TICKET_STATUSES = ["open", "assigned", "in_progress", "waiting_for_customer", "escalated", "resolved", "closed", "reopened", "cancelled"];
 export const TICKET_PRIORITIES = ["low", "medium", "high", "urgent"];
+export const TICKET_SOURCES = ["customer", "chat", "escalation", "email", "api"];
 
 export const TICKET_DEPARTMENTS = [
   "billing",
@@ -75,29 +68,48 @@ export const TICKET_DEPARTMENTS = [
   "product",
   "general",
 ];
-
-// SLA targets in minutes, keyed by priority. Used as defaults when the
-// organization does not override them via organization.sla_settings.
 export const DEFAULT_SLA_TARGETS = {
-  urgent: { first_response_minutes: 30, resolution_minutes: 240 }, // 4h
-  high: { first_response_minutes: 60, resolution_minutes: 480 }, // 8h
-  medium: { first_response_minutes: 240, resolution_minutes: 1440 }, // 24h
+  urgent: { first_response_minutes: 30, resolution_minutes: 240 },
+  high: { first_response_minutes: 60, resolution_minutes: 480 }, 
+  medium: { first_response_minutes: 240, resolution_minutes: 1440 }, 
   low: { first_response_minutes: 720, resolution_minutes: 2880 }, // 48h
 };
 
-// A ticket is highlighted as "warning" when less than this fraction of its
-// total SLA window remains.
 export const SLA_WARNING_FRACTION = 0.25;
 
 export const TICKET_TRANSITIONS = {
-  open: ["assigned", "in_progress", "pending", "closed", "waiting_for_customer"],
-  assigned: ["in_progress", "pending", "resolved", "closed", "waiting_for_customer"],
-  in_progress: ["waiting_for_customer", "resolved", "closed"],
-  pending: ["in_progress", "pending", "resolved", "closed", "waiting_for_customer"],
-  resolved: ["closed", "reopen"],
-  closed: ["reopen"],
-  reopen: ["in_progress", "pending", "assigned", "waiting_for_customer"],
+  open: ["assigned", "in_progress", "pending", "closed", "waiting_for_customer", "escalated", "cancelled"],
+  assigned: ["in_progress", "pending", "resolved", "closed", "waiting_for_customer", "escalated"],
+  in_progress: ["waiting_for_customer", "resolved", "closed", "escalated"],
+  pending: ["in_progress", "pending", "resolved", "closed", "waiting_for_customer", "escalated"],
+  waiting_for_customer: ["in_progress", "resolved", "closed", "escalated"],
+  escalated: ["in_progress", "resolved", "closed", "waiting_for_customer"],
+  resolved: ["closed", "reopened"],
+  closed: ["reopened"],
+  reopened: ["in_progress", "pending", "assigned", "waiting_for_customer"],
+  cancelled: [],
 };
+
+// Escalation levels (L1 support → L2 → branch_admin → admin).
+export const ESCALATION_TARGETS = ["support", "branch_admin", "admin"];
+export const ESCALATION_LEVELS = { support: 1, branch_admin: 2, admin: 3 };
+
+// Auto-assignment strategy keys.
+export const ASSIGNMENT_STRATEGIES = [
+  "round_robin",
+  "least_loaded",
+  "skill_based",
+  "priority_aware",
+  "weighted",
+  "hybrid",
+];
+export const DEFAULT_ASSIGNMENT_STRATEGY = "hybrid";
+
+// Default per-agent capacity cap for open tickets.
+export const DEFAULT_MAX_ACTIVE_TICKETS = 10;
+
+// Weighted workload per priority (used to measure agent load).
+export const PRIORITY_WEIGHTS = { simple: 1, normal: 2, complex: 4, critical: 8, low: 1, medium: 2, high: 4, urgent: 8 };
 
 export const CHAT_STATUSES = ["open", "closed"];
 export const CHAT_PRIORITIES = ["low", "medium", "high", "urgent"];
@@ -185,3 +197,13 @@ export const isBranchAdminOrAbove = (userRole) => {
 export const isSupportOrAbove = (userRole) => {
   return hasAnyRole(userRole, "super_admin", "admin", "branch_admin", "support");
 };
+
+export const DEFAULT_TICKET_FORM_CONFIG = [
+  { field_key: "subject", label: "Subject", enabled: true, required: true, order: 1 },
+  { field_key: "description", label: "Description", enabled: true, required: true, order: 2 },
+  { field_key: "category", label: "Category", enabled: true, required: true, order: 3 },
+  { field_key: "priority", label: "Priority", enabled: true, required: false, order: 4 },
+  { field_key: "attachment", label: "Attachment", enabled: true, required: false, order: 5 },
+  { field_key: "phone", label: "Phone Number", enabled: false, required: false, order: 6 },
+  { field_key: "order_id", label: "Order ID", enabled: false, required: false, order: 7 },
+];

@@ -9,7 +9,6 @@ import { branchRoutes } from "./BranchRoutes";
 import { customerRoutes } from "./CustomerRoutes";
 import { profileRoute } from "./ProfileRoute";
 import NotFound from "@/pages/NotFound";
-
 export default function AppRoutes() {
   return (
     <Routes>

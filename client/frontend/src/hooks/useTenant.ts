@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { AuthAPI } from "@/api/auth.api";
-import { hexToHsl } from "@/lib/utils";
 
 export interface TenantOrg {
   _id: string;
@@ -46,23 +45,9 @@ export async function fetchTenantSettings(tenantIdOrOrgId?: string): Promise<Ten
   return null;
 }
 
-export function applyBrandColors(brand_colors?: { primary?: string; secondary?: string; accent?: string }) {
-  if (!brand_colors) return;
-  const root = document.documentElement;
-  const { primary, secondary, accent } = brand_colors;
-  if (primary) {
-    root.style.setProperty("--primary", hexToHsl(primary));
-    root.style.setProperty("--ring", hexToHsl(primary));
-    root.style.setProperty("--brand-primary", primary);
-  }
-  if (secondary) {
-    root.style.setProperty("--secondary", hexToHsl(secondary));
-    root.style.setProperty("--brand-secondary", secondary);
-  }
-  if (accent) {
-    root.style.setProperty("--accent", hexToHsl(accent));
-    root.style.setProperty("--brand-accent", accent);
-  }
+export function applyBrandColors(_brand_colors?: { primary?: string; secondary?: string; accent?: string }) {
+  // Disabled: Backend-driven UI color branding overrides are removed to enforce global application design system
+  return;
 }
 
 export function useTenant() {

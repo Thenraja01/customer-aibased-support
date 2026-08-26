@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { AuthAPI } from "@/api/auth.api";
-import { applyBrandColors } from "@/hooks/useTenant";
 
 interface AppSettings {
   _id: string;
@@ -31,9 +30,6 @@ export function useAppSettings() {
         const res: any = await (AuthAPI as any).getAppSettings();
         if (mounted && res.data.success) {
           setSettings(res.data.data);
-          if (res.data.data.brand_colors) {
-            applyBrandColors(res.data.data.brand_colors);
-          }
         }
       } catch {
         // ignore

@@ -29,10 +29,11 @@ export const useAdminAuditLogs = (options: UseAdminAuditLogsOptions = {}): UseAd
     queryKey: ["adminAuditLogs", params],
     queryFn: async () => {
       const res = await AdminAPI.getAuditLogs(params);
-      if (!res.success) {
-        throw new Error(res.message || "Failed to fetch audit logs");
+      const payload = res?.data?.success !== undefined ? res.data : res;
+      if (!payload?.success) {
+        throw new Error(payload?.message || "Failed to fetch audit logs");
       }
-      return res;
+      return payload;
     },
     enabled: shouldFetch,
     ...options,

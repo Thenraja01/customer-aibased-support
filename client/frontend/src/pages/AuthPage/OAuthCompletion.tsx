@@ -89,6 +89,11 @@ export default function OAuthCompletion() {
     return () => { mounted = false; };
   }, []);
 
+  const DEFAULT_FALLBACK_ROLES = [
+    { _id: "customer", role_name: "customer", description: "Customer / End User" },
+    { _id: "support", role_name: "support", description: "Customer Support Agent" },
+  ];
+
   // Load requestable roles for the selected organization.
   useEffect(() => {
     if (!selectedOrg) {
@@ -102,14 +107,16 @@ export default function OAuthCompletion() {
     const load = async () => {
       try {
         const res: any = await AuthAPI.getRequestableRoles(selectedOrg);
-        if (mounted) setRoles(res?.data?.data || []);
+        const data = res?.data?.data;
+        if (mounted) setRoles(Array.isArray(data) && data.length > 0 ? data : DEFAULT_FALLBACK_ROLES);
       } catch {
         // Fall back to the legacy global roles endpoint if the org-scoped one fails.
         try {
           const res: any = await AuthAPI.getRoles();
-          if (mounted) setRoles(res?.data?.data || []);
+          const data = res?.data?.data;
+          if (mounted) setRoles(Array.isArray(data) && data.length > 0 ? data : DEFAULT_FALLBACK_ROLES);
         } catch {
-          if (mounted) setRoles([]);
+          if (mounted) setRoles(DEFAULT_FALLBACK_ROLES);
         }
       } finally {
         if (mounted) setRolesLoading(false);
@@ -305,9 +312,23 @@ export default function OAuthCompletion() {
               </div>
 
               {submitError && (
-                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 flex items-start gap-2 text-sm text-destructive" role="alert">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>{submitError}</span>
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 space-y-2 text-sm text-destructive" role="alert">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>{submitError}</span>
+                  </div>
+                  {submitError.toLowerCase().includes("already exists") && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate("/login", { state: { email: identity?.oauthEmail } })}
+                      className="w-full mt-2 border-destructive/40 hover:bg-destructive/20 text-destructive font-medium"
+                    >
+                      <LogIn className="mr-2 h-3.5 w-3.5" />
+                      Sign In to Your Existing Account
+                    </Button>
+                  )}
                 </div>
               )}
 
