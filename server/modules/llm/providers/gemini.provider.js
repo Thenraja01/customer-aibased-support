@@ -62,11 +62,15 @@ export class GeminiProvider extends LLMProvider {
   async generate(prompt, options = {}) {
     const apiKey = this._apiKey(options);
     if (!apiKey) {
-      console.warn("[GeminiProvider] No API key available for request");
-      return null;
+      const err = new Error("No API key configured for Gemini");
+      err.status = 401;
+      throw err;
     }
 
-    const modelName = options.model || this.modelName;
+    let modelName = options.model || this.modelName;
+    if (!modelName || !modelName.startsWith("gemini-") || modelName.includes("llama")) {
+      modelName = "gemini-1.5-flash";
+    }
 
     try {
       const googleAI = new GoogleGenerativeAI(apiKey);
@@ -81,8 +85,8 @@ export class GeminiProvider extends LLMProvider {
       });
       return result.response.text();
     } catch (err) {
-      console.error(`[GeminiProvider] API error:`, err.message);
-      return null;
+      console.error(`[GeminiProvider] API error (${modelName}):`, err.message);
+      throw err;
     }
   }
 }

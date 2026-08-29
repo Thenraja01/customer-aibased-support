@@ -1,0 +1,570 @@
+================================================================================
+                    PROJECT OVERVIEW & BUSINESS PROPOSAL
+================================================================================
+
+DOCUMENT CONTROL
+--------------------------------------------------------------------------------
+Project Name:       SupportAI - Enterprise AI-Powered Multi-Tenant Customer Support Platform
+Document Title:     Project Overview & Commercial Business Proposal
+Target Client:      [CUSTOMER NAME / TO BE CONFIRMED]
+Presented By:       SupportAI Solutions Engineering Team / [YOUR COMPANY NAME]
+Industry:           Enterprise SaaS / Customer Experience (CX) / Multi-Tenant Support
+Document Version:   1.0.0
+Date:               August 2026
+Confidentiality:    Confidential - For Business Stakeholder Review Only
+
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1.  Cover Page & Document Control
+2.  Executive Summary
+3.  Business Challenge / Current Situation
+4.  Project Objectives
+5.  Proposed Solution
+6.  Overall Project Scope
+7.  Key Features & Functionalities
+8.  Business Benefits & Value Proposition
+9.  End-to-End Business Workflow & Process Architecture
+10. Technology Overview & Strategic Architectural Fit
+11. Project Deliverables
+12. Implementation Approach & Project Governance
+13. Project Timeline & Milestones
+14. Roles & Responsibilities Matrix (RACI)
+15. Assumptions & Dependencies
+16. Risk Management & Mitigation Framework
+17. Key Performance Indicators (KPIs) & Success Criteria
+18. Future Scope & Roadmap
+19. Conclusion & Commercial Authorization
+---
+EXECUTIVE ATTACHMENTS:
+A. One-Page Executive Summary
+B. Concise Project Scope Summary
+C. Key Benefits Summary
+D. Master Milestone Schedule
+E. Customer Action Items & Inputs Needed to Finalize
+
+
+================================================================================
+1. COVER PAGE & METADATA
+================================================================================
+* Project Name:             SupportAI Enterprise Autonomous Support Platform
+* Customer/Client:          [CUSTOMER NAME / TO BE CONFIRMED]
+* Vendor / Provider:        [YOUR COMPANY NAME / SupportAI Technologies]
+* Industry Domain:          Omni-channel Customer Service, SaaS & Helpdesk Automation
+* Primary Engagement Goal:  Deploying an Autonomous, Multi-Tenant Hybrid RAG Support System
+* Target Launch Window:     Q4 2026 / [TIMELINE TO BE CONFIRMED]
+
+
+================================================================================
+2. EXECUTIVE SUMMARY
+================================================================================
+In today's hyper-competitive digital marketplace, customer expectations for instant, 
+accurate, 24/7 technical and product support are higher than ever. Traditional customer 
+service models rely heavily on manual human triage, fragmented ticket repositories, 
+and static knowledge bases. This approach leads to escalating operational headcount 
+costs, delayed response times, agent burnout, and inconsistent resolution quality.
+
+SupportAI is an enterprise-grade, multi-tenant customer support and agent copilot 
+platform engineered to resolve up to 70-80% of customer inquiries autonomously while 
+empowering human agents with real-time AI assistance. By combining cutting-edge 
+Retrieval-Augmented Generation (Hybrid Vector Search + Knowledge Graph RAG), 
+strict security guardrails, multi-tenant isolation, and real-time live-agent escalation, 
+SupportAI transforms customer service operations from a cost center into a 
+high-efficiency value driver.
+
+Key Expected Business Outcomes:
+- 70%+ Instant Automated Resolution (Deflection) of Tier-1 repetitive inquiries.
+- Under 2-Second Average First Response Time on Web, Widget, and Portal channels.
+- 40-50% Reduction in Average Handle Time (AHT) for human-assisted escalated tickets.
+- Zero-Hallucination Enterprise Answers grounded strictly in verified corporate documents.
+- Multi-Branch & Departmental Isolation with centralized executive reporting.
+
+
+================================================================================
+3. BUSINESS CHALLENGE / CURRENT SITUATION
+================================================================================
+Organizations managing growing customer bases face distinct structural challenges:
+
+1. High Volume of Repetitive Inquiries:
+   Over 60-70% of inbound support requests consist of recurring questions (account setup, 
+   API keys, billing inquiries, policy clarifications, troubleshooting common errors). 
+   Skilled human support agents spend substantial time answering identical questions.
+
+2. Escalating Headcount & Scaling Costs:
+   As customer volume increases, organizations are forced to expand support staff 
+   linearly, driving up recruitment, onboarding, training, and operational overhead.
+
+3. Delayed Response & Resolution Times:
+   Customer queues peak during peak business hours and across global time zones, 
+   causing ticket backlogs, SLA breaches, and customer dissatisfaction.
+
+4. Inconsistent Quality & Information Silos:
+   Internal documentation is often scattered across PDF manuals, confluence pages, 
+   FAQs, and email threads. Agents provide varying answers depending on their 
+   individual experience, impacting customer trust and brand credibility.
+
+5. Legacy Chatbot Frustration ("Dumb Keyword Bots"):
+   Traditional rule-based chatbots fail to grasp natural language context, cannot 
+   understand organizational relationships, and frequently trap customers in dead-end loops.
+
+
+================================================================================
+4. PROJECT OBJECTIVES
+================================================================================
+The primary objective of the SupportAI project is to deploy a reliable, secure, 
+and enterprise-ready AI support ecosystem that achieves measurable operational metrics:
+
+1. Immediate Ticket Deflection:
+   Achieve an automated deflection rate of 65% to 80% on standard tier-1 support traffic.
+
+2. 24/7/365 Sub-Second Customer Engagement:
+   Deliver real-time responses to customer queries in < 2 seconds via embeddable web widgets.
+
+3. Total Grounding & Zero Hallucinations:
+   Enforce document verification workflows, source citations, and strict AI guardrails so 
+   that generated answers are 100% sourced from authorized organizational knowledge.
+
+4. Human-in-the-Loop Escalation:
+   Enable seamless live handoffs to human agents when high sentiment dissatisfaction, 
+   complex technical problems, or explicit human requests occur.
+
+5. Centralized Multi-Tenant & Multi-Branch Governance:
+   Provide complete data segregation, role-based access control (RBAC), custom branding, 
+   and real-time analytics across different business entities and branch locations.
+
+
+================================================================================
+5. PROPOSED SOLUTION
+================================================================================
+SupportAI delivers an end-to-end intelligent customer support infrastructure comprising:
+
+1. Autonomous AI Customer Concierge:
+   An interactive embeddable web chat widget and customer portal that ingests user questions, 
+   searches the organization's verified knowledge base via Hybrid RAG, and produces 
+   instant, personalized, and context-aware responses with source document citations.
+
+2. Agent Copilot & Command Center:
+   A productivity workspace for human support agents offering AI-generated draft responses, 
+   one-click sentiment analysis, automated ticket classification, and summary generation.
+
+3. Document Verification & Knowledge Pipeline:
+   A governance workflow where organizational manuals, policy docs, and FAQs are uploaded, 
+   chunked, embedded, linked into a knowledge graph, and reviewed by administrators 
+   before entering active AI retrieval.
+
+4. Multi-Tenant Administration & RBAC:
+   Hierarchical control across SuperAdmins, Organization Admins, Branch Managers, 
+   Support Agents, and End Customers, guaranteeing complete data privacy.
+
+
+================================================================================
+6. OVERALL PROJECT SCOPE
+================================================================================
+The project encompasses five core architectural modules:
+
+1. Customer Engagement & Embeddable Widget Module:
+   - Floating live chat widget (embeddable via lightweight script on any website/app).
+   - Dedicated Customer Support Portal (ticket submission, tracking, chat history, FAQ hub).
+
+2. Knowledge Management & Hybrid RAG Engine:
+   - Multi-format document parser (PDF, DOCX, TXT, Markdown).
+   - Hybrid Retrieval: ChromaDB Vector Embeddings + Neo4j Graph traversal + Keyword Search.
+   - Document verification, versioning, chunk management, and role-based visibility.
+
+3. Live Escalation & Ticketing System:
+   - Real-time WebSocket live chat between customers and agents.
+   - Comprehensive ticketing system with SLA timers, auto-close policies, priority matrix, 
+     and email notifications (SMTP/FCM).
+
+4. Agent Copilot & Productivity Suite:
+   - Intelligent response drafting, smart action recommendations, and interaction summarization.
+   - Knowledge Gap detector identifying unaddressed customer queries for FAQ generation.
+
+5. Administration, Analytics & Multi-Tenant Engine:
+   - Organization/Branch hierarchy, custom branding (logos, colors, loaders), custom prompts.
+   - AI Model & Provider manager (Gemini, Groq, Claude, Ollama) with encrypted key management.
+   - SLA tracking, audit logging, exportable analytics dashboards, and billing metrics.
+
+
+================================================================================
+7. KEY FEATURES & FUNCTIONALITIES
+================================================================================
+
+--------------------------------------------------------------------------------
+Module 1: Hybrid RAG & Knowledge Intelligence
+--------------------------------------------------------------------------------
+* Feature Name:         Hybrid Graph + Vector Retrieval-Augmented Generation
+* Business Purpose:     Ensure AI answers are accurate, contextual, and hallucination-free.
+* How It Works:         When a customer asks a question, the engine queries a Vector Database 
+                        (semantic search) and a Knowledge Graph (entity relationship search), 
+                        combines the top context chunks, and provides them to the LLM.
+* Customer Benefit:     Customers receive accurate, verified answers backed by source citations.
+* Expected Outcome:     99%+ factual accuracy with verifiable document references.
+
+--------------------------------------------------------------------------------
+Module 2: Multi-Model LLM Orchestration & Fallback Engine
+--------------------------------------------------------------------------------
+* Feature Name:         Dynamic Multi-Provider AI Routing with Automatic Failover
+* Business Purpose:     Eliminate downtime risk and optimize LLM API operational costs.
+* How It Works:         Supports Google Gemini, Groq, Anthropic Claude, and local Ollama. 
+                        If the primary provider experiences rate limits or outages, the system 
+                        instantly cascades to secondary backup providers without dropping user sessions.
+* Customer Benefit:     Continuous 24/7 uptime without service interruptions.
+* Expected Outcome:     99.9% uptime SLA on AI customer interactions.
+
+--------------------------------------------------------------------------------
+Module 3: Intelligent Embeddable Customer Widget
+--------------------------------------------------------------------------------
+* Feature Name:         Omni-Channel Drop-In Support Widget
+* Business Purpose:     Provide immediate AI support across any client website or customer portal.
+* How It Works:         Deployed via a single `<script>` snippet; connects directly to the 
+                        tenant's secure API key and customized brand theme.
+* Customer Benefit:     Zero friction access to support on web and mobile devices.
+* Expected Outcome:     Immediate customer engagement and instant query resolution.
+
+--------------------------------------------------------------------------------
+Module 4: Real-Time Human Escalation & Agent Dispatch
+--------------------------------------------------------------------------------
+* Feature Name:         Seamless AI-to-Human Handshake
+* Business Purpose:     Prevent customer frustration on complex or high-touch inquiries.
+* How It Works:         The AI detects customer sentiment, complexity, or explicit agent requests, 
+                        immediately paging on-duty human agents via WebSockets and push alerts.
+* Customer Benefit:     Instant access to human assistance when automation is insufficient.
+* Expected Outcome:     High CSAT (Customer Satisfaction Score) and reduced churn.
+
+--------------------------------------------------------------------------------
+Module 5: Agent Copilot Productivity Studio
+--------------------------------------------------------------------------------
+* Feature Name:         AI Ticket Assistant & One-Click Polishing
+* Business Purpose:     Accelerate human agent turnaround time on complex technical tickets.
+* How It Works:         Analyzes ticket history, searches knowledge bases, and drafts 
+                        ready-to-send professional responses for agent review and approval.
+* Customer Benefit:     Fast, thorough, and highly accurate human responses.
+* Expected Outcome:     40-50% reduction in agent response draft time.
+
+--------------------------------------------------------------------------------
+Module 6: Enterprise Security & Content Guardrails
+--------------------------------------------------------------------------------
+* Feature Name:         Real-Time Content Moderation & PII Protection
+* Business Purpose:     Protect brand reputation and customer sensitive data.
+* How It Works:         Scans both incoming queries and outgoing AI responses against forbidden 
+                        patterns, prompt injection attacks, and sensitive PII regex rules.
+* Customer Benefit:     Safe, compliant, and enterprise-grade conversational security.
+* Expected Outcome:     Total defense against data leaks and prompt manipulation.
+
+
+================================================================================
+8. BUSINESS BENEFITS & VALUE PROPOSITION
+================================================================================
+1. Drastic Operational Cost Reduction:
+   Automating 70%+ of tier-1 support queries allows organizations to scale customer count 
+   10x without proportional increases in customer service staff.
+
+2. 24/7 Global Availability:
+   Provides immediate assistance across all time zones and outside standard working hours 
+   with zero incremental cost.
+
+3. Accelerated Agent Ramp-Up:
+   New support agents leverage the AI Copilot to answer complex queries immediately, 
+   cutting agent onboarding time from weeks to days.
+
+4. Consistent Brand Voice & Compliance:
+   Custom system prompts, guardrails, and verified document retrieval ensure uniform, 
+   polite, and legally compliant communications.
+
+5. Data-Driven Knowledge Optimization:
+   Built-in "Knowledge Gap" analytics automatically highlight unanswered customer questions, 
+   allowing content teams to continuously update documentation.
+
+
+================================================================================
+9. END-TO-END BUSINESS WORKFLOW & PROCESS ARCHITECTURE
+================================================================================
+
+Workflow Steps:
+1. Customer Engagement:
+   Customer opens the SupportAI widget or portal and submits an inquiry.
+2. Guardrail & Security Verification:
+   The system validates the query against tenant rate limits and prompt safety filters.
+3. Hybrid RAG Retrieval:
+   The engine searches ChromaDB vector embeddings and Neo4j knowledge graphs to pull 
+   the most relevant chunks from verified tenant documents.
+4. AI Response Generation:
+   The LLM generates a clear, concise answer with source citations.
+5. Resolution or Live Escalation:
+   - If resolved: Interaction is logged to analytics; customer provides satisfaction rating.
+   - If complex / customer requests human: System converts the conversation into a live 
+     ticket, notifies available agents, and enables real-time WebSocket live chat.
+
+Process Flow Diagram:
+```
++-----------------------------------------------------------------------------+
+|                               CUSTOMER INQUIRY                              |
+|                   (Web Widget / Support Portal / API)                       |
++--------------------------------------┬--------------------------------------+
+                                       │
+                                       ▼
++-----------------------------------------------------------------------------+
+|                          SECURITY & GUARDRAIL LAYER                         |
+|             (Rate Limiter, Prompt Injection Filter, PII Scrubber)           |
++--------------------------------------┬--------------------------------------+
+                                       │
+                                       ▼
++-----------------------------------------------------------------------------+
+|                             HYBRID RAG PIPELINE                             |
+|       - ChromaDB: Semantic Vector Similarity Search                         |
+|       - Neo4j: Entity & Knowledge Graph Relationship Retrieval              |
+|       - Document Chunks: Filtered by Tenant & User Role Permissions         |
++--------------------------------------┬--------------------------------------+
+                                       │
+                                       ▼
++-----------------------------------------------------------------------------+
+|                     MULTI-PROVIDER AI INFERENCE ENGINE                      |
+|                (Gemini / Groq / Claude / Ollama + Fallback)                 |
++--------------------------------------┬--------------------------------------+
+                                       │
+                   ┌───────────────────┴───────────────────┐
+                   ▼                                       ▼
+       [RESOLVED AUTONOMOUSLY]                [LIVE AGENT ESCALATION]
+       - Verified Answer Delivered            - Ticket Created & SLA Clock Starts
+       - Source Documents Cited               - Real-Time WebSocket Notification
+       - Analytics & Metrics Logged           - Agent Copilot Suggests Reply
+```
+
+
+================================================================================
+10. TECHNOLOGY OVERVIEW
+================================================================================
+The SupportAI platform is built on modern, scalable, and enterprise-grade technologies:
+
+* Core Backend:         Node.js (Express 5, ES Modules) - High-concurrency event-driven architecture.
+* Primary Database:     MongoDB (Mongoose) - Secure multi-tenant document storage.
+* Vector Database:      ChromaDB - High-speed vector similarity search for knowledge chunks.
+* Graph Database:       Neo4j - Graph relationship traversal for complex multi-hop knowledge retrieval.
+* In-Memory / Cache:    Redis - Token rate limiting, real-time query caching, and session tracking.
+* Real-Time Engine:     Socket.io - Bi-directional real-time communication for live chat.
+* Frontend Portal:      React 18+ (Vite, TypeScript, TailwindCSS) - Responsive, high-performance UI.
+* Media Storage:        Cloudinary - Cloud asset and document attachment storage.
+* Communications:       Nodemailer (SMTP transactional emails), Firebase FCM (Push alerts).
+
+
+================================================================================
+11. PROJECT DELIVERABLES
+================================================================================
+
+1. Core Software Applications:
+   - Fully deployed Multi-Tenant SupportAI Backend API Server.
+   - SuperAdmin Management Portal & Command Center.
+   - Organization & Branch Admin Web Application.
+   - Customer Portal & Self-Service Knowledge Base.
+   - Embeddable SupportAI Web Chat Widget (`widget.js`).
+
+2. Integrations & Configurations:
+   - Configured LLM Providers & Fallback Chain (Gemini / Groq / Claude / Ollama).
+   - Knowledge Base ingestion pipeline for customer documentation.
+   - SMTP Transactional Email and FCM Push Notification system setup.
+
+3. Documentation & Governance:
+   - Full REST API Specification & Postman Collection.
+   - System Architecture & Deployment Runbook.
+   - Administrator & Support Agent Training Manuals.
+   - Security, RBAC & Data Privacy Governance Guide.
+
+
+================================================================================
+12. IMPLEMENTATION APPROACH
+================================================================================
+The project follows an Agile, phased delivery methodology ensuring rapid time-to-value:
+
+* Phase 1: Discovery & Requirements Analysis
+  - Audit existing customer support workflows, ticket categories, and document formats.
+  - Finalize tenant branding, role definitions, and LLM model preferences.
+
+* Phase 2: Platform Deployment & Configuration
+  - Provision server infrastructure, databases (MongoDB, ChromaDB, Neo4j, Redis).
+  - Configure multi-tenant accounts, branch hierarchy, and security policies.
+
+* Phase 3: Knowledge Base Ingestion & RAG Tuning
+  - Ingest initial batch of organizational manuals, policies, and FAQs.
+  - Benchmark retrieval accuracy, similarity thresholds, and guardrails.
+
+* Phase 4: Integration & Widget Deployment
+  - Embed support widget into staging website/app.
+  - Test live WebSocket chat, notifications, and ticket routing.
+
+* Phase 5: User Acceptance Testing (UAT) & Training
+  - Conduct agent and administrator training workshops.
+  - Run simulated high-load scenarios and fine-tune prompt templates.
+
+* Phase 6: Production Launch & Hypercare
+  - Cutover to production with live monitoring and hypercare technical support.
+
+
+================================================================================
+13. PROJECT TIMELINE & MILESTONES
+================================================================================
+
++-------+----------------------------------+-------------------+--------------------------------------+
+| Phase | Activity / Milestone             | Duration          | Key Deliverable                      |
++-------+----------------------------------+-------------------+--------------------------------------+
+| M1    | Discovery, Architecture & Setup  | Weeks 1 - 2       | Requirements & Env Provisioning      |
+| M2    | Knowledge Pipeline & RAG Setup   | Weeks 3 - 4       | Ingested Knowledge Graph & Vectors   |
+| M3    | Widget & Multi-Tenant Features   | Weeks 5 - 6       | Embeddable Widget & Admin Portal     |
+| M4    | Live Chat & Agent Copilot Suite  | Weeks 7 - 8       | Ticketing, SLA & Escalation Engine   |
+| M5    | UAT, Training & Quality Audit    | Week 9            | Verified Test Reports & Trained Staff|
+| M6    | Production Cutover & Go-Live     | Week 10           | Live System & Post-Launch Monitoring |
++-------+----------------------------------+-------------------+--------------------------------------+
+
+
+================================================================================
+14. ROLES & RESPONSIBILITIES MATRIX (RACI)
+================================================================================
+
++-----------------------------------------+-------------------+----------------------+
+| Project Activity                        | SupportAI Team    | Client Team          |
++-----------------------------------------+-------------------+----------------------+
+| Requirements Gathering & Scope Signoff  | Accountable (A)   | Responsible (R)      |
+| Infrastructure & Server Deployment      | Responsible (R)   | Informed (I)         |
+| Knowledge Documents Provisioning        | Consulted (C)     | Responsible (R)      |
+| AI Prompt Tuning & RAG Optimization     | Responsible (R)   | Consulted (C)        |
+| Website Widget Embedding                | Consulted (C)     | Responsible (R)      |
+| User Acceptance Testing (UAT)           | Consulted (C)     | Accountable (A)      |
+| Staff Training & Go-Live Approval       | Responsible (R)   | Accountable (A)      |
++-----------------------------------------+-------------------+----------------------+
+
+
+================================================================================
+15. ASSUMPTIONS & DEPENDENCIES
+================================================================================
+
+Assumptions:
+1. Client will provide clean, authorized versions of documentation (PDF, Word, TXT, FAQ).
+2. Client IT team will embed the provided JavaScript snippet into target web properties.
+3. Client will designate a primary Product Owner for weekly sprint reviews and signoffs.
+
+Dependencies:
+1. Valid API keys or access tokens for target LLM providers (Google Gemini / Groq / Claude).
+2. Standard SMTP server credentials for outgoing ticket and verification emails.
+3. Domain DNS access if custom subdomains (e.g., `support.clientdomain.com`) are configured.
+
+
+================================================================================
+16. RISKS & MITIGATION FRAMEWORK
+================================================================================
+
++-----------------------+----------+-------------------------------------------------------------+
+| Identified Risk       | Severity | Proposed Mitigation Strategy                                |
++-----------------------+----------+-------------------------------------------------------------+
+| Incomplete Documents  | Medium   | Automated "Knowledge Gap" alerts identify missing info;     |
+|                       |          | unverified queries automatically fall back to human agents. |
++-----------------------+----------+-------------------------------------------------------------+
+| LLM Provider Outage   | Low      | Multi-provider automatic failover chain switches from       |
+|                       |          | primary to secondary model instantly without session loss.  |
++-----------------------+----------+-------------------------------------------------------------+
+| Data Privacy / Leaks  | High     | Built-in PII filtering, strict tenant database boundaries,  |
+|                       |          | and encrypted credentials at rest using AES-256-GCM.        |
++-----------------------+----------+-------------------------------------------------------------+
+| Staff Adoption Delay  | Low      | Intuitive Agent Copilot UI requiring minimal training;      |
+|                       |          | live interactive workshops and video walkthroughs provided. |
++-----------------------+----------+-------------------------------------------------------------+
+
+
+================================================================================
+17. SUCCESS CRITERIA & MEASURABLE KPIS
+================================================================================
+
+* Deflection Rate:              65% - 80% automated resolution without human touch.
+* First Response Time:          < 2.0 seconds on AI conversations.
+* Human Escalation CSAT:        >= 90% positive customer satisfaction ratings.
+* Hallucination Incident Rate:  0% on verified organizational knowledge topics.
+* Mean Time to Resolution:      >= 40% reduction across all support ticket categories.
+
+
+================================================================================
+18. FUTURE SCOPE & ROADMAP
+================================================================================
+
+* Voice AI & Telephony Bot:     Direct voice customer support integration via SIP / Twilio.
+* Multi-Lingual Auto-Translate: Real-time dynamic translation across 40+ global languages.
+* WhatsApp & Mobile SDK:        Native iOS and Android embeddable support widgets.
+* Proactive Outbound Alerts:    Predictive customer support triggers based on user behavior.
+
+
+================================================================================
+19. CONCLUSION & COMMERCIAL AUTHORIZATION
+================================================================================
+SupportAI delivers an enterprise-grade AI customer support platform that blends 
+autonomous self-service with human-in-the-loop assistance. By implementing this platform, 
+[CUSTOMER NAME] will dramatically reduce support operating costs, achieve 24/7 responsiveness, 
+and provide an industry-leading support experience to every customer.
+
+We look forward to partnering with your team on this transformation initiative.
+
+--------------------------------------------------------------------------------
+Commercial Signoff:
+
+For [CUSTOMER NAME]:                        For [YOUR COMPANY NAME]:
+Signature: __________________________       Signature: __________________________
+Name:      __________________________       Name:      __________________________
+Title:     __________________________       Title:     __________________________
+Date:      __________________________       Date:      __________________________
+
+
+================================================================================
+ATTACHMENT A: ONE-PAGE EXECUTIVE SUMMARY
+================================================================================
+SupportAI is an AI-powered customer support ecosystem engineered to automate 70-80% 
+of tier-1 support queries while assisting human agents with real-time AI tools. 
+Grounded by Hybrid Vector + Knowledge Graph RAG, SupportAI eliminates hallucinations 
+by restricting AI responses exclusively to verified organizational documents. 
+The system features multi-tenant data segregation, an embeddable customer chat widget, 
+real-time WebSocket live chat, automatic multi-LLM failover, and comprehensive 
+SLA analytics dashboards.
+
+
+================================================================================
+ATTACHMENT B: CONCISE PROJECT SCOPE SUMMARY
+================================================================================
+* Customer-Facing:  Embeddable live chat widget, customer self-service portal, FAQ search.
+* Knowledge Engine: Hybrid RAG (ChromaDB Vector + Neo4j Graph), PDF/Doc parser, doc verifier.
+* Agent Copilot:    Ticket dashboard, AI response generator, live chat takeover, sentiment alerts.
+* Multi-Tenancy:    SuperAdmin, Org Admin, Branch Admin roles; custom branding, prompts & keys.
+* Security:         Real-time prompt injection filters, PII redaction, AES-256 key encryption.
+
+
+================================================================================
+ATTACHMENT C: KEY BENEFITS SUMMARY
+================================================================================
+1. Cost Savings:        Reduce support operational costs by up to 60-70%.
+2. Rapid Response:      Immediate (< 2 second) replies 24/7/365.
+3. Zero Hallucinations: All answers backed by verified organizational sources.
+4. Agent Efficiency:    40-50% faster handle time for human agents.
+5. Scalability:         Handle 10x traffic surges without expanding headcount.
+
+
+================================================================================
+ATTACHMENT D: MASTER MILESTONE SCHEDULE
+================================================================================
+* Milestone 1 (Weeks 1-2): Architecture, Tenant Setup & Core Infrastructure Provisioning.
+* Milestone 2 (Weeks 3-4): Document Ingestion, Knowledge Graph & Hybrid RAG Calibration.
+* Milestone 3 (Weeks 5-6): Embeddable Web Widget, Customer Portal & Custom Branding.
+* Milestone 4 (Weeks 7-8): Live Agent Escalation, WebSocket Messaging & SLA Engine.
+* Milestone 5 (Week 9):    User Acceptance Testing (UAT), Staff Training & Security Audit.
+* Milestone 6 (Week 10):   Production Deployment, Cutover & Hypercare Support.
+
+
+================================================================================
+ATTACHMENT E: CUSTOMER ACTION ITEMS & INPUTS NEEDED TO FINALIZE
+================================================================================
+To finalize and execute this business proposal, please provide the following details:
+1. Customer / Organization Legal Entity Name: [TO BE CONFIRMED]
+2. Target Go-Live Date / Launch Quarter:     [TO BE CONFIRMED]
+3. Primary Commercial Contact & Product Owner: [TO BE CONFIRMED]
+4. Preferred Cloud Hosting / Deployment Model: (Cloud SaaS vs. Dedicated Tenant)
+5. Initial Knowledge Base Document Repositories: (PDF manuals, website URLs, FAQs)
+6. Commercial Budget & Support SLA Tier:       [TO BE CONFIRMED]
+
+================================================================================
+                          END OF BUSINESS PROPOSAL
+================================================================================

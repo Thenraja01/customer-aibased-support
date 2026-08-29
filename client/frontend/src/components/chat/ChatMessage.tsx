@@ -15,24 +15,42 @@ interface ChatMessageProps {
 }
 
 function renderMarkdown(text: string) {
+  if (!text) return "";
+
   let html = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-muted/50 dark:bg-white/[0.04] rounded-lg p-3 my-2 text-xs overflow-x-auto font-mono border border-border"><code>$2</code></pre>');
-  html = html.replace(/`([^`]+)`/g, '<code class="bg-muted/50 dark:bg-white/[0.04] px-1.5 py-0.5 rounded text-xs font-mono">$1</code>');
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  // Code blocks
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-muted/60 dark:bg-slate-900/80 rounded-xl p-3 my-2 text-xs overflow-x-auto font-mono border border-border/80 shadow-xs"><code>$2</code></pre>');
+  html = html.replace(/`([^`]+)`/g, '<code class="bg-muted/60 dark:bg-slate-800/80 px-1.5 py-0.5 rounded text-xs font-mono text-primary font-medium">$1</code>');
 
-  html = html.replace(/^### (.+)$/gm, '<h3 class="font-semibold text-sm mt-3 mb-1">$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2 class="font-semibold text-base mt-3 mb-1">$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1 class="font-bold text-lg mt-3 mb-1">$1</h1>');
+  // Horizontal rules / ASCII divider lines (e.g. ====== or -------)
+  html = html.replace(/^[=\-]{4,}$/gm, '<hr class="my-3 border-border/60" />');
 
-  html = html.replace(/^[\-\*] (.+)$/gm, '<li class="ml-4 list-disc text-sm leading-relaxed">$1</li>');
-  html = html.replace(/^(\d+)\. (.+)$/gm, '<li class="ml-4 list-decimal text-sm leading-relaxed">$2</li>');
+  // Headings
+  html = html.replace(/^#### (.+)$/gm, '<h4 class="font-bold text-xs uppercase tracking-wider text-muted-foreground mt-3 mb-1">$1</h4>');
+  html = html.replace(/^### (.+)$/gm, '<h3 class="font-bold text-sm text-foreground mt-3.5 mb-1">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 class="font-extrabold text-base text-foreground mt-4 mb-1.5">$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 class="font-extrabold text-lg text-foreground mt-4 mb-2">$1</h1>');
 
-  html = html.replace(/\n/g, "<br />");
+  // Section titles with number prefix (e.g. "11. PROJECT DELIVERABLES")
+  html = html.replace(/^(\d+\.\s+[A-Z\s\-_]{3,})$/gm, '<h3 class="font-bold text-sm text-primary mt-3.5 mb-1 tracking-wide">$1</h3>');
+
+  // Key-value bullets (e.g. "* Core Backend: Node.js" or "- Primary Database: MongoDB")
+  html = html.replace(/^[\-\*]\s+([A-Za-z0-9\s/_\(\)]+):/gm, '<li class="ml-4 list-disc text-[13.5px] leading-relaxed my-0.5"><strong class="text-foreground">$1:</strong>');
+
+  // Standard bullets
+  html = html.replace(/^[\-\*] (.+)$/gm, '<li class="ml-4 list-disc text-[13.5px] leading-relaxed my-0.5">$1</li>');
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<li class="ml-4 list-decimal text-[13.5px] leading-relaxed my-0.5">$2</li>');
+
+  // Bold & Italic
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>');
+  html = html.replace(/([^\*]|^)\*([^\*\n]+?)\*([^\*]|$)/g, '$1<em>$2</em>$3');
+
+  // Paragraph line breaks (prevent double spacing on lists and headings)
+  html = html.replace(/\n(?!(?:<\/(?:li|h1|h2|h3|h4|pre|hr)>|<hr|<pre))/g, "<br />");
 
   return html;
 }

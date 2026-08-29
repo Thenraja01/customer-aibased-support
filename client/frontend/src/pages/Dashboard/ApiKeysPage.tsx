@@ -56,7 +56,7 @@ export default function ApiKeysPage() {
   const [createdRawKey, setCreatedRawKey] = useState<string | null>(null);
 
   // Integration tab state
-  const [activeTab, setActiveTab] = useState<"html" | "react" | "next" | "express" | "python" | "sdk">("html");
+  const [activeTab, setActiveTab] = useState<"html" | "iframe" | "react" | "next" | "express" | "python" | "sdk">("html");
   const [copiedType, setCopiedType] = useState<string | null>(null);
 
   // Widget Configuration State (for live preview & config)
@@ -169,6 +169,17 @@ export default function ApiKeysPage() {
   };
 
   // Code snippets by framework
+  const frontendUrl = window.location.origin;
+  const iframeSnippet = `<!-- Pure React AI Chatbot (100% CSS Isolated & Responsive) -->
+<iframe
+  src="${frontendUrl}/widget?key=${createdRawKey || activePublicKey}&theme=${configTheme}"
+  width="100%"
+  height="600"
+  frameborder="0"
+  style="border: none; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); max-width: 440px;"
+  allow="clipboard-write">
+</iframe>`;
+
   const htmlSnippet = `<script
   src="${backendUrl}/widget.js"
   data-api-key="${createdRawKey || activePublicKey}"
@@ -395,7 +406,7 @@ window.SupportAI.identifyUser({
 
           {/* Framework Tabs */}
           <div className="flex flex-wrap items-center p-1 rounded-xl bg-muted/60 border border-border text-xs font-semibold gap-1">
-            {(["html", "react", "next", "express", "python", "sdk"] as const).map((tab) => (
+            {(["html", "iframe", "react", "next", "express", "python", "sdk"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -407,7 +418,9 @@ window.SupportAI.identifyUser({
                 }`}
               >
                 {tab === "html"
-                  ? "HTML"
+                  ? "HTML (Script)"
+                  : tab === "iframe"
+                  ? "iFrame (React)"
                   : tab === "react"
                   ? "React"
                   : tab === "next"
@@ -432,6 +445,8 @@ window.SupportAI.identifyUser({
               <span className="ml-2 text-slate-300 font-semibold">
                 {activeTab === "html"
                   ? "index.html"
+                  : activeTab === "iframe"
+                  ? "embed-iframe.html"
                   : activeTab === "react"
                   ? "SupportAIWidget.jsx"
                   : activeTab === "next"
@@ -451,6 +466,8 @@ window.SupportAI.identifyUser({
                   const code =
                     activeTab === "html"
                       ? htmlSnippet
+                      : activeTab === "iframe"
+                      ? iframeSnippet
                       : activeTab === "react"
                       ? reactSnippet
                       : activeTab === "next"
@@ -473,6 +490,7 @@ window.SupportAI.identifyUser({
           <div className="p-5 font-mono text-xs text-indigo-300 overflow-x-auto leading-relaxed">
             <pre>
               {activeTab === "html" && htmlSnippet}
+              {activeTab === "iframe" && iframeSnippet}
               {activeTab === "react" && reactSnippet}
               {activeTab === "next" && nextSnippet}
               {activeTab === "express" && expressSnippet}

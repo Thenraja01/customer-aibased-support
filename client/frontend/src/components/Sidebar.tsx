@@ -63,6 +63,11 @@ export default function Sidebar({ className }: SidebarProps) {
   };
 
   const userAvatarUrl = user?.profileImage || (user as any)?.avatar || (user as any)?.profile_image;
+  const [sidebarImgError, setSidebarImgError] = useState(false);
+
+  useEffect(() => {
+    setSidebarImgError(false);
+  }, [userAvatarUrl]);
 
   const rawRoles = user?.roles && user.roles.length > 0 ? user.roles : [getRoleName(user)];
   const userRoles: UserRole[] = rawRoles.map(
@@ -356,20 +361,18 @@ export default function Sidebar({ className }: SidebarProps) {
                   isEmbeddedSection && !collapsed && "p-1.5 rounded-2xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 shadow-xs my-3"
                 )}
               >
-                {!collapsed && section !== "OTHER" && (
+                {!collapsed && section && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className={cn(
-                      "px-3 py-2 text-[10px] font-bold uppercase flex items-center gap-2",
+                      "px-3 pt-3.5 pb-1 text-[10px] font-bold uppercase tracking-wider",
                       isEmbeddedSection
-                        ? "text-emerald-600 dark:text-emerald-400 font-extrabold tracking-wider"
-                        : "text-muted-foreground/50"
+                        ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
+                        : "text-muted-foreground/60"
                     )}
                   >
-                    <span className={cn("h-px flex-1", isEmbeddedSection ? "bg-emerald-500/30" : "bg-border/50")} />
                     {section}
-                    <span className={cn("h-px flex-1", isEmbeddedSection ? "bg-emerald-500/30" : "bg-border/50")} />
                   </motion.div>
                 )}
                 <div className="space-y-0.5">
@@ -548,20 +551,19 @@ export default function Sidebar({ className }: SidebarProps) {
             >
               <div className="relative shrink-0">
                 <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-semibold text-xs shadow-md shadow-emerald-500/20 ring-2 ring-background overflow-hidden transition-transform duration-300 group-hover:scale-105">
-                  {userAvatarUrl ? (
+                  {userAvatarUrl && !sidebarImgError ? (
                     <img
                       src={getImageUrl(userAvatarUrl)}
                       alt={user?.name || "Profile"}
                       className="h-full w-full object-cover rounded-full"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = "none";
-                      }}
+                      onError={() => setSidebarImgError(true)}
                     />
                   ) : (
                     <span>
                       {user?.name
                         ? user.name
-                          .split(" ")
+                          .trim()
+                          .split(/\s+/)
                           .map((n: string) => n[0])
                           .join("")
                           .toUpperCase()
@@ -659,8 +661,8 @@ export default function Sidebar({ className }: SidebarProps) {
         ref={sidebarRef}
         initial={false}
         className={cn(
-          "fixed left-0 top-0 z-50 h-screen bg-background/95  backdrop-blur-xl border-r border-border/50 shadow-2xl shadow-black/5 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-          collapsed ? "w-[72px]" : "w-[260px]",
+          "fixed left-0 top-0 z-50 h-screen bg-background/95 backdrop-blur-xl border-r border-border/50 shadow-2xl shadow-black/5 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
+          collapsed ? "w-[68px]" : "w-[236px]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           "md:translate-x-0",
           className
@@ -674,7 +676,7 @@ export default function Sidebar({ className }: SidebarProps) {
       <div
         className={cn(
           "shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hidden md:block",
-          collapsed ? "w-[72px]" : "w-[260px]"
+          collapsed ? "w-[68px]" : "w-[236px]"
         )}
       />
     </>

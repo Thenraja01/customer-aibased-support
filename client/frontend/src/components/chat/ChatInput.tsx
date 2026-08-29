@@ -9,12 +9,17 @@ import {
   ShieldCheck,
   RefreshCw,
   Clock,
+  CreditCard,
+  HelpCircle,
+  Truck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/context/SocketContext";
 import { useAuthContext } from "@/context/AuthContext";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useQuery } from "@tanstack/react-query";
+import AxiosInstance from "@/api/axiosInstance";
 
 interface ChatInputProps {
   onSend: (text: string, file?: File) => void;
@@ -23,12 +28,19 @@ interface ChatInputProps {
   chatId?: string;
 }
 
-const QUICK_SUGGESTION_PILLS = [
-  { icon: RefreshCw, label: "Refund Policy", query: "What is your refund and return policy?" },
-  { icon: Clock, label: "Track My Order", query: "Help me track my recent shipment." },
-  { icon: ShieldCheck, label: "Account Security", query: "How do I secure my account with 2FA?" },
-  { icon: Zap, label: "Live System Diagnostics", query: "Run diagnostics check on my active services." },
-];
+const PILL_ICON_MAP: Record<string, any> = {
+  refund: RefreshCw,
+  return: RefreshCw,
+  billing: CreditCard,
+  payment: CreditCard,
+  pricing: CreditCard,
+  security: ShieldCheck,
+  auth: ShieldCheck,
+  shipping: Truck,
+  delivery: Truck,
+  track: Clock,
+  diagnostic: Zap,
+};
 
 const ChatInput = memo(function ChatInput({
   onSend,
@@ -43,6 +55,55 @@ const ChatInput = memo(function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { socket } = useSocket();
+
+  // Purely dynamic backend knowledge query: topics, document summaries, graph entities
+  const { data: displayPills = [] } = useQuery({
+    queryKey: ["chat-input-quick-actions"],
+    queryFn: async () => {
+      try {
+        // 1. Unified Intelligence Quick Actions
+        const res = await AxiosInstance.get("/chats/quick-actions");
+        const actions = res.data?.quickActions || res.data?.data || [];
+        if (Array.isArray(actions) && actions.length > 0) {
+          return actions.slice(0, 4).map((a: any) => {
+            const name = a.label || a.title || "Knowledge";
+            const lower = name.toLowerCase();
+            let matchedIcon = Zap;
+            for (const [k, ic] of Object.entries(PILL_ICON_MAP)) {
+              if (lower.includes(k) || (a.icon && a.icon.toLowerCase().includes(k))) {
+                matchedIcon = ic;
+                break;
+              }
+            }
+            return {
+              label: name,
+              query: a.query || `Tell me about ${name} from our documentation`,
+              icon: matchedIcon,
+            };
+          });
+        }
+
+        // 2. Published Document Summaries
+        const docRes = await AxiosInstance.get("/documents", { params: { status: "published", limit: 4 } });
+        const docs = docRes.data?.data?.documents || docRes.data?.documents || docRes.data?.data || [];
+        if (Array.isArray(docs) && docs.length > 0) {
+          return docs.slice(0, 4).map((d: any) => {
+            const name = (d.title || "Document").replace(/\.[a-zA-Z0-9]+$/, "").trim();
+            return {
+              label: name,
+              query: `Summarize "${name}" policies from the knowledge base.`,
+              icon: Zap,
+            };
+          });
+        }
+
+        return [];
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 60000,
+  });
 
   const typingValue = useDebounce(message, 300);
   const typingEmittedRef = useRef(false);
@@ -143,13 +204,13 @@ const ChatInput = memo(function ChatInput({
   return (
     <div className="w-full px-2 sm:px-4 pb-4 pt-1 bg-transparent select-none">
       {/* 1. Interactive Floating Quick Suggestion Chips */}
-      {!chatId && (
+      {!chatId && displayPills.length > 0 && (
         <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1 scrollbar-none">
           <div className="flex items-center gap-1.5 shrink-0 text-[11px] font-bold text-primary px-1">
             <Sparkles size={13} className="text-primary animate-pulse" />
             <span>Suggested:</span>
           </div>
-          {QUICK_SUGGESTION_PILLS.map((pill, idx) => (
+          {displayPills.map((pill, idx) => (
             <button
               key={idx}
               type="button"

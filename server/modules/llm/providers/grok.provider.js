@@ -88,15 +88,16 @@ export class GrokProvider extends LLMProvider {
 
   async generate(prompt, options = {}) {
     if (!this._apiKey(options)) {
-      console.warn("[GrokProvider] No API key available for request");
-      return null;
+      const err = new Error("No API key configured for Grok");
+      err.status = 401;
+      throw err;
     }
 
     try {
       return await this._call([{ role: "user", content: prompt }], options, options.maxTokens ?? 2048);
     } catch (err) {
       console.error(`[GrokProvider] API error:`, err.message);
-      return null;
+      throw err;
     }
   }
 }

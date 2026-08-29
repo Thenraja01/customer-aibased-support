@@ -186,41 +186,64 @@ export const getTopicGraph = async (topicId, organizationId, branchId, options =
     let relQuery = {
       organization_id: organizationId,
       target_name: topic.name,
-      target_type: "topic",
       type: "HAS_TOPIC"
     };
     if (branchId) relQuery.branch_id = branchId;
     const topicRelations = await GraphRelationship.find(relQuery).lean();
 
-    const chunkNames = topicRelations
-      .filter((r) => r.source_type === "chunk" || (r.source_name && r.source_name.startsWith("Chunk")) || r.chunk_id)
-      .map((r) => r.source_name);
+    // Collect linked document IDs
+    const linkedDocIds = [
+      ...new Set(topicRelations.map((r) => r.document_id).filter(Boolean)),
+    ];
 
+    // Also include documents explicitly tagged with this topic in DB
+    const taggedDocs = await Document.find({
+      organization_id: organizationId,
+      topics: topic._id,
+    }).select("_id title").lean();
+    taggedDocs.forEach((d) => linkedDocIds.push(d._id));
+
+    // Find all entity relationships linked to these documents or chunks
     let entityRelQuery = {
       organization_id: organizationId,
-      source_name: { $in: chunkNames },
-      type: "HAS_ENTITY"
+      $or: [
+        { document_id: { $in: linkedDocIds } },
+        { target_name: topic.name },
+        { source_name: topic.name },
+      ],
+      type: { $in: ["HAS_ENTITY", "COVERS_ENTITY", "HAS_TOPIC", "RELATED_TO"] },
     };
     if (branchId) entityRelQuery.branch_id = branchId;
     if (documentId) entityRelQuery.document_id = documentId;
 
     const entityRelations = await GraphRelationship.find(entityRelQuery).lean();
-    const entityNames = [...new Set(entityRelations.map((r) => r.target_name))];
+    const entityNames = [
+      ...new Set([
+        ...entityRelations.map((r) => r.target_name),
+        ...entityRelations.map((r) => r.source_name),
+      ]),
+    ].filter((name) => name && name !== topic.name && !name.startsWith("Chunk"));
 
     let relsQuery = {
       organization_id: organizationId,
-      source_name: { $in: entityNames },
-      target_name: { $in: entityNames }
+      $or: [
+        { document_id: { $in: linkedDocIds } },
+        { source_name: { $in: entityNames } },
+        { target_name: { $in: entityNames } },
+      ],
     };
     if (branchId) relsQuery.branch_id = branchId;
     if (relationshipType) relsQuery.type = relationshipType;
     if (documentId) relsQuery.document_id = documentId;
 
-    let rels = await GraphRelationship.find(relsQuery).populate("document_id", "title file_name").limit(Number(limit)).lean();
+    let rels = await GraphRelationship.find(relsQuery)
+      .populate("document_id", "title file_name")
+      .limit(Number(limit))
+      .lean();
 
     let nodeQuery = {
       organization_id: organizationId,
-      name: { $in: entityNames }
+      $or: [{ name: { $in: entityNames } }, { canonical_id: { $in: entityNames } }],
     };
     if (branchId) nodeQuery.branch_id = branchId;
     if (entityType) nodeQuery["properties.entity_type"] = entityType;
@@ -229,9 +252,9 @@ export const getTopicGraph = async (topicId, organizationId, branchId, options =
     const entityNodes = await GraphNode.find(nodeQuery).limit(Number(limit)).lean();
 
     // Map doc titles & chunk details for metadata
-    const docIds = [...new Set(entityRelations.map(r => r.document_id?.toString()).filter(Boolean))];
+    const docIds = [...new Set([...linkedDocIds.map(String), ...entityRelations.map((r) => r.document_id?.toString()).filter(Boolean)])];
     const docs = await Document.find({ _id: { $in: docIds } }).select("title file_name").lean();
-    const docMap = new Map(docs.map(d => [d._id.toString(), d]));
+    const docMap = new Map(docs.map((d) => [d._id.toString(), d]));
 
     const nodes = entityNodes.map((node) => {
       const relatedRel = entityRelations.find(r => r.target_name === node.name);

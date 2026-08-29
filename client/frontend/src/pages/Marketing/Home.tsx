@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -32,6 +32,34 @@ import TicketIntelligenceDashboard from "./components/TicketIntelligenceDashboar
 import RoleExperienceSelector from "./components/RoleExperienceSelector";
 import LiveArchitectureShowcase from "./components/LiveArchitectureShowcase";
 
+function SupportAIWidget() {
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "http://localhost:3030/widget.js";
+    script.dataset.apiKey = "pk_live_c69d6096f676ddc709f2a13956f1c6d476c03956f395f48e04af2a17fff34749";
+    script.dataset.theme = "dark";
+    script.dataset.position = "bottom-right";
+    script.async = true;
+
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+      const widgetContainer =
+        document.getElementById("supportai-widget-root") ||
+        document.getElementById("supportai-widget-container") ||
+        document.getElementById("supportai-chat-bubble");
+      if (widgetContainer && document.body.contains(widgetContainer)) {
+        widgetContainer.remove();
+      }
+    };
+  }, []);
+
+  return null;
+}
+
 export default function Home() {
   const { settings } = useAppSettings();
   const appName = settings?.app_name || "SupportAI";
@@ -50,6 +78,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground selection:bg-primary/20 selection:text-primary">
+      <SupportAIWidget />
+
       {/* 1. Hero Section with Live AI Chat Preview Card */}
       <HeroSection />
 
@@ -262,7 +292,7 @@ export default function Home() {
           </div>
         </div>
       </section>
-
+    
       {/* 7. Live Architecture Showcase: Tech stack, benchmarks, security */}
       <LiveArchitectureShowcase />
 

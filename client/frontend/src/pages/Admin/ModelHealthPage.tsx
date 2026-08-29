@@ -194,9 +194,9 @@ export default function ModelHealthPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastCheckedTime, setLastCheckedTime] = useState<string>("");
 
-  // Auto Refresh State
+  // Auto Refresh State (10 min default)
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [autoRefreshIntervalSec, setAutoRefreshIntervalSec] = useState(30);
+  const [autoRefreshIntervalSec, setAutoRefreshIntervalSec] = useState(600);
 
   // Expanded Error Technical Details
   const [expandedTechErrors, setExpandedTechErrors] = useState<Record<string, boolean>>({});
@@ -644,9 +644,11 @@ export default function ModelHealthPage() {
                   onChange={(e) => setAutoRefreshIntervalSec(Number(e.target.value))}
                   className="bg-transparent text-foreground border-none text-[11px] focus:outline-none cursor-pointer"
                 >
-                  <option value={10}>10s</option>
                   <option value={30}>30s</option>
-                  <option value={60}>60s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                  <option value={600}>10m (Recommended)</option>
+                  <option value={1800}>30m</option>
                 </select>
               )}
             </div>

@@ -26,6 +26,7 @@ router.post("/:id/versions", checkRole(...ADMINS), handleUpload(uploadToGridFS),
 router.post("/:id/version", checkRole(...ADMINS), handleUpload(uploadToGridFS), docController.uploadNewVersion);
 router.post("/:id/retry-ingestion", checkRole(...ADMINS), docController.retryIngestion);
 router.post("/:id/reprocess", checkRole(...ADMINS), docController.retryIngestion);
+router.post("/:id/abort", checkRole(...ADMINS), docController.abortProcessing);
 router.post("/:id/generate-summary", checkRole(...STAFF), docController.generateSummary);
 
 router.get("/", docController.getAll);

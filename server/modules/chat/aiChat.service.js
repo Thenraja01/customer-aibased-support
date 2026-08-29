@@ -149,10 +149,15 @@ export const shouldLogKnowledgeGap = ({ orgHasKnowledgeBase, intent, userMessage
 const getDocumentTitles = async (documentIds) => {
   if (!documentIds || documentIds.length === 0) return {};
   const docs = await Document.find({ _id: { $in: documentIds } })
-    .select("_id title")
+    .select("_id title summary context_summary")
     .lean();
   const map = {};
-  docs.forEach((d) => { map[d._id.toString()] = d.title; });
+  docs.forEach((d) => {
+    map[d._id.toString()] = {
+      title: d.title,
+      summary: d.summary || d.context_summary || "",
+    };
+  });
   return map;
 };
 
@@ -166,11 +171,22 @@ const formatRAGContext = (documentResults, docTitles, similarityThreshold = MIN_
   let relevant = sorted.filter((r) => r.score >= minScore).slice(0, 5);
   if (relevant.length === 0) relevant = sorted.slice(0, 3);
 
+  const seenSummaries = new Set();
+
   return relevant
     .map((r) => {
       const docId = r.document_id?.toString();
-      const title = docTitles[docId] || r.title || r.document_name || "Knowledge Base Document";
-      return `[Source: ${title}]\n${r.content}`;
+      const docInfo = docTitles[docId];
+      const title = typeof docInfo === "string" ? docInfo : docInfo?.title || r.title || r.document_name || "Knowledge Base Document";
+      const summary = typeof docInfo === "object" ? docInfo?.summary : "";
+
+      let overview = "";
+      if (summary && docId && !seenSummaries.has(docId)) {
+        seenSummaries.add(docId);
+        overview = `[Document Overview (${title})]\n${summary}\n\n`;
+      }
+
+      return `${overview}[Source: ${title}]\n${r.content}`;
     })
     .join("\n\n");
 };
@@ -196,7 +212,8 @@ const buildCitations = (documentResults, docTitles, similarityThreshold = MIN_RA
     if (docId && seenDocs.has(docId)) continue;
     if (docId) seenDocs.add(docId);
 
-    const docName = docTitles[r.document_id?.toString()] || r.title || r.file_name || "Official Documentation";
+    const docInfo = docTitles[r.document_id?.toString()];
+    const docName = typeof docInfo === "string" ? docInfo : docInfo?.title || r.title || r.file_name || "Official Documentation";
     uniqueCitations.push({
       documentId: r.document_id?.toString(),
       documentName: docName,

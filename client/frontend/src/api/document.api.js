@@ -39,6 +39,8 @@ export const DocumentAPI = {
 
   reprocess: (id) => AxiosInstance.post(`/${url}/${id}/reprocess`),
 
+  abort: (id) => AxiosInstance.post(`/${url}/${id}/abort`),
+
   resolveDocumentUrl: async (docId) => {
     try {
       const res = await AxiosInstance.get(`/${url}/${docId}`);

@@ -73,6 +73,12 @@ export const updateOrganizationSettingsSchema = z.object({
     .optional(),
   email_templates: z
     .object({
+      ticket_created: z
+        .object({
+          subject: z.string().optional(),
+          body: z.string().optional(),
+        })
+        .optional(),
       ticket_assigned: z
         .object({
           subject: z.string().optional(),
@@ -80,6 +86,24 @@ export const updateOrganizationSettingsSchema = z.object({
         })
         .optional(),
       ticket_resolved: z
+        .object({
+          subject: z.string().optional(),
+          body: z.string().optional(),
+        })
+        .optional(),
+      ai_escalation: z
+        .object({
+          subject: z.string().optional(),
+          body: z.string().optional(),
+        })
+        .optional(),
+      sla_warning: z
+        .object({
+          subject: z.string().optional(),
+          body: z.string().optional(),
+        })
+        .optional(),
+      announcement_update: z
         .object({
           subject: z.string().optional(),
           body: z.string().optional(),
@@ -93,46 +117,38 @@ export const updateOrganizationSettingsSchema = z.object({
       chunk_overlap: z.number().int().min(0).max(2000).optional(),
       top_k: z.number().int().min(1).max(100).optional(),
       min_score: z.number().min(0).max(1).optional(),
+      rerank_enabled: z.boolean().optional(),
+      rerank_model: z.string().optional(),
+      embedding_provider: z.string().optional(),
+      embedding_model: z.string().optional(),
       bfs_max_depth: z.number().int().min(1).max(10).optional(),
-    })
-    .optional(),
-  smtp_config: z
-    .object({
-      host: z.string().optional(),
-      port: z.number().int().min(1).max(65535).optional(),
-      secure: z.boolean().optional(),
-      user: z.string().optional(),
-      pass: z.string().optional(),
-      from: z.string().optional(),
-      enabled: z.boolean().optional(),
-    })
-    .optional(),
-  ticket_form_config: z
-    .array(
-      z.object({
-        field_key: z.string(),
-        label: z.string(),
-        enabled: z.boolean(),
-        required: z.boolean(),
-        order: z.number().optional(),
-      })
-    )
-    .optional(),
-  sla_settings: z.record(z.any()).optional(),
-  auto_close_settings: z
-    .object({
-      enabled: z.boolean().optional(),
-      closing_period_hours: z.number().int().min(1).max(720).optional(),
+      bfs_max_nodes: z.number().int().min(1).max(100).optional(),
+      query_cache_ttl_ms: z.number().int().min(0).max(86400000).optional(),
     })
     .optional(),
   llm_config: z
     .object({
       provider: z.string().optional(),
-      api_key: z.string().optional(),
-      model: z.string().optional(),
-      base_url: z.string().optional(),
-      temperature: z.number().optional(),
-      max_tokens: z.number().optional(),
+      model_name: z.string().optional(),
+      gemini_api_key: z.string().optional(),
+      groq_api_key: z.string().optional(),
+      openai_api_key: z.string().optional(),
+      grok_api_key: z.string().optional(),
+      claude_api_key: z.string().optional(),
     })
     .optional(),
-}).passthrough();
+  custom_fields: z
+    .array(
+      z.object({
+        name: z.string(),
+        label: z.string(),
+        type: z.enum(["text", "number", "select", "checkbox", "date"]),
+        options: z.array(z.string()).optional(),
+        required: z.boolean().optional(),
+        order: z.number().optional(),
+      })
+    )
+    .optional(),
+  plan: z.enum(["free", "starter", "business", "enterprise"]).optional(),
+  status: z.enum(["active", "suspended"]).optional(),
+});

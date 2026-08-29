@@ -13,26 +13,24 @@ import BranchSettingsPage from "@/pages/BranchAdmin/BranchSettingsPage";
 import BranchProfilePage from "@/pages/BranchAdmin/BranchProfilePage";
 import AIWorkspacePage from "@/pages/ai/AIWorkspacePage";
 import TicketDetailPage from "@/pages/Support/TicketDetailPage";
-import AdminCommunicationPage from "@/pages/Admin/AdminCommunicationPage";
-
 import BranchLiveSupportPage from "@/pages/BranchAdmin/BranchLiveSupportPage";
+import NotFound from "@/pages/NotFound";
 
 export const branchRoutes = (
-  <Route path="/branch/*" element={<ProtectedRoute allowedRoles={["branch_admin", "admin", "super_admin"]} />}>
-    <Route path="dashboard" element={<BranchAdminDashboard />} />
-    <Route path="live-support" element={<BranchLiveSupportPage />} />
-    <Route path="ai" element={<AIWorkspacePage />} />
-    <Route path="tickets" element={<BranchTicketsPage />} />
-    <Route path="tickets/:id" element={<TicketDetailPage />} />
-    <Route path="communication" element={<AdminCommunicationPage />} />
-    <Route path="agents" element={<BranchAgentsPage />} />
-    <Route path="customers" element={<BranchCustomersPage />} />
-    <Route path="knowledge" element={<BranchKnowledgePage />} />
-    <Route path="faq" element={<BranchFAQPage />} />
-    <Route path="sla" element={<BranchSLAPage />} />
-    <Route path="analytics" element={<BranchAnalyticsPage />} />
-    <Route path="notifications" element={<BranchNotificationsPage />} />
-    <Route path="settings" element={<BranchSettingsPage />} />
-    <Route path="profile" element={<BranchProfilePage />} />
+  <Route element={<ProtectedRoute allowedRoles={["branch_admin", "admin", "super_admin"]} />}>
+    <Route path="/branch/dashboard" element={<BranchAdminDashboard />} />
+    <Route path="/branch/live-support" element={<BranchLiveSupportPage />} />
+    <Route path="/branch/ai" element={<AIWorkspacePage />} />
+    <Route path="/branch/tickets" element={<BranchTicketsPage />} />
+    <Route path="/branch/tickets/:id" element={<TicketDetailPage />} />
+    <Route path="/branch/agents" element={<BranchAgentsPage />} />
+    <Route path="/branch/customers" element={<BranchCustomersPage />} />
+    <Route path="/branch/knowledge" element={<BranchKnowledgePage />} />
+    <Route path="/branch/faq" element={<BranchFAQPage />} />
+    <Route path="/branch/sla" element={<BranchSLAPage />} />
+    <Route path="/branch/analytics" element={<BranchAnalyticsPage />} />
+    <Route path="/branch/notifications" element={<BranchNotificationsPage />} />
+    <Route path="/branch/settings" element={<BranchSettingsPage />} />
+    <Route path="/branch/profile" element={<BranchProfilePage />} />
   </Route>
 );

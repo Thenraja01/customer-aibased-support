@@ -13,6 +13,7 @@ import WelcomeScreen from "@/components/chat/WelcomeScreen";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
 import TypingIndicator from "@/components/chat/TypingIndicator";
+import AIProcessingSteps from "@/components/chat/AIProcessingSteps";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ChatAPI, FAQAPI } from "@/api";
 import { useToast } from "@/components/ui/toast";
@@ -457,42 +458,14 @@ export default function SupportChatPage() {
                 />
               ))}
 
-              {/* Agent Status Checklist */}
-              {isStreaming && (
-                <div className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl mx-auto my-3 shadow-sm border-dashed">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <Loader2 size={12} className="animate-spin text-primary" />
-                    Agent Processing States
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    {[
-                      { label: "Analyzing Question", status: "Analyzing question" },
-                      { label: "Analyzing Capabilities", status: "Checking topic capabilities" },
-                      { label: "Searching Knowledge Base", status: "Searching knowledge base" },
-                      { label: "Checking Graph Relations", status: "Checking graph relationships" },
-                      { label: "Generating Response", status: "Generating response" }
-                    ].map((item, index) => {
-                      const isMatchedStatus = agentStatusList.some(s => s.toLowerCase().includes(item.status.toLowerCase())) ||
-                                              currentStatus.toLowerCase().includes(item.status.toLowerCase());
-                      const isCurrent = currentStatus.toLowerCase().includes(item.status.toLowerCase());
-
-                      return (
-                        <div key={index} className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${
-                            isCurrent ? "bg-amber-500 animate-pulse scale-125" : isMatchedStatus ? "bg-emerald-500" : "bg-slate-350 dark:bg-slate-700"
-                          }`} />
-                          <span className={isCurrent ? "font-semibold text-slate-850 dark:text-slate-100" : isMatchedStatus ? "text-slate-600 dark:text-slate-350" : "text-slate-400"}>
-                            {item.label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+              {/* Enterprise Intelligent AI Processing Loader */}
+              {(aiThinking || isStreaming) && (
+                <AIProcessingSteps
+                  currentStatus={currentStatus}
+                  statusList={agentStatusList}
+                  isStreaming={aiThinking || isStreaming}
+                />
               )}
-
-              {/* Pending Action Confirmation */}
               {pendingConfirm && (
                 <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-250 dark:border-amber-900/30 rounded-2xl my-4 max-w-xl mx-auto shadow-sm space-y-3">
                   <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs uppercase tracking-wider">

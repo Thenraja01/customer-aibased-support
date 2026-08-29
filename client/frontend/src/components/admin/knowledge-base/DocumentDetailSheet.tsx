@@ -22,6 +22,11 @@ import {
   Shield,
   Building2,
   Layers,
+  StopCircle,
+  AlertTriangle,
+  Sparkles,
+  Check,
+  Loader2,
 } from "lucide-react";
 import {
   DocumentStatusBadge,
@@ -30,6 +35,7 @@ import {
   isDocumentStuck,
 } from "./StatusBadges";
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/toast";
 
 const formatFileSize = (bytes?: number | null) => {
   if (!bytes || bytes <= 0) return "—";
@@ -52,7 +58,115 @@ interface DocumentDetailSheetProps {
   onDelete?: (doc: any) => void;
   onUploadVersion?: (doc: any) => void;
   onRetryIngestion?: (doc: any) => void;
+  onAbortProcessing?: (doc: any) => void;
   onRefreshStatus?: (doc: any) => void;
+}
+
+// ── Ingestion Pipeline Stepper ──────────────────────────────────────────
+function IngestionPipelineStepper({ doc }: { doc: any }) {
+  if (!doc) return null;
+
+  const isComplete = doc.knowledge_index_status === "indexed";
+  const isFailed = doc.knowledge_index_status === "failed" || doc.ingestionStatus === "failed" || doc.knowledge_index_status === "not_ingestible";
+  const stage = doc.ingestionStatus || doc.knowledge_index_status || "queued";
+
+  const steps = [
+    {
+      id: "upload",
+      name: "Upload",
+      status: "complete",
+    },
+    {
+      id: "extract",
+      name: "Extract Text",
+      status: isComplete || ["chunking", "embedding", "indexed"].includes(stage) || (doc.chunk_count && doc.chunk_count > 0)
+        ? "complete"
+        : isFailed && doc.failed_stage === "extract"
+        ? "failed"
+        : stage === "parsing"
+        ? "active"
+        : "pending",
+    },
+    {
+      id: "chunking",
+      name: "Chunking",
+      status: isComplete || ["embedding", "indexed"].includes(stage) || (doc.chunk_count && doc.chunk_count > 0)
+        ? "complete"
+        : isFailed && doc.failed_stage === "chunk"
+        ? "failed"
+        : stage === "chunking"
+        ? "active"
+        : "pending",
+    },
+    {
+      id: "topics",
+      name: "Topics & Graph",
+      status: isComplete || doc.topicStatus === "detected" || (doc.topics && doc.topics.length > 0)
+        ? "complete"
+        : doc.topicStatus === "detecting"
+        ? "active"
+        : isComplete
+        ? "complete"
+        : "pending",
+    },
+    {
+      id: "embedding",
+      name: "Vector Indexing",
+      status: isComplete
+        ? "complete"
+        : isFailed
+        ? "failed"
+        : stage === "embedding" || doc.knowledge_index_status === "indexing"
+        ? "active"
+        : "pending",
+    },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border/80 bg-card/60 p-3.5 shadow-sm space-y-2.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <Sparkles size={13} className="text-primary" />
+          <span>Ingestion Pipeline Flow</span>
+        </div>
+        {doc.chunk_count > 0 && (
+          <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+            {doc.chunk_count} Chunks
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-5 gap-1.5">
+        {steps.map((s, idx) => {
+          let badgeClass = "bg-muted/40 text-muted-foreground border-border/40";
+          let icon = <span className="text-[10px] font-mono">{idx + 1}</span>;
+
+          if (s.status === "complete") {
+            badgeClass = "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-medium";
+            icon = <Check size={11} className="stroke-[3]" />;
+          } else if (s.status === "active") {
+            badgeClass = "bg-primary/15 text-primary border-primary/40 font-semibold animate-pulse";
+            icon = <Loader2 size={11} className="animate-spin" />;
+          } else if (s.status === "failed") {
+            badgeClass = "bg-destructive/15 text-destructive border-destructive/30 font-medium";
+            icon = <XCircle size={11} />;
+          }
+
+          return (
+            <div
+              key={s.id}
+              className={`flex flex-col items-center justify-center text-center p-1.5 rounded-lg border text-[11px] transition-all ${badgeClass}`}
+            >
+              <div className="mb-0.5 flex h-4 w-4 items-center justify-center rounded-full">
+                {icon}
+              </div>
+              <span className="truncate w-full leading-tight font-medium scale-95">{s.name}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function AuditTimeline({ doc, verifications }: { doc: any; verifications: any[] }) {
@@ -102,21 +216,17 @@ function AuditTimeline({ doc, verifications }: { doc: any; verifications: any[] 
           v.status === "approved"
             ? "bg-green-500/10 text-green-500"
             : v.status === "rejected"
-              ? "bg-red-500/10 text-red-500"
-              : "bg-amber-500/10 text-amber-500",
+            ? "bg-red-500/10 text-red-500"
+            : "bg-amber-500/10 text-amber-500",
       });
     });
 
-  const sorted = events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  if (sorted.length === 0) {
-    return <p className="text-sm text-muted-foreground py-4 text-center">No activity recorded yet.</p>;
-  }
+  events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
-    <div className="space-y-4 mt-2">
-      {sorted.map((e, i) => (
-        <div key={i} className="flex gap-3">
+    <div className="space-y-3">
+      {events.map((e, idx) => (
+        <div key={idx} className="flex items-start gap-2.5">
           <div className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 ${e.tone}`}>
             <e.icon size={13} />
           </div>
@@ -144,6 +254,7 @@ export default function DocumentDetailSheet({
   onDelete,
   onUploadVersion,
   onRetryIngestion,
+  onAbortProcessing,
   onRefreshStatus,
   onUpdateMetadata,
   branches = [],
@@ -153,10 +264,13 @@ export default function DocumentDetailSheet({
   branches?: any[];
   documentTypes?: any[];
 }) {
+  const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [newCommentText, setNewCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const [isAborting, setIsAborting] = useState(false);
 
   const handleAddComment = async () => {
     if (!newCommentText.trim() || !doc?._id) return;
@@ -172,8 +286,9 @@ export default function DocumentDetailSheet({
         await onUpdateMetadata(doc._id, { comments: doc.comments });
       }
       setNewCommentText("");
-    } catch {
-      /* ignore */
+      toast.success("Comment added", "Note was saved to the document.");
+    } catch (err: any) {
+      toast.error("Error", err?.response?.data?.message || err?.message || "Failed to save comment");
     } finally {
       setSubmittingComment(false);
     }
@@ -204,6 +319,7 @@ export default function DocumentDetailSheet({
   const canReview = status === "pending_approval" || status === "pending";
   const canPublish = status === "approved";
   const canArchive = status === "published";
+  const isIngesting = doc.status === "processing" || doc.ingestionStatus === "processing" || doc.knowledge_index_status === "indexing" || doc.ingestionStatus === "queued";
 
   const handleSaveMetadata = async () => {
     if (!onUpdateMetadata) return;
@@ -217,17 +333,32 @@ export default function DocumentDetailSheet({
         allowed_roles: editRoles,
       });
       setIsEditing(false);
-    } catch (err) {
-      console.error("Failed to update metadata:", err);
+      toast.success("Document updated", "Metadata changes saved successfully.");
+    } catch (err: any) {
+      toast.error("Error", err?.response?.data?.message || err?.message || "Failed to save metadata changes");
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleRole = (r: string) => {
-    setEditRoles((prev) =>
-      prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]
-    );
+  const handleForceReprocess = async () => {
+    if (!onRetryIngestion) return;
+    setIsReprocessing(true);
+    try {
+      await onRetryIngestion(doc);
+    } finally {
+      setIsReprocessing(false);
+    }
+  };
+
+  const handleAbort = async () => {
+    if (!onAbortProcessing) return;
+    setIsAborting(true);
+    try {
+      await onAbortProcessing(doc);
+    } finally {
+      setIsAborting(false);
+    }
   };
 
   const metaRows: { label: string; value: string; icon: any }[] = [
@@ -295,24 +426,74 @@ export default function DocumentDetailSheet({
                 </Button>
               )}
             </div>
-            {isDocumentStuck(doc) && (
+
+            {/* Quick Recovery Action Toolbar */}
+            <div className="mt-2.5 flex items-center gap-2 p-2 rounded-xl border border-border/80 bg-muted/30">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleForceReprocess}
+                disabled={isReprocessing}
+                className="h-7 text-xs px-2.5 font-semibold text-primary border-primary/30 hover:bg-primary/10 flex-1"
+              >
+                <RefreshCw size={12} className={`mr-1.5 ${isReprocessing ? "animate-spin" : ""}`} />
+                Force Reprocess
+              </Button>
+              {isIngesting && onAbortProcessing && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAbort}
+                  disabled={isAborting}
+                  className="h-7 text-xs px-2.5 font-medium text-destructive border-destructive/30 hover:bg-destructive/10"
+                >
+                  <StopCircle size={12} className="mr-1.5" />
+                  Abort Ingestion
+                </Button>
+              )}
+              {onRefreshStatus && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRefreshStatus(doc)}
+                  className="h-7 text-xs px-2"
+                  title="Refresh live document status"
+                >
+                  <RefreshCw size={12} />
+                </Button>
+              )}
+            </div>
+
+            {/* Ingestion Error Alert if any */}
+            {doc.ingestion_error && (
+              <div className="mt-3 p-3 rounded-xl border border-destructive/40 bg-destructive/10 flex items-start gap-2.5 text-xs text-destructive">
+                <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold">Ingestion Issue Detected</p>
+                  <p className="text-[11px] opacity-90 mt-0.5">{doc.ingestion_error}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Stuck Warning if taking too long */}
+            {isDocumentStuck(doc) && !doc.ingestion_error && (
               <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2.5">
                 <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
                   <Clock size={14} className="shrink-0 mt-0.5" />
-                  <span>
-                    Taking longer than expected. The document has been processing for a while. You can retry processing or refresh the status.
-                  </span>
+                  <span>Taking longer than expected. You can trigger force reprocess or abort.</span>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button variant="outline" size="sm" onClick={() => onRefreshStatus?.(doc)}>
-                    Refresh status
-                  </Button>
-                  <Button size="sm" onClick={() => onRetryIngestion?.(doc)}>
-                    Retry
+                <div className="flex gap-1.5 shrink-0">
+                  <Button size="sm" className="h-7 text-xs px-2" onClick={handleForceReprocess} disabled={isReprocessing}>
+                    Reprocess
                   </Button>
                 </div>
               </div>
             )}
+
+            {/* 5-Stage Ingestion Pipeline Stepper */}
+            <div className="mt-3">
+              <IngestionPipelineStepper doc={doc} />
+            </div>
 
             {isEditing ? (
               <div className="mt-3 p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-3">
@@ -328,58 +509,62 @@ export default function DocumentDetailSheet({
                 <div>
                   <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Description</label>
                   <textarea
-                    value={editDesc}
                     rows={2}
+                    value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
-                    className="w-full text-sm rounded-lg border border-border px-3 py-1.5 bg-background text-foreground"
+                    className="w-full text-sm rounded-lg border border-border px-3 py-1.5 bg-background text-foreground resize-none"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Branch Scope</label>
-                    <select
-                      value={editBranchId}
-                      onChange={(e) => setEditBranchId(e.target.value)}
-                      className="w-full text-xs rounded-lg border border-border px-2 py-1.5 bg-background text-foreground"
-                    >
-                      <option value="all">All Branches (Global)</option>
-                      {branches.map((b) => (
-                        <option key={b._id} value={b._id}>
-                          {b.name || b.branch_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Document Type</label>
-                    <select
-                      value={editDocTypeId}
-                      onChange={(e) => setEditDocTypeId(e.target.value)}
-                      className="w-full text-xs rounded-lg border border-border px-2 py-1.5 bg-background text-foreground"
-                    >
-                      <option value="">Default / None</option>
-                      {documentTypes.map((dt) => (
-                        <option key={dt._id} value={dt._id}>
-                          {dt.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Branch</label>
+                  <select
+                    value={editBranchId}
+                    onChange={(e) => setEditBranchId(e.target.value)}
+                    className="w-full text-sm rounded-lg border border-border px-3 py-1.5 bg-background text-foreground"
+                  >
+                    <option value="all">All Branches</option>
+                    {branches.map((b: any) => (
+                      <option key={b._id} value={b._id}>
+                        {b.name || b.branch_name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1.5">Role Visibility</label>
-                  <div className="flex flex-wrap gap-2">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Document Type</label>
+                  <select
+                    value={editDocTypeId}
+                    onChange={(e) => setEditDocTypeId(e.target.value)}
+                    className="w-full text-sm rounded-lg border border-border px-3 py-1.5 bg-background text-foreground"
+                  >
+                    <option value="">Select a type...</option>
+                    {documentTypes.map((dt: any) => (
+                      <option key={dt._id} value={dt._id}>
+                        {dt.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">Visibility Roles</label>
+                  <div className="flex flex-wrap gap-1.5">
                     {["admin", "branch_admin", "support", "customer"].map((r) => {
-                      const checked = editRoles.includes(r);
+                      const selected = editRoles.includes(r);
                       return (
                         <button
                           key={r}
                           type="button"
-                          onClick={() => toggleRole(r)}
-                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                            checked
-                              ? "bg-primary text-primary-foreground border-primary font-medium"
-                              : "bg-muted text-muted-foreground border-border"
+                          onClick={() => {
+                            if (selected) {
+                              setEditRoles(editRoles.filter((x) => x !== r));
+                            } else {
+                              setEditRoles([...editRoles, r]);
+                            }
+                          }}
+                          className={`text-xs px-2.5 py-1 rounded-md border transition-all ${
+                            selected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
                           }`}
                         >
                           {r}
@@ -388,8 +573,8 @@ export default function DocumentDetailSheet({
                     })}
                   </div>
                 </div>
-                <div className="pt-2 flex justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
                     Cancel
                   </Button>
                   <Button size="sm" onClick={handleSaveMetadata} disabled={saving}>
@@ -399,8 +584,8 @@ export default function DocumentDetailSheet({
               </div>
             ) : (
               <>
-                <SheetTitle className="text-lg leading-tight pr-8">{doc.title}</SheetTitle>
-                <SheetDescription className="pr-8">
+                <SheetTitle className="text-lg font-bold mt-3 leading-tight">{doc.title}</SheetTitle>
+                <SheetDescription className="text-xs text-muted-foreground mt-1">
                   {doc.description || "No description provided."}
                 </SheetDescription>
               </>
@@ -408,95 +593,98 @@ export default function DocumentDetailSheet({
           </div>
         </SheetHeader>
 
-        <div className="px-6 space-y-6">
-          {/* Metadata */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {metaRows.map((row) => (
-              <div key={row.label} className="flex items-start gap-2.5">
-                <row.icon size={15} className="text-muted-foreground shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{row.label}</p>
-                  <p className="text-sm font-medium truncate" title={row.value}>{row.value}</p>
+        <div className="space-y-6 py-6">
+          {/* AI Context Summary (Fast LLM Retrieval) */}
+          {(doc.summary || doc.context_summary) && (
+            <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary">
+                <Sparkles size={13} />
+                <span>AI Context Summary (Fast LLM Cache)</span>
+              </div>
+              <p className="text-xs leading-relaxed text-foreground whitespace-pre-line">
+                {doc.summary || doc.context_summary}
+              </p>
+            </div>
+          )}
+
+          {/* Metadata Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {metaRows.map((row, idx) => (
+              <div key={idx} className="p-3 rounded-xl border border-border/70 bg-card/40 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <row.icon size={13} />
+                  <span className="text-[11px] uppercase tracking-wider font-semibold">{row.label}</span>
                 </div>
+                <p className="text-xs font-medium truncate" title={row.value}>
+                  {row.value}
+                </p>
               </div>
             ))}
           </div>
 
-          {/* Rejection reason */}
-          {doc.rejection_reason && (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">
-              <p className="text-xs font-medium text-red-600">Rejection Reason</p>
-              <p className="text-sm mt-1">{doc.rejection_reason}</p>
-            </div>
-          )}
-
-          {/* Audit timeline */}
+          {/* Activity Timeline */}
           <div>
-            <h3 className="text-sm font-semibold mb-1 flex items-center gap-1.5">
-              <Clock size={14} className="text-muted-foreground" /> Activity Timeline
-            </h3>
-            <AuditTimeline doc={doc} verifications={verifications} />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Clock size={13} />
+              Activity Timeline
+            </h4>
+            <div className="p-4 rounded-xl border border-border/70 bg-card/40">
+              <AuditTimeline doc={doc} verifications={verifications} />
+            </div>
           </div>
 
-          {/* Versions */}
-          <div className="rounded-lg border border-border bg-card px-4 py-3">
+          {/* Version Info & Uploader */}
+          <div className="p-4 rounded-xl border border-border/70 bg-card/40 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold">Current Version</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  v{doc.version_number || 1} · {doc.file_name || "File"}
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Version</p>
+                <p className="text-sm font-semibold mt-0.5">
+                  v{doc.version_number || 1} <span className="text-muted-foreground font-normal">· {doc.file_name}</span>
                 </p>
               </div>
               {onUploadVersion && (
-                <Button variant="outline" size="sm" onClick={() => onUploadVersion(doc)}>
-                  <FileUp size={14} className="mr-1" /> Upload New Version
+                <Button variant="outline" size="sm" onClick={() => onUploadVersion(doc)} className="text-xs h-8">
+                  <FileUp size={13} className="mr-1" /> Upload Version
                 </Button>
               )}
             </div>
           </div>
 
-          {/* Interactive Document Notes & Comments */}
-          <div className="rounded-xl border border-border bg-card p-4 space-y-3 shadow-sm">
-            <h4 className="text-sm font-semibold text-foreground flex items-center justify-between">
-              <span>Document Notes & Comments</span>
-              <span className="text-xs text-muted-foreground font-mono">
-                {doc?.comments?.length || 0} comment(s)
-              </span>
-            </h4>
-
-            {/* Existing Comments List */}
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-              {(!doc?.comments || doc.comments.length === 0) ? (
-                <p className="text-xs text-muted-foreground italic text-center py-2 border border-dashed rounded-lg bg-muted/20">
-                  No internal comments posted yet. Add a note below for collaborative review.
-                </p>
-              ) : (
-                doc.comments.map((c: any, i: number) => (
-                  <div key={i} className="p-2.5 rounded-lg border border-border bg-muted/30 text-xs space-y-1">
-                    <div className="flex items-center justify-between font-semibold">
-                      <span className="text-primary">{c.user_name || "Admin"}</span>
-                      <span className="text-[10px] text-muted-foreground">{new Date(c.created_at || Date.now()).toLocaleString()}</span>
+          {/* Document Notes & Comments */}
+          <div className="p-4 rounded-xl border border-border/70 bg-card/40 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Document Notes & Comments <span className="font-normal font-mono">({doc.comments?.length || 0})</span>
+            </p>
+            {doc.comments && doc.comments.length > 0 ? (
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {doc.comments.map((c: any, idx: number) => (
+                  <div key={idx} className="p-2.5 rounded-lg bg-background/80 border border-border text-xs space-y-1">
+                    <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{c.user_name || "Admin"}</span>
+                      <span>{c.created_at ? new Date(c.created_at).toLocaleTimeString() : ""}</span>
                     </div>
-                    <p className="text-foreground">{c.text}</p>
+                    <p className="text-foreground leading-relaxed">{c.text}</p>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic text-center py-2 border border-dashed rounded-lg">
+                No internal comments posted yet. Add a note below for collaborative review.
+              </p>
+            )}
 
-            {/* Add New Comment */}
-            <div className="space-y-2 pt-2 border-t border-border">
-              <textarea
-                rows={2}
-                placeholder="Add collaborative note or review comment..."
+            <div className="flex gap-2 pt-1">
+              <input
+                type="text"
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                onKeyDown={(e) => e.key === "Enter" && handleAddComment()}
+                placeholder="Write an internal note..."
+                className="flex-1 text-xs rounded-lg border border-border px-3 py-2 bg-background text-foreground"
               />
-              <div className="flex justify-end">
-                <Button size="sm" onClick={handleAddComment} disabled={!newCommentText.trim() || submittingComment} className="h-7 text-xs px-3">
-                  {submittingComment ? "Posting..." : "Post Comment"}
-                </Button>
-              </div>
+              <Button size="sm" onClick={handleAddComment} disabled={submittingComment || !newCommentText.trim()} className="text-xs h-9">
+                Post Note
+              </Button>
             </div>
           </div>
         </div>

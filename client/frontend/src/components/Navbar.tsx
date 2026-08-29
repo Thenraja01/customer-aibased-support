@@ -146,8 +146,21 @@ export default function Navbar() {
                 onClick={() => setUserMenuOpen((prev) => !prev)}
                 className="flex items-center gap-2"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                  <User className="h-4 w-4 text-primary" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 overflow-hidden">
+                  {user?.profileImage || (user as any)?.avatar ? (
+                    <img
+                      src={user?.profileImage?.startsWith("http") || user?.profileImage?.startsWith("data:")
+                        ? user.profileImage
+                        : `${(import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/+$/, "")}/${(user?.profileImage || (user as any)?.avatar).replace(/^\/+/, "")}`}
+                      alt={user.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <User className="h-4 w-4 text-primary" />
+                  )}
                 </div>
                 <span>{user.name}</span>
                 <ChevronDown className="h-4 w-4" />

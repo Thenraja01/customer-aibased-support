@@ -2,7 +2,27 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { UsersAPI, TicketAPI, ChatAPI, DocumentAPI, AISessionAPI, AdminAPI } from "@/api";
-import { Users, Ticket, MessageSquare, FileText, Clock, CheckCircle2, ListOrdered, BarChart3, Sparkles, MessageCircle, TrendingUp, X } from "lucide-react";
+import BranchAPI from "@/api/branch.api.js";
+import {
+  Users,
+  Ticket,
+  MessageSquare,
+  FileText,
+  Clock,
+  CheckCircle2,
+  ListOrdered,
+  BarChart3,
+  Sparkles,
+  MessageCircle,
+  TrendingUp,
+  LayoutDashboard,
+  Bot,
+  Building2,
+  AlertCircle,
+  ShieldCheck,
+  ArrowRight,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { HistogramWidget, AreaChartWidget } from "@/components/admin/AdvancedDashboardCharts";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis } from "recharts";
@@ -11,7 +31,7 @@ import AIAgentOperations from "@/components/admin/AIAgentOperations";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const [viewTab, setViewTab] = useState<"overview" | "ai_operations">("ai_operations");
+  const [viewTab, setViewTab] = useState<"support_overview" | "ai_operations" | "overview">("support_overview");
   const brandPrimary = "hsl(var(--primary))";
   const brandSecondary = "hsl(var(--flax))";
   const brandAccent = "hsl(var(--success))";
@@ -31,6 +51,17 @@ export default function AdminDashboard() {
     pendingDocs: 0,
     queueCount: 0,
   });
+
+  const [supportOverviewStats, setSupportOverviewStats] = useState({
+    activeChats: 0,
+    openTickets: 0,
+    escalatedChats: 0,
+    resolvedToday: 0,
+  });
+
+  const [branches, setBranches] = useState<any[]>([]);
+  const [branchActivity, setBranchActivity] = useState<any[]>([]);
+  const [escalatedTickets, setEscalatedTickets] = useState<any[]>([]);
 
   const [ticketChartData, setTicketChartData] = useState<any[]>([]);
   const [roleUserChartData, setRoleUserChartData] = useState<any[]>([]);
@@ -58,30 +89,44 @@ export default function AdminDashboard() {
   };
 
   const loadStats = async () => {
-    if (!user?.organization_id?._id) return;
+    setLoading(true);
     try {
-      const [usersRes, ticketsRes, chatsRes, docsRes, sessionRes, queueRes] = await Promise.all([
-        UsersAPI.getAll({ organization_id: user.organization_id._id }).catch(() => ({ data: { success: false, data: [] } })),
+      const orgId = user?.organization_id?._id || user?.organization_id || user?.organizationId || user?.tenantId;
+      const [usersRes, ticketsRes, chatsRes, docsRes, sessionRes, queueRes, branchRes] = await Promise.all([
+        UsersAPI.getAll(orgId ? { organization_id: orgId } : {}).catch(() => ({ data: { success: false, data: [] } })),
         TicketAPI.getAll().catch(() => ({ data: { success: false, data: [] } })),
         ChatAPI.getAll().catch(() => ({ data: { success: false, data: [] } })),
         DocumentAPI.getAll().catch(() => ({ data: { success: false, data: [] } })),
         AISessionAPI.getStats().catch(() => ({ data: { success: false, data: null } })),
         TicketAPI.getQueue().catch(() => ({ data: { success: false, data: { queue: [] } } })),
+        BranchAPI.getAll(orgId ? { organization_id: orgId } : {}).catch(() => ({ data: { success: false, data: [] } })),
       ]);
 
-      const users = usersRes.data?.success ? usersRes.data.data : [];
-      const tickets = ticketsRes.data?.success ? ticketsRes.data.data : [];
-      const chats = chatsRes.data?.success ? chatsRes.data.data : [];
-      const docs = docsRes.data?.success ? docsRes.data.data : [];
-      const sessionData = sessionRes.data?.success ? sessionRes.data.data : {};
-      const queueData = queueRes.data?.success ? queueRes.data.data : { queue: [] };
+      const users = usersRes.data?.success && Array.isArray(usersRes.data.data) ? usersRes.data.data : (Array.isArray(usersRes.data) ? usersRes.data : []);
+      const tickets = ticketsRes.data?.success && Array.isArray(ticketsRes.data.data) ? ticketsRes.data.data : (Array.isArray(ticketsRes.data) ? ticketsRes.data : []);
+      const chats = chatsRes.data?.success && Array.isArray(chatsRes.data.data) ? chatsRes.data.data : (Array.isArray(chatsRes.data) ? chatsRes.data : []);
+      const docs = docsRes.data?.success && Array.isArray(docsRes.data.data) ? docsRes.data.data : (Array.isArray(docsRes.data) ? docsRes.data : []);
+      const sessionData = sessionRes.data?.success ? sessionRes.data.data : (sessionRes.data || {});
+      const queueData = queueRes.data?.success ? queueRes.data.data : (queueRes.data || { queue: [] });
+      const branchList = branchRes.data?.success && Array.isArray(branchRes.data.data) ? branchRes.data.data : (Array.isArray(branchRes.data) ? branchRes.data : []);
 
-      const orgUsers = users.filter((u: any) => u.organization_id?._id === user.organization_id._id);
+      setBranches(branchList);
+
+      const filteredUsers = orgId
+        ? users.filter((u: any) => {
+            const uOrg = u.organization_id?._id || u.organization_id || u.organizationId;
+            return !uOrg || uOrg === orgId;
+          })
+        : users;
+      const orgUsers = filteredUsers.length > 0 ? filteredUsers : users;
 
       const openCount = tickets.filter((t: any) => t.status === "open").length;
-      const inProgCount = tickets.filter((t: any) => t.status === "in_progress").length;
+      const inProgCount = tickets.filter((t: any) => t.status === "in_progress" || t.status === "pending").length;
       const resolvedCount = tickets.filter((t: any) => t.status === "resolved").length;
       const closedCount = tickets.filter((t: any) => t.status === "closed").length;
+      const activeChatsCount = chats.filter((c: any) => c.status === "active" || c.status === "open" || c.status === "escalated").length || chatStats?.activeChats || 0;
+      const escalatedCount = tickets.filter((t: any) => t.priority === "urgent" || t.priority === "high" || t.status === "escalated" || t.is_escalated).length +
+        chats.filter((c: any) => c.status === "escalated" || c.status === "waiting_for_agent").length;
 
       setStats({
         totalUsers: orgUsers.length,
@@ -94,6 +139,38 @@ export default function AdminDashboard() {
         pendingDocs: docs.filter((d: any) => d.status === "pending").length,
         queueCount: queueData.queue?.length ?? 0,
       });
+
+      setSupportOverviewStats({
+        activeChats: activeChatsCount,
+        openTickets: openCount + inProgCount,
+        escalatedChats: escalatedCount,
+        resolvedToday: resolvedCount + closedCount,
+      });
+
+      // Filter real escalations from backend tickets
+      const realEscalated = tickets
+        .filter((t: any) => t.priority === "urgent" || t.priority === "high" || t.status === "escalated" || t.is_escalated)
+        .slice(0, 5);
+      setEscalatedTickets(realEscalated);
+
+      // Build real branch activity breakdown
+      const activityData = branchList.map((b: any) => {
+        const bTickets = tickets.filter((t: any) => (t.branch_id?._id || t.branch_id) === b._id);
+        const bChats = chats.filter((c: any) => (c.branch_id?._id || c.branch_id) === b._id);
+        const bEscalated = bTickets.filter((t: any) => t.priority === "urgent" || t.priority === "high" || t.status === "escalated").length;
+        const bResolved = bTickets.filter((t: any) => t.status === "resolved" || t.status === "closed").length;
+        const slaHealthPct = bTickets.length > 0 ? ((bResolved / bTickets.length) * 100).toFixed(1) : "100.0";
+        return {
+          id: b._id,
+          name: b.name || "Branch",
+          chats: bChats.length,
+          tickets: bTickets.length,
+          escalated: bEscalated,
+          slaHealth: parseFloat(slaHealthPct),
+          status: b.status || "active",
+        };
+      });
+      setBranchActivity(activityData);
 
       // 1. Ticket Chart Dataset
       setTicketChartData([
@@ -139,7 +216,7 @@ export default function AdminDashboard() {
       });
       const docRoleArr = Object.entries(docRoleMap).map(([interval, count]) => ({ interval, count }));
       setDocRoleChartData(docRoleArr.length > 0 ? docRoleArr : [
-        { interval: "Admin", count:adminCount  },
+        { interval: "Admin", count: adminCount },
         { interval: "Support", count: supportCount },
         { interval: "Customer", count: customerCount },
         { interval: "Public", count: 6 },
@@ -159,7 +236,7 @@ export default function AdminDashboard() {
           <Icon size={22} className="opacity-90" />
         </div>
         <div>
-          <p className="text-3xl font-bold  text-foreground/90">{loading ? "-" : value}</p>
+          <p className="text-3xl font-bold text-foreground/90">{loading ? "-" : value}</p>
           <p className="text-sm font-medium text-muted-foreground mt-0.5">{label}</p>
         </div>
       </div>
@@ -168,13 +245,13 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10 dark:border-white/5">
+      <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border/60">
         <div>
-          <h1 className="text-4xl font-extrabold flex items-center gap-3 bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-            <Sparkles className="text-primary animate-pulse" size={32} />
+          <h1 className="text-3xl font-extrabold flex items-center gap-3 bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+            <Sparkles className="text-primary" size={28} />
             Organization Support Dashboard
           </h1>
-          <p className="text-muted-foreground text-base max-w-2xl mt-1">
+          <p className="text-muted-foreground text-sm max-w-2xl mt-1">
             Welcome back, <span className="font-semibold text-foreground/90">{user?.name || "Admin"}</span>! Monitor organization-wide live chats, branch activity, SLA health, and escalations.
           </p>
         </div>
@@ -183,35 +260,38 @@ export default function AdminDashboard() {
           <button
             type="button"
             onClick={() => setViewTab("support_overview")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
               viewTab === "support_overview"
                 ? "bg-primary text-primary-foreground shadow-md"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            💬 Support Overview
+            <LayoutDashboard size={14} />
+            Support Overview
           </button>
           <button
             type="button"
             onClick={() => setViewTab("ai_operations")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
               viewTab === "ai_operations"
                 ? "bg-primary text-primary-foreground shadow-md"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            🤖 AI Agent Operations
+            <Bot size={14} />
+            AI Agent Operations
           </button>
           <button
             type="button"
             onClick={() => setViewTab("overview")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
               viewTab === "overview"
                 ? "bg-primary text-primary-foreground shadow-md"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            📊 Analytics Overview
+            <BarChart3 size={14} />
+            Analytics Overview
           </button>
         </div>
       </div>
@@ -220,12 +300,12 @@ export default function AdminDashboard() {
         <AIAgentOperations />
       ) : viewTab === "support_overview" ? (
         <div className="space-y-6">
-          {/* Support Overview Cards */}
+          {/* Support Overview Cards - Real Database Metrics */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase">Active Chats</p>
-                <p className="text-3xl font-extrabold text-indigo-500 mt-1">{stats.queueCount || 24}</p>
+                <p className="text-3xl font-extrabold text-indigo-500 mt-1">{loading ? "-" : supportOverviewStats.activeChats}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">Live customer sessions</p>
               </div>
               <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
@@ -236,7 +316,7 @@ export default function AdminDashboard() {
             <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase">Open Tickets</p>
-                <p className="text-3xl font-extrabold text-amber-500 mt-1">{stats.openTickets || 86}</p>
+                <p className="text-3xl font-extrabold text-amber-500 mt-1">{loading ? "-" : supportOverviewStats.openTickets}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">Pending resolution</p>
               </div>
               <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
@@ -247,7 +327,7 @@ export default function AdminDashboard() {
             <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase">Escalated Chats</p>
-                <p className="text-3xl font-extrabold text-rose-500 mt-1">7</p>
+                <p className="text-3xl font-extrabold text-rose-500 mt-1">{loading ? "-" : supportOverviewStats.escalatedChats}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">Require admin review</p>
               </div>
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold">
@@ -258,7 +338,7 @@ export default function AdminDashboard() {
             <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase">Resolved Today</p>
-                <p className="text-3xl font-extrabold text-emerald-500 mt-1">{stats.resolvedTickets || 132}</p>
+                <p className="text-3xl font-extrabold text-emerald-500 mt-1">{loading ? "-" : supportOverviewStats.resolvedToday}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">Closed support items</p>
               </div>
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
@@ -285,7 +365,7 @@ export default function AdminDashboard() {
             </Link>
           </div>
 
-          {/* Branch Support Activity Table */}
+          {/* Branch Support Activity Table - Live Real Database Data */}
           <div className="glass-card rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold">Branch Support Activity</h3>
@@ -293,48 +373,65 @@ export default function AdminDashboard() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-muted/50 uppercase text-[10px] text-muted-foreground font-bold">
-                  <tr>
-                    <th className="p-3 rounded-l-lg">Branch</th>
-                    <th className="p-3">Chats</th>
-                    <th className="p-3">Tickets</th>
-                    <th className="p-3">Escalated</th>
-                    <th className="p-3">SLA Health</th>
-                    <th className="p-3 rounded-r-lg">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  <tr>
-                    <td className="p-3 font-bold text-foreground">Chennai Central Branch</td>
-                    <td className="p-3">12</td>
-                    <td className="p-3">34</td>
-                    <td className="p-3 font-bold text-rose-500">3</td>
-                    <td className="p-3"><Badge variant="outline" className="text-emerald-600 bg-emerald-500/10 text-[10px]">98.2% Healthy</Badge></td>
-                    <td className="p-3"><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /></td>
-                  </tr>
-                  <tr>
-                    <td className="p-3 font-bold text-foreground">Bangalore Tech Hub Branch</td>
-                    <td className="p-3">8</td>
-                    <td className="p-3">28</td>
-                    <td className="p-3 font-bold text-amber-500">2</td>
-                    <td className="p-3"><Badge variant="outline" className="text-amber-600 bg-amber-500/10 text-[10px]">92.5% Warning</Badge></td>
-                    <td className="p-3"><span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" /></td>
-                  </tr>
-                  <tr>
-                    <td className="p-3 font-bold text-foreground">Mumbai West Branch</td>
-                    <td className="p-3">4</td>
-                    <td className="p-3">24</td>
-                    <td className="p-3 font-bold text-rose-500">2</td>
-                    <td className="p-3"><Badge variant="outline" className="text-emerald-600 bg-emerald-500/10 text-[10px]">99.1% Healthy</Badge></td>
-                    <td className="p-3"><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /></td>
-                  </tr>
-                </tbody>
-              </table>
+              {branchActivity.length === 0 ? (
+                <div className="text-center py-8 text-xs text-muted-foreground space-y-2">
+                  <Building2 size={28} className="mx-auto text-muted-foreground/40" />
+                  <p>No branch records found in this organization.</p>
+                  <Link to="/admin/branches" className="text-primary font-semibold hover:underline inline-flex items-center gap-1">
+                    Configure Branches <ArrowRight size={12} />
+                  </Link>
+                </div>
+              ) : (
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-muted/50 uppercase text-[10px] text-muted-foreground font-bold">
+                    <tr>
+                      <th className="p-3 rounded-l-lg">Branch</th>
+                      <th className="p-3">Chats</th>
+                      <th className="p-3">Tickets</th>
+                      <th className="p-3">Escalated</th>
+                      <th className="p-3">SLA Health</th>
+                      <th className="p-3 rounded-r-lg">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {branchActivity.map((b) => (
+                      <tr key={b.id}>
+                        <td className="p-3 font-bold text-foreground">{b.name}</td>
+                        <td className="p-3">{b.chats}</td>
+                        <td className="p-3">{b.tickets}</td>
+                        <td className={`p-3 font-bold ${b.escalated > 0 ? "text-rose-500" : "text-muted-foreground"}`}>
+                          {b.escalated}
+                        </td>
+                        <td className="p-3">
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] ${
+                              b.slaHealth >= 95
+                                ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/20"
+                                : b.slaHealth >= 85
+                                ? "text-amber-600 bg-amber-500/10 border-amber-500/20"
+                                : "text-rose-600 bg-rose-500/10 border-rose-500/20"
+                            }`}
+                          >
+                            {b.slaHealth}% {b.slaHealth >= 95 ? "Healthy" : b.slaHealth >= 85 ? "Warning" : "Critical"}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`inline-block w-2.5 h-2.5 rounded-full ${
+                              b.status === "active" ? "bg-emerald-500" : "bg-muted-foreground"
+                            }`}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
 
-          {/* Recent Escalations */}
+          {/* Recent Escalations - Live Real Database Data */}
           <div className="glass-card rounded-2xl p-6 space-y-4">
             <h3 className="text-lg font-bold text-rose-500 flex items-center gap-2">
               <Clock size={18} />
@@ -342,27 +439,32 @@ export default function AdminDashboard() {
             </h3>
 
             <div className="space-y-2 text-xs">
-              <div className="p-3 border rounded-xl flex items-center justify-between bg-rose-500/5 border-rose-500/20">
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+              {escalatedTickets.length === 0 ? (
+                <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] flex items-center gap-3">
+                  <ShieldCheck size={18} className="text-emerald-500 shrink-0" />
                   <div>
-                    <span className="font-bold text-foreground">🔴 Payment failure on invoice checkout</span>
-                    <p className="text-muted-foreground text-[11px]">Branch: Chennai Central · Customer: John Doe</p>
+                    <p className="text-xs font-bold text-foreground">All systems normal</p>
+                    <p className="text-[11px] text-muted-foreground">No active escalated tickets or SLA breaches recorded.</p>
                   </div>
                 </div>
-                <Badge variant="outline" className="bg-rose-500/20 text-rose-600 border-rose-500/30 font-bold">High Priority</Badge>
-              </div>
-
-              <div className="p-3 border rounded-xl flex items-center justify-between bg-amber-500/5 border-amber-500/20">
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  <div>
-                    <span className="font-bold text-foreground">🟡 SLA approaching limit (12m remaining)</span>
-                    <p className="text-muted-foreground text-[11px]">Branch: Bangalore Tech Hub · Customer: Alice Smith</p>
+              ) : (
+                escalatedTickets.map((t) => (
+                  <div key={t._id} className="p-3 border rounded-xl flex items-center justify-between bg-rose-500/5 border-rose-500/20">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <AlertCircle size={16} className="text-rose-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-bold text-foreground truncate">{t.title || "Escalated ticket issue"}</p>
+                        <p className="text-muted-foreground text-[11px] truncate">
+                          Branch: {t.branch_id?.name || "Main Organization"} · Customer: {t.user_id?.name || t.customer_id?.name || "Customer"}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="bg-rose-500/20 text-rose-600 border-rose-500/30 font-bold shrink-0 capitalize">
+                      {t.priority || "High"} Priority
+                    </Badge>
                   </div>
-                </div>
-                <Badge variant="outline" className="bg-amber-500/20 text-amber-600 border-amber-500/30 font-bold">Medium Priority</Badge>
-              </div>
+                ))
+              )}
             </div>
           </div>
         </div>

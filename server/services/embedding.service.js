@@ -125,11 +125,28 @@ export const getEmbedding = async (text) => {
   }
 };
 
-export const getEmbeddingBatch = async (texts) => {
-  const results = [];
-  for (const t of texts) {
-    results.push(await getEmbedding(t));
-  }
+export const getEmbeddingBatch = async (texts, concurrency = 6) => {
+  if (!Array.isArray(texts) || texts.length === 0) return [];
+
+  const results = new Array(texts.length);
+  let currentIndex = 0;
+
+  // Worker pool for parallel processing with bounded concurrency
+  const worker = async () => {
+    while (currentIndex < texts.length) {
+      const idx = currentIndex++;
+      try {
+        results[idx] = await getEmbedding(texts[idx]);
+      } catch (err) {
+        console.error(`[OllamaEmbedding] Batch item ${idx} failed:`, err.message);
+        results[idx] = null;
+      }
+    }
+  };
+
+  const pool = Array.from({ length: Math.min(concurrency, texts.length) }, () => worker());
+  await Promise.all(pool);
+
   return results;
 };
 

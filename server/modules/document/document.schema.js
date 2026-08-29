@@ -179,12 +179,15 @@ const documentSchema = new mongoose.Schema(
     // ── Storage key for MinIO (future) ───────────────────────
     storage_key: { type: String, default: null },
 
-    // ── Associated Topics ───────────────────────────────────
+    // ── Associated Topics & AI Summaries ────────────────────
     topics: {
       type: [{ type: Schema.Types.ObjectId, ref: "Topic" }],
       default: [],
       index: true,
     },
+    summary: { type: String, default: "" },
+    context_summary: { type: String, default: "" },
+    key_topics: { type: [String], default: [] },
   },
   {
     timestamps: {

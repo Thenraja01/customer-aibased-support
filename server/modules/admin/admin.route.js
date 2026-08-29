@@ -11,6 +11,7 @@ import * as adminController from "./admin.controller.js";
 import * as aiConfigController from "../ai/aiConfig.controller.js";
 import * as billingController from "../billing/billing.controller.js";
 import * as analyticsController from "../analytics/analytics.controller.js";
+import { uploadAvatar, handleUpload } from "../../middleware/upload.middleware.js";
 
 // RBAC: every route below is gated purely by role.
 //   super_admin      → always allowed (bypasses checkRole)
@@ -29,7 +30,11 @@ router.get("/organizations/:id/users", checkRole(...ADMIN), adminController.getO
 
 // Organization management — Super Admin only (RBAC)
 router.post("/organizations", checkRole("super_admin"), adminController.createOrg);
+router.get("/organizations/:id/full-details", checkRole("super_admin"), adminController.getOrgFullDetails);
+router.get("/organizations/:id/analytics", checkRole("super_admin"), adminController.getOrgAnalytics);
 router.put("/organizations/:id", checkRole("super_admin"), adminController.updateOrg);
+router.post("/organizations/:id/logo", checkRole("super_admin"), handleUpload(uploadAvatar), adminController.uploadOrgLogo);
+router.post("/organization/logo", checkRole("admin"), handleUpload(uploadAvatar), adminController.uploadOrgLogo);
 router.delete("/organizations/:id", checkRole("super_admin"), adminController.deleteOrg);
 
 router.get("/users", checkRole(...ADMIN), adminController.getUsers);
@@ -77,6 +82,9 @@ router.post("/smtp/test", checkRole("admin"), adminController.testSmtpConfig);
 router.get("/ai-configs", checkRole("admin"), aiConfigController.getAIConfigs);
 router.post("/ai-configs", checkRole("admin"), aiConfigController.createAIConfig);
 router.put("/ai-configs/:id", checkRole("admin"), aiConfigController.updateAIConfig);
+router.patch("/ai-configs/:id/set-default", checkRole("admin"), aiConfigController.setDefaultModel);
+router.patch("/ai-configs/reorder", checkRole("admin"), aiConfigController.reorderPriorities);
+router.post("/ai-configs/:id/reset-circuit", checkRole("admin"), aiConfigController.resetCircuitBreaker);
 router.delete("/ai-configs/:id", checkRole("admin"), aiConfigController.deleteAIConfig);
 router.post("/ai-configs/:id/test", checkRole("admin"), aiConfigController.testAIConfig);
 
@@ -145,5 +153,9 @@ router.put("/global-settings", checkRole("super_admin"), validate(updateGlobalSe
 // RAG Evaluation & AI Provider Health Metrics
 router.get("/rag-eval", checkRole(...ADMIN), adminController.getRAGEvaluation);
 router.get("/llm-health", checkRole(...ADMIN), adminController.getLLMHealth);
+
+// Email Template Testing & AI Polish
+router.post("/email-templates/test", checkRole(...ADMIN), adminController.testEmailTemplate);
+router.post("/email-templates/polish", checkRole(...ADMIN), adminController.polishEmailTemplate);
 
 export default router;

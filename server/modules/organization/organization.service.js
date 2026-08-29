@@ -2,9 +2,42 @@ import Organization from "./organization.schema.js";
 import { escapeRegex } from "../../utils/escapeRegex.js";
 
 export const createOrganization = async (data) => {
-  const existing = await Organization.findOne({ email: data.email });
-  if (existing) throw new Error("Organization email already registered");
-  return await Organization.create(data);
+  const cleanData = { ...data };
+
+  if (cleanData.domain) {
+    if (typeof cleanData.domain === "string" && cleanData.domain.trim()) {
+      cleanData.domain = cleanData.domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    } else {
+      delete cleanData.domain;
+    }
+  } else {
+    delete cleanData.domain;
+  }
+
+  if (cleanData.organization_id) {
+    cleanData.organization_id = String(cleanData.organization_id).trim();
+    const existingOrgId = await Organization.findOne({ organization_id: cleanData.organization_id });
+    if (existingOrgId) throw new Error("Organization ID already registered");
+  }
+
+  if (cleanData.email) {
+    cleanData.email = String(cleanData.email).trim().toLowerCase();
+    const existingEmail = await Organization.findOne({ email: cleanData.email });
+    if (existingEmail) throw new Error("Organization email already registered");
+  }
+
+  if (cleanData.domain) {
+    const existingDomain = await Organization.findOne({ domain: cleanData.domain });
+    if (existingDomain) throw new Error("Organization domain already registered");
+  }
+
+  if (Array.isArray(cleanData.allowed_registration_roles)) {
+    cleanData.allowed_registration_roles = cleanData.allowed_registration_roles.filter(Boolean);
+  } else {
+    cleanData.allowed_registration_roles = ["admin", "branch_admin", "support", "customer"];
+  }
+
+  return await Organization.create(cleanData);
 };
 
 export const getAllOrganizations = async () => {
@@ -24,7 +57,44 @@ export const getOrganizationByOrgId = async (organizationId) => {
 };
 
 export const updateOrganization = async (id, data) => {
-  const org = await Organization.findByIdAndUpdate(id, data, {
+  const updateData = { ...data };
+  const unsetFields = {};
+
+  if ("allowed_registration_roles" in updateData) {
+    if (Array.isArray(updateData.allowed_registration_roles)) {
+      updateData.allowed_registration_roles = updateData.allowed_registration_roles.filter(Boolean);
+    }
+  }
+
+  if ("domain" in updateData) {
+    if (!updateData.domain || typeof updateData.domain !== "string" || !updateData.domain.trim()) {
+      delete updateData.domain;
+      unsetFields.domain = 1;
+    } else {
+      updateData.domain = updateData.domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    }
+  }
+
+  if (updateData.logo && typeof updateData.logo === "object") {
+    if (updateData.logo.url !== undefined) {
+      updateData["logo.url"] = updateData.logo.url;
+      delete updateData.logo;
+    }
+  }
+
+  if (updateData.brand_colors && typeof updateData.brand_colors === "object") {
+    if (updateData.brand_colors.primary !== undefined) updateData["brand_colors.primary"] = updateData.brand_colors.primary;
+    if (updateData.brand_colors.secondary !== undefined) updateData["brand_colors.secondary"] = updateData.brand_colors.secondary;
+    if (updateData.brand_colors.accent !== undefined) updateData["brand_colors.accent"] = updateData.brand_colors.accent;
+    delete updateData.brand_colors;
+  }
+
+  const updateOp = { $set: updateData };
+  if (Object.keys(unsetFields).length > 0) {
+    updateOp.$unset = unsetFields;
+  }
+
+  const org = await Organization.findByIdAndUpdate(id, updateOp, {
     new: true,
     runValidators: true,
   });
@@ -49,7 +119,6 @@ import PromptVersion from "../prompt-version/promptVersion.schema.js";
 import ChatMemory from "../memory/memory.schema.js";
 import RefreshSession from "../refresh-session/refreshSession.schema.js";
 import Notification from "../notification/notification.schema.js";
-import { chromaService } from "../../config/chroma.js";
 import { deleteFromCloudinary } from "../../services/cloudinary.service.js";
 import DocumentVersion from "../document-version/documentVersion.schema.js";
 import DocumentVerification from "../document-verification/documentVerification.schema.js";
@@ -59,15 +128,7 @@ const purgeTenantData = async (orgIdStr) => {
   try {
     const orgId = new mongoose.Types.ObjectId(orgIdStr);
     
-    // 1. Delete Chroma DB embeddings
-    try {
-      const chromaCollection = chromaService.getCollection();
-      await chromaCollection.delete({ where: { organization_id: orgIdStr } });
-    } catch (err) {
-      console.error("[Tenant Purge] Failed to delete Chroma embeddings:", err.message);
-    }
-
-    // 2. Delete Cloudinary files
+    // 1. Delete Cloudinary files
     try {
       const docs = await Document.find({ organization_id: orgId }).select("cloudinary_public_id cloudinary_resource_type branch_id").lean();
       for (const doc of docs) {

@@ -133,11 +133,9 @@ const ChatHeader = memo(function ChatHeader({ activeChat, isSupportView, onBack,
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-sm font-bold leading-tight truncate">
-                {isNew
-                  ? "Enterprise AI Copilot"
-                  : isSupportView
-                    ? `Session with ${(activeChat?.user_id as any)?.name || "Customer"}`
-                    : (orgSettings?.chatbot_name || "Support AI")}
+                {isSupportView
+                  ? `Session with ${(activeChat?.user_id as any)?.name || "Customer"}`
+                  : (orgSettings?.chatbot_name || "Support AI Copilot")}
               </h1>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold inline-flex items-center gap-1">
                 <Cpu size={10} /> v2.4 Turbo

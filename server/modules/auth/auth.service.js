@@ -81,16 +81,24 @@ export const registerWithApproval = async (userData) => {
     throw new Error("Email already registered");
   }
 
-  // Validate that the role is not restricted
-  const validRoles = Object.values(ROLE_KEYS);
+  // Validate that the role is valid for registration
+  if (role.toLowerCase() === "super_admin") {
+    throw new Error("Cannot register with super admin role");
+  }
+
+  const validRoles = ["admin", "branch_admin", "support", "customer"];
   if (!validRoles.includes(role)) {
     throw new Error("Invalid role selected");
   }
 
-  if (RESTRICTED_ROLE_KEYS.some(restricted =>
-    role.toLowerCase() === restricted.toLowerCase()
-  )) {
-    throw new Error("Cannot register with admin or super admin roles");
+  // Check if organization has restricted allowed_registration_roles
+  if (organization_id) {
+    const org = await Organization.findById(organization_id);
+    if (org && Array.isArray(org.allowed_registration_roles) && org.allowed_registration_roles.length > 0) {
+      if (!org.allowed_registration_roles.includes(role)) {
+        throw new Error(`Registration for role '${role}' is not enabled for this organization.`);
+      }
+    }
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -98,7 +106,7 @@ export const registerWithApproval = async (userData) => {
     organization_id,
     role,
     name,
-    email,
+    email: email.toLowerCase().trim(),
     phone,
     password: hashedPassword,
     dob,

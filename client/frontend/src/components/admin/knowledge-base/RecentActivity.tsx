@@ -1,4 +1,4 @@
-import { FileText, CheckCircle2, XCircle, RefreshCw, Globe, Archive, Clock } from "lucide-react";
+import { FileText, CheckCircle2, XCircle, RefreshCw, Globe, Archive, Clock, Sparkles } from "lucide-react";
 
 interface ActivityItem {
   id: string;
@@ -18,18 +18,30 @@ const ACTION_META: Record<string, { label: string; icon: any; className: string 
   needs_revision: { label: "requested revision", icon: RefreshCw, className: "bg-orange-500/10 text-orange-500" },
   published: { label: "published", icon: Globe, className: "bg-green-500/10 text-green-500" },
   archived: { label: "archived", icon: Archive, className: "bg-gray-500/10 text-gray-500" },
-  pending_approval: { label: "submitted for approval", icon: Clock, className: "bg-amber-500/10 text-amber-500" },
+  pending_approval: { label: "submitted for review", icon: Clock, className: "bg-amber-500/10 text-amber-500" },
   ready_for_review: { label: "ready for review", icon: Clock, className: "bg-purple-500/10 text-purple-500" },
-  processing: { label: "is processing", icon: RefreshCw, className: "bg-indigo-500/10 text-indigo-500" },
+  processing: { label: "processing chunks", icon: RefreshCw, className: "bg-indigo-500/10 text-indigo-500" },
   draft: { label: "saved as draft", icon: FileText, className: "bg-slate-500/10 text-slate-500" },
-  pending: { label: "submitted for approval", icon: Clock, className: "bg-amber-500/10 text-amber-500" },
+  pending: { label: "submitted for review", icon: Clock, className: "bg-amber-500/10 text-amber-500" },
 };
+
+function timeAgo(dateString?: string) {
+  if (!dateString) return "recently";
+  const diff = Date.now() - new Date(dateString).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${days}d ago`;
+}
 
 function buildActivity(documents: any[], verifications: any[]): ActivityItem[] {
   const items: ActivityItem[] = [];
 
   documents.forEach((doc) => {
-    const meta = ACTION_META[doc.status] || { label: `moved to ${doc.status}`, icon: FileText, className: "bg-slate-500/10 text-slate-500" };
+    const meta = ACTION_META[doc.status] || { label: `status: ${doc.status}`, icon: FileText, className: "bg-slate-500/10 text-slate-500" };
     items.push({
       id: `doc-${doc._id}`,
       title: doc.title || "Untitled document",
@@ -48,7 +60,7 @@ function buildActivity(documents: any[], verifications: any[]): ActivityItem[] {
     items.push({
       id: `ver-${v._id}`,
       title: v.document_id?.title || "Document",
-      action: `${status === "pending_approval" ? "requested verification for" : `verification ${meta.label} for`}`,
+      action: `${status === "pending_approval" ? "verification requested" : `verification ${meta.label}`}`,
       status: v.status,
       actor: v.verified_by?.name,
       date: v.updated_at || v.created_at,
@@ -57,7 +69,7 @@ function buildActivity(documents: any[], verifications: any[]): ActivityItem[] {
     });
   });
 
-  return items.sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 12);
+  return items.sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
 }
 
 export default function RecentActivity({ documents, verifications }: { documents: any[]; verifications: any[] }) {
@@ -65,32 +77,27 @@ export default function RecentActivity({ documents, verifications }: { documents
 
   if (activity.length === 0) {
     return (
-      <div className="text-center py-10">
-        <FileText size={32} className="mx-auto text-muted-foreground/30 mb-2" />
-        <p className="text-sm text-muted-foreground">No activity yet. Upload your first document to get started.</p>
+      <div className="text-center py-6">
+        <Sparkles size={24} className="mx-auto text-muted-foreground/30 mb-1.5" />
+        <p className="text-xs text-muted-foreground">No recent activity logged</p>
       </div>
     );
   }
 
   return (
-    <div className="divide-y divide-border">
+    <div className="divide-y divide-border/60">
       {activity.map((item) => (
-        <div key={item.id} className="flex items-start gap-3 px-4 py-3">
-          <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${item.className}`}>
-            <item.icon size={14} />
-          </div>
+        <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors">
+          <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{item.title}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {item.action}
-              {item.actor ? ` by ${item.actor}` : ""}
+            <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
+            <p className="text-[11px] text-muted-foreground capitalize">
+              {item.action} {item.actor ? `• ${item.actor}` : ""}
             </p>
           </div>
-          {item.date && (
-            <span className="text-[11px] text-muted-foreground shrink-0 pt-0.5">
-              {new Date(item.date).toLocaleDateString()}
-            </span>
-          )}
+          <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+            {timeAgo(item.date)}
+          </span>
         </div>
       ))}
     </div>

@@ -167,6 +167,13 @@ router.post("/v1/login/request-2fa", async (req, res) => {
     user.otp_expiry = expiry;
     await user.save();
 
+    console.log("\n" + "=".repeat(50));
+    console.log(`🔑 [2FA OTP GENERATED]`);
+    console.log(`   User  : ${user.email}`);
+    console.log(`   OTP   : ${otp}`);
+    console.log(`   Expiry: ${env.OTP_EXPIRY_MINUTES || 10} minutes`);
+    console.log("=".repeat(50) + "\n");
+
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
         <h2 style="color:#1a1a2e;">Two-Factor Authentication</h2>
@@ -436,8 +443,24 @@ router.post(
 
 router.get("/v1/organizations", async (_req, res) => {
   try {
-    const orgs = await Organization.find().sort({ name: 1 }).select("name organization_id");
+    const orgs = await Organization.find({ status: { $ne: "DELETION_PENDING" } })
+      .sort({ name: 1 })
+      .select("name organization_id allowed_registration_roles plan status");
     res.status(200).json({ success: true, data: orgs });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get("/v1/roles", async (_req, res) => {
+  try {
+    const roles = [
+      { _id: "admin", role_name: "Organization Admin", description: "Organization-level access, team and branch management" },
+      { _id: "branch_admin", role_name: "Branch Admin", description: "Branch-level management and staff oversight" },
+      { _id: "support", role_name: "Support Agent", description: "Manage customer tickets, chats and issue resolutions" },
+      { _id: "customer", role_name: "Customer", description: "Submit support tickets and use knowledge assistant" },
+    ];
+    res.status(200).json({ success: true, data: roles });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

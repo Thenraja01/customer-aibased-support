@@ -292,6 +292,18 @@ export const retryIngestion = async (req, res) => {
   }
 };
 
+export const abortProcessing = async (req, res) => {
+  try {
+    const orgId = req.user?.roleName === "super_admin" ? null : req.user?.organizationId;
+    const branchId = (req.user?.roleName === "branch_admin" || req.user?.roleName === "support") ? req.user?.branchId : null;
+    const doc = await docService.abortDocumentProcessing(req.params.id, orgId, branchId);
+    res.status(200).json({ success: true, message: "Document processing aborted successfully", data: doc });
+  } catch (error) {
+    const status = error.message === "Document not found" ? 404 : 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
 export const updateMetadata = async (req, res) => {
   try {
     const docId = req.params.id;
@@ -331,19 +343,29 @@ export const getDocumentContent = async (req, res) => {
 
 export const generateSummary = async (req, res) => {
   try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
     const { getChunksByDocument } = await import("./documentChunk.service.js");
     const chunks = await getChunksByDocument(req.params.id);
     const textSample = chunks.slice(0, 5).map((c) => c.text || c.content).join("\n\n");
-    let summary = "Summary not available";
+    let summaryText = doc.summary || doc.context_summary || "Summary not available";
+
     if (textSample) {
-      const { generateResponse } = await import("../llm/index.js");
-      summary = await generateResponse({
-        prompt: `Please provide a concise 2-3 sentence executive summary for the following document text:\n\n${textSample.substring(0, 2500)}`,
+      const { generateResponse } = await import("../llm/llm.service.js");
+      const prompt = `Please provide a concise 2-3 sentence executive context summary and key points for the following document text:\n\nDocument Title: "${doc.title}"\nContent:\n${textSample.substring(0, 2500)}`;
+      const result = await generateResponse(prompt, "", {
+        organizationId: doc.organization_id,
         temperature: 0.3,
         maxTokens: 300,
       });
+      summaryText = typeof result === "string" ? result : result?.text || summaryText;
+
+      doc.summary = summaryText.trim();
+      doc.context_summary = summaryText.trim();
+      await doc.save();
     }
-    res.status(200).json({ success: true, data: { summary } });
+    res.status(200).json({ success: true, data: { summary: summaryText, document: doc } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

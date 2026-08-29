@@ -5,7 +5,6 @@
   // Read configuration from current script tag
   var scriptTag = document.currentScript || document.querySelector('script[src*="widget.js"]');
   var apiKey = scriptTag ? scriptTag.getAttribute('data-api-key') || scriptTag.getAttribute('data-key') || '' : '';
-  var customOrgId = scriptTag ? scriptTag.getAttribute('data-org-id') || scriptTag.getAttribute('data-tenant-id') || '' : '';
   var customUserId = scriptTag ? scriptTag.getAttribute('data-user-id') || '' : '';
   var customUserRole = scriptTag ? scriptTag.getAttribute('data-user-role') || scriptTag.getAttribute('data-role') || 'customer' : 'customer';
   var customBranchId = scriptTag ? scriptTag.getAttribute('data-branch-id') || '' : '';
@@ -217,6 +216,61 @@
           border-bottom-left-radius: 4px;
         }
 
+        @keyframes sai-pulse {
+          0%, 100% { opacity: 0.35; transform: scale(0.85); }
+          50% { opacity: 1; transform: scale(1.2); }
+        }
+        @keyframes sai-sparkle-spin {
+          0% { transform: rotate(0deg) scale(0.9); }
+          50% { transform: rotate(180deg) scale(1.15); }
+          100% { transform: rotate(360deg) scale(0.9); }
+        }
+        @keyframes sai-gradient-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .sai-msg-thinking {
+          display: inline-flex !important;
+          align-items: center;
+          gap: 8px;
+          background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95)) !important;
+          border: 1px solid rgba(99, 102, 241, 0.35) !important;
+          box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+          padding: 10px 14px !important;
+        }
+        .sai-thinking-sparkle {
+          font-size: 13px;
+          display: inline-block;
+          animation: sai-sparkle-spin 3s infinite ease-in-out;
+        }
+        .sai-thinking-label {
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.2px;
+          background: linear-gradient(90deg, #e2e8f0, ${accentColor}, #e2e8f0);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: sai-gradient-shift 3s infinite linear;
+        }
+        .sai-dots {
+          display: inline-flex;
+          align-items: center;
+          gap: 3.5px;
+          margin-left: 2px;
+        }
+        .sai-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: ${accentColor};
+          animation: sai-pulse 1.2s infinite ease-in-out;
+        }
+        .sai-dot:nth-child(1) { animation-delay: 0s; }
+        .sai-dot:nth-child(2) { animation-delay: 0.2s; }
+        .sai-dot:nth-child(3) { animation-delay: 0.4s; }
+
         .sai-citations {
           margin-top: 8px;
           display: flex;
@@ -378,16 +432,12 @@
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
-          'x-tenant-id': customOrgId,
-          'x-org-id': customOrgId,
           'x-user-id': customUserId,
           'x-user-role': customUserRole,
           'x-branch-id': customBranchId,
         },
         body: JSON.stringify({
           sessionId: this.state.sessionId,
-          orgId: customOrgId,
-          tenantId: customOrgId,
           userId: customUserId,
           role: customUserRole,
           branchId: customBranchId,
@@ -432,8 +482,6 @@
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
-          'x-tenant-id': customOrgId,
-          'x-org-id': customOrgId,
           'x-user-id': customUserId,
           'x-user-role': customUserRole,
           'x-branch-id': customBranchId,
@@ -441,8 +489,6 @@
         body: JSON.stringify({
           sessionId: this.state.sessionId,
           apiKey: apiKey,
-          orgId: customOrgId,
-          tenantId: customOrgId,
           userId: customUserId,
           role: customUserRole,
           roleName: customUserRole,
@@ -453,7 +499,7 @@
         .then((response) => {
           if (!response.ok) throw new Error('Stream request failed');
 
-          const aiMsgIndex = this.appendMessage({ text: '', isUser: false, citations: [] });
+          const aiMsgIndex = this.appendMessage({ text: '', isUser: false, isThinking: true, citations: [] });
           const reader = response.body.getReader();
           const decoder = new TextDecoder('utf-8');
           let buffer = '';
@@ -516,21 +562,19 @@
         })
         .catch((err) => {
           console.warn('[SupportAI Widget] SSE Stream fallback activated:', err);
+          const aiMsgIndex = this.appendMessage({ text: '', isUser: false, isThinking: true, citations: [] });
+
           fetch(backendUrl + '/api/v1/chat/message', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'x-api-key': apiKey,
-              'x-tenant-id': customOrgId,
-              'x-org-id': customOrgId,
               'x-user-id': customUserId,
               'x-branch-id': customBranchId,
             },
             body: JSON.stringify({
               chatId: this.state.sessionId,
               apiKey: apiKey,
-              orgId: customOrgId,
-              tenantId: customOrgId,
               userId: customUserId,
               branchId: customBranchId,
               message: text,
@@ -545,24 +589,24 @@
                   this.state.sessionId = res.data.chatId;
                   localStorage.setItem('__support_ai_session_' + apiKey, res.data.chatId);
                 }
-                this.appendMessage({
+                this.updateAIMessage(aiMsgIndex, {
                   text: res.data.answer || 'I am here to assist you.',
-                  isUser: false,
+                  isThinking: false,
                   citations: res.data.citations || [],
                 });
               } else {
-                this.appendMessage({
+                this.updateAIMessage(aiMsgIndex, {
                   text: res.message || 'Unable to connect to support assistant.',
-                  isUser: false,
+                  isThinking: false,
                 });
               }
             })
             .catch(() => {
               this.state.loading = false;
               this.shadowRoot.getElementById('sai-send').disabled = false;
-              this.appendMessage({
+              this.updateAIMessage(aiMsgIndex, {
                 text: 'Unable to connect to support assistant. Please try again later.',
-                isUser: false,
+                isThinking: false,
               });
             });
         });
@@ -617,7 +661,8 @@
 
     appendToAIMessage(index, token) {
       if (this.state.messages[index]) {
-        this.state.messages[index].text += token;
+        this.state.messages[index].isThinking = false;
+        this.state.messages[index].text = (this.state.messages[index].text || '') + token;
         this.renderMessages();
       }
     }
@@ -642,6 +687,22 @@
       }
 
       this.state.messages.forEach((m) => {
+        if (!m.isUser && (!m.text || m.isThinking)) {
+          const thinkDiv = document.createElement('div');
+          thinkDiv.className = 'sai-msg sai-msg-ai sai-msg-thinking';
+          thinkDiv.innerHTML = `
+            <span class="sai-thinking-sparkle">✨</span>
+            <span class="sai-thinking-label">AI is thinking</span>
+            <span class="sai-dots">
+              <span class="sai-dot"></span>
+              <span class="sai-dot"></span>
+              <span class="sai-dot"></span>
+            </span>
+          `;
+          body.appendChild(thinkDiv);
+          return;
+        }
+
         const div = document.createElement('div');
         div.className = 'sai-msg ' + (m.isUser ? 'sai-msg-user' : 'sai-msg-ai');
         div.innerText = m.text;
@@ -742,7 +803,7 @@
       if (config.apiKey) apiKey = config.apiKey;
       if (config.backendUrl) backendUrl = config.backendUrl.replace(/\/+$/, '');
       if (config.userId) customUserId = config.userId;
-      if (config.orgId) customOrgId = config.orgId;
+      if (config.branchId) customBranchId = config.branchId;
       if (widgetInstance && widgetInstance.initHandshake) widgetInstance.initHandshake();
     },
     submitCsat: function (rating, comment) {

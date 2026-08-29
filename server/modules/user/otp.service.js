@@ -116,6 +116,13 @@ export const generateApprovalOtp = async (email) => {
   user.otp_expiry = expiry;
   await user.save();
 
+  console.log("\n" + "=".repeat(50));
+  console.log(`🔑 [APPROVAL OTP GENERATED]`);
+  console.log(`   User  : ${user.name} (${user.email})`);
+  console.log(`   OTP   : ${otp}`);
+  console.log(`   Expiry: ${env.OTP_EXPIRY_MINUTES} minutes`);
+  console.log("=".repeat(50) + "\n");
+
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#fafafa;border-radius:12px;">
       <div style="text-align:center;margin-bottom:24px;">

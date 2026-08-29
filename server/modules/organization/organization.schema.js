@@ -47,6 +47,19 @@ const organizationSchema = new mongoose.Schema(
       accent: { type: String, default: "#f59e0b" },
     },
 
+    // Tenant Animated Splash Loader Configuration
+    loader_config: {
+      enabled: { type: Boolean, default: true },
+      title: { type: String, default: "" },
+      subtitle: { type: String, default: "Build fast, ship faster" },
+      duration_ms: { type: Number, default: 2400 },
+      bg_theme: {
+        type: String,
+        enum: ["dark", "light", "brand", "glass"],
+        default: "dark",
+      },
+    },
+
     // Chart Colors
     chart_colors: {
       primary: { type: String, default: "#2563eb" },
@@ -67,6 +80,21 @@ const organizationSchema = new mongoose.Schema(
     widget_position: { type: String, enum: ["right", "left"], default: "right" },
     widget_theme: { type: String, enum: ["dark", "light", "custom"], default: "dark" },
     widget_enabled: { type: Boolean, default: true },
+
+    // Ticket Auto-Assignment & Dispatch Configuration
+    ticket_assignment_config: {
+      method: {
+        type: String,
+        enum: ["round_robin", "least_busy", "skill_based", "hybrid", "manual"],
+        default: "round_robin",
+      },
+      auto_assign_on_create: { type: Boolean, default: true },
+      only_active_agents: { type: Boolean, default: true },
+      max_tickets_per_agent: { type: Number, default: 10 },
+      reassign_on_sla_warning: { type: Boolean, default: false },
+      inactivity_timeout_mins: { type: Number, default: 60 },
+      fallback_to_branch_admin: { type: Boolean, default: true },
+    },
 
     // AI Settings
     ai_settings: {
@@ -111,6 +139,7 @@ const organizationSchema = new mongoose.Schema(
       max_retries: { type: Number, default: 2 },
       temperature: { type: Number, default: 0.7 },
       max_tokens: { type: Number, default: 2048 },
+      max_fallbacks: { type: Number, default: 1 },
     },
     cloudinary_config: {
       cloud_name: { type: String, default: "" },
@@ -124,6 +153,8 @@ const organizationSchema = new mongoose.Schema(
       top_k: { type: Number, default: 5 },
       min_score: { type: Number, default: 0.35 },
       bfs_max_depth: { type: Number, default: 2 },
+      bfs_max_nodes: { type: Number, default: 30 },
+      query_cache_ttl_ms: { type: Number, default: 600000 },
     },
 
     // Guardrails
@@ -172,14 +203,54 @@ const organizationSchema = new mongoose.Schema(
 
     // Email Templates
     email_templates: {
+      ticket_created: {
+        subject: { type: String, default: "Ticket #{{ticket_id}} Created: {{subject}}" },
+        body: { type: String, default: "Hello {{customer_name}},\n\nThank you for reaching out. We have received your support ticket #{{ticket_id}} regarding \"{{subject}}\".\n\nPriority: {{priority}}\nBranch: {{branch_name}}\n\nOur support team is reviewing your request and will get back to you shortly.\n\nBest regards,\n{{org_name}} Support Team" },
+      },
       ticket_assigned: {
-        subject: { type: String, default: "New ticket assigned: {{ticket_id}}" },
-        body: { type: String, default: "Hello {{agent_name}},\n\nTicket {{ticket_id}} has been assigned to you.\n\nSubject: {{subject}}\nPriority: {{priority}}\n\nPlease respond within the SLA period." },
+        subject: { type: String, default: "Ticket Assigned: #{{ticket_id}} - {{subject}}" },
+        body: { type: String, default: "Hello {{agent_name}},\n\nTicket #{{ticket_id}} has been assigned to you.\n\nSubject: {{subject}}\nCustomer: {{customer_name}}\nPriority: {{priority}}\nBranch: {{branch_name}}\n\nPlease review and respond within the SLA deadline.\n\nPortal: {{portal_url}}" },
       },
       ticket_resolved: {
-        subject: { type: String, default: "Ticket resolved: {{ticket_id}}" },
-        body: { type: String, default: "Hello {{customer_name}},\n\nYour ticket {{ticket_id}} has been resolved.\n\nPlease confirm if you're satisfied with the resolution." },
+        subject: { type: String, default: "Ticket #{{ticket_id}} Resolved: {{subject}}" },
+        body: { type: String, default: "Hello {{customer_name}},\n\nYour support ticket #{{ticket_id}} has been marked as resolved.\n\nResolution Summary:\n{{ai_summary}}\n\nIf you have any further questions or if your issue persists, please reply to this email or visit our portal.\n\nBest regards,\n{{org_name}} Customer Care" },
       },
+      ai_escalation: {
+        subject: { type: String, default: "⚠️ AI Escalation Alert: Ticket #{{ticket_id}} requires human assistance" },
+        body: { type: String, default: "Hello Support Team,\n\nA customer chat session has been escalated by the AI assistant and requires human agent takeover.\n\nTicket: #{{ticket_id}}\nCustomer: {{customer_name}}\nTopic: {{subject}}\nBranch: {{branch_name}}\n\nPlease open the ticket immediately to assist the customer.\n\nPortal: {{portal_url}}" },
+      },
+      sla_warning: {
+        subject: { type: String, default: "⏰ SLA Deadline Warning: Ticket #{{ticket_id}} is approaching breach" },
+        body: { type: String, default: "Attention {{agent_name}},\n\nSupport Ticket #{{ticket_id}} (Priority: {{priority}}) is approaching its SLA response/resolution deadline.\n\nSubject: {{subject}}\nCustomer: {{customer_name}}\nBranch: {{branch_name}}\n\nPlease take immediate action to avoid an SLA breach." },
+      },
+      announcement_update: {
+        subject: { type: String, default: "📢 Announcement from {{org_name}}: {{subject}}" },
+        body: { type: String, default: "Dear {{customer_name}},\n\nWe would like to share an important update regarding {{org_name}}:\n\n{{subject}}\n\nIf you have any questions or need assistance, our support team is always here to help.\n\nBest regards,\n{{org_name}} Team" },
+      },
+    },
+
+    default_branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
+    },
+    allowed_domains: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+    ],
+    allowed_registration_roles: {
+      type: [String],
+      default: ["admin", "branch_admin", "support", "customer"],
+    },
+    plan_customization: {
+      custom_price: { type: Number },
+      custom_name: { type: String },
+      custom_storage_mb: { type: Number },
+      custom_ai_requests: { type: Number },
+      features: [{ type: String }],
     },
 
     storage_used: { type: Number, default: 0 },
@@ -205,14 +276,13 @@ const organizationSchema = new mongoose.Schema(
   }
 );
 
-organizationSchema.pre("save", function (next) {
+organizationSchema.pre("save", function () {
   if (this.domain === "" || (typeof this.domain === "string" && !this.domain.trim())) {
     this.domain = undefined;
   }
-  next();
 });
 
-organizationSchema.pre("findOneAndUpdate", function (next) {
+organizationSchema.pre("findOneAndUpdate", function () {
   const update = this.getUpdate();
   if (update) {
     if (update.domain === "" || (typeof update.domain === "string" && !update.domain.trim())) {
@@ -221,8 +291,10 @@ organizationSchema.pre("findOneAndUpdate", function (next) {
     if (update.$set && (update.$set.domain === "" || (typeof update.$set.domain === "string" && !update.$set.domain.trim()))) {
       delete update.$set.domain;
     }
+    if (update.$setOnInsert && (update.$setOnInsert.domain === "" || (typeof update.$setOnInsert.domain === "string" && !update.$setOnInsert.domain.trim()))) {
+      delete update.$setOnInsert.domain;
+    }
   }
-  if (typeof next === "function") next();
 });
 
 export default mongoose.model("Organization", organizationSchema);

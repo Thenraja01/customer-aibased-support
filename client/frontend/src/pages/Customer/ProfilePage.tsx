@@ -15,25 +15,14 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Type,
-  Palette,
-  Sun,
-  Moon,
-  Laptop,
-  Sparkles,
   Camera,
   Building2,
   GitBranch,
   Check,
   RotateCcw,
-  AlignLeft,
-  TextSelect,
-  LetterText,
   BadgeCheck,
   Eye,
-  SlidersHorizontal,
-  Zap,
-  Layers,
+  Type,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { UsersAPI } from "@/api/user.api";
@@ -43,18 +32,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
 import { Switch } from "@/components/ui/switch";
-import {
-  useTheme,
-  ThemeMode,
-  ACCENT_COLORS,
-} from "@/context/ThemeContext";
-import {
-  useFontSettings,
-  FontSize,
-  FontFamily,
-} from "@/context/FontSettingsContext";
+import FontSettingsPanel from "@/components/FontSettingsPanel";
 
-type Tab = "profile" | "appearance" | "security";
+type Tab = "profile" | "security" | "font";
 
 type UserData = {
   _id: string;
@@ -72,45 +52,10 @@ type UserData = {
   profileImage?: string;
 };
 
-const THEME_MODES: { id: ThemeMode; label: string; desc: string; icon: any }[] = [
-  { id: "glass", label: "Glass Frost", desc: "Translucent frosted glass backdrop aesthetic", icon: Layers },
-  { id: "neon", label: "Neon Cyber", desc: "Vibrant high-contrast cyberpunk dark aesthetic", icon: Zap },
-  { id: "dark", label: "Dark Slate", desc: "Balanced dark charcoal mode", icon: Moon },
-  { id: "light", label: "Light Mode", desc: "Clean bright daylight aesthetic", icon: Sun },
-  { id: "midnight", label: "Midnight OLED", desc: "Pure pitch black with high contrast", icon: Sparkles },
-  { id: "system", label: "System Sync", desc: "Automatically match OS preference", icon: Laptop },
-];
-
-const FONT_SIZE_OPTIONS: { value: FontSize; label: string; scaleText: string }[] = [
-  { value: "small", label: "Compact", scaleText: "87.5%" },
-  { value: "medium", label: "Standard", scaleText: "100%" },
-  { value: "large", label: "Large", scaleText: "112.5%" },
-  { value: "x-large", label: "Extra Large", scaleText: "125%" },
-];
-
-const FONT_FAMILY_OPTIONS: { value: FontFamily; label: string; fontSample: string }[] = [
-  { value: "sans", label: "Inter / Modern Sans", fontSample: "Aa Bb Gg" },
-  { value: "system", label: "System UI Default", fontSample: "Aa Bb Gg" },
-  { value: "mono", label: "JetBrains Mono", fontSample: "01 {} =>" },
-  { value: "serif", label: "Merriweather Serif", fontSample: "Aa Bb Gg" },
-  { value: "dyslexic", label: "OpenDyslexic", fontSample: "Aa Bb Gg" },
-];
-
 export default function ProfilePage() {
-  const { user, isAuthenticated, token, logout, setSession } = useAuth();
+  const { user, isAuthenticated, token, logout, setSession, updateUser } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
-
-  // Theme & Font Settings Contexts
-  const { themeMode, setThemeMode, accentColor, setAccentColor } = useTheme();
-  const {
-    settings: fontSettings,
-    setFontSize,
-    setFontFamily,
-    setLineHeight,
-    setLetterSpacing,
-    resetToDefaults: resetFontDefaults,
-  } = useFontSettings();
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<Tab>("profile");
@@ -174,14 +119,7 @@ export default function ProfilePage() {
         toast.success("Avatar Updated", "Your profile photo has been refreshed.");
         const newUrl = res.data.data.profileImage;
         setProfile((prev) => (prev ? { ...prev, profileImage: newUrl } : prev));
-
-        setSession({
-          token,
-          user: {
-            ...user,
-            profileImage: newUrl,
-          },
-        });
+        updateUser({ profileImage: newUrl });
       }
     } catch (err: any) {
       toast.error("Upload Failed", err.response?.data?.message || "Failed to update profile photo.");
@@ -197,6 +135,7 @@ export default function ProfilePage() {
       const res = await UsersAPI.getProfile();
       if (res?.data?.success) {
         setProfile(res.data.data);
+        updateUser(res.data.data);
         setTwoFactorEnabled(res.data.data.two_factor_enabled ?? false);
       }
     } catch (err: any) {
@@ -360,16 +299,16 @@ export default function ProfilePage() {
 
         {/* User Identity Pill */}
         <div className="flex items-center gap-3 bg-card border border-border px-4 py-2 rounded-2xl shadow-sm">
-          <div className="h-9 w-9 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary font-bold text-xs">
-            {profile?.profileImage ? (
-              <img
-                src={getImageUrl(profile.profileImage)}
-                alt={displayName}
-                className="h-full w-full rounded-full object-cover"
-              />
-            ) : (
-              initials
-            )}
+          <div className="h-9 w-9 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center overflow-hidden shrink-0">
+            <img
+              src={
+                profile?.profileImage
+                  ? getImageUrl(profile.profileImage)
+                  : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=4f46e5&color=ffffff&bold=true&rounded=true&format=svg`
+              }
+              alt={displayName}
+              className="h-full w-full object-cover"
+            />
           </div>
           <div>
             <p className="font-bold text-xs leading-tight">{displayName}</p>
@@ -382,8 +321,8 @@ export default function ProfilePage() {
       <div className="flex items-center gap-2 border-b border-border mb-6">
         {[
           { id: "profile", label: "Personal Details", icon: User },
-          { id: "appearance", label: "Theme & Fonts Settings", icon: Palette },
           { id: "security", label: "Security & Credentials", icon: Shield },
+          { id: "font", label: "Font Customization", icon: Type },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -424,18 +363,17 @@ export default function ProfilePage() {
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                 <div className="relative group">
-                  <div className="h-24 w-24 rounded-2xl bg-muted border-2 border-border overflow-hidden flex items-center justify-center text-2xl font-bold text-primary shadow-inner">
-                    {previewUrl ? (
-                      <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
-                    ) : profile?.profileImage ? (
-                      <img
-                        src={getImageUrl(profile.profileImage)}
-                        alt={displayName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      initials
-                    )}
+                  <div className="h-24 w-24 rounded-2xl bg-muted border-2 border-border overflow-hidden flex items-center justify-center shadow-inner">
+                    <img
+                      src={
+                        previewUrl ||
+                        (profile?.profileImage
+                          ? getImageUrl(profile.profileImage)
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=4f46e5&color=ffffff&bold=true&rounded=true&format=svg`)
+                      }
+                      alt={displayName}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
 
                   <input
@@ -566,279 +504,7 @@ export default function ProfilePage() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 2: THEME & FONTS SETTINGS */}
-        {/* ========================================================================= */}
-        {activeTab === "appearance" && (
-          <motion.div
-            key="appearance"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-8 max-w-4xl"
-          >
-            {/* 1. Theme Mode Switcher */}
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
-              <div>
-                <h3 className="text-base font-bold tracking-tight flex items-center gap-2">
-                  <Palette size={18} className="text-primary" />
-                  Interface Theme Mode
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Choose your preferred lighting scheme across dashboards, navigation, and tools.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {THEME_MODES.map((mode) => {
-                  const isSelected = themeMode === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => setThemeMode(mode.id)}
-                      className={`p-4 rounded-xl border text-left transition-all relative ${
-                        isSelected
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-border bg-card/60 hover:border-primary/40 hover:bg-muted/50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className={`p-2 rounded-lg ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                          <mode.icon size={16} />
-                        </div>
-                        {isSelected && (
-                          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                        )}
-                      </div>
-                      <p className="font-bold text-xs">{mode.label}</p>
-                      <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{mode.desc}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 2. Accent Color Palette */}
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
-              <div>
-                <h3 className="text-base font-bold tracking-tight flex items-center gap-2">
-                  <Sparkles size={18} className="text-primary" />
-                  Accent Color Theme
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Personalize the primary highlight color for buttons, badges, indicators, and active states.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {ACCENT_COLORS.map((accent) => {
-                  const isSelected = accentColor === accent.id;
-                  return (
-                    <button
-                      key={accent.id}
-                      type="button"
-                      onClick={() => setAccentColor(accent.id)}
-                      className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                        isSelected
-                          ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/30"
-                          : "border-border bg-card/60 hover:border-primary/40 hover:bg-muted/50"
-                      }`}
-                    >
-                      <div
-                        className="h-7 w-7 rounded-full shadow-md flex items-center justify-center text-white"
-                        style={{ backgroundColor: accent.hex }}
-                      >
-                        {isSelected && <Check size={14} className="drop-shadow" />}
-                      </div>
-                      <span className="text-xs font-semibold text-center">{accent.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 3. Typography & Font Settings */}
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-6">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h3 className="text-base font-bold tracking-tight flex items-center gap-2">
-                    <Type size={18} className="text-primary" />
-                    Typography &amp; Readability Settings
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Customize font family, scale, line spacing, and letter pitch for comfortable reading.
-                  </p>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={resetFontDefaults}
-                  className="border-border text-xs h-8 hover:bg-muted"
-                >
-                  <RotateCcw size={12} className="mr-1.5" />
-                  Reset Defaults
-                </Button>
-              </div>
-
-              {/* Font Family */}
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold flex items-center gap-1.5">
-                  <LetterText size={14} className="text-primary" />
-                  Font Family Style
-                </Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                  {FONT_FAMILY_OPTIONS.map((f) => {
-                    const isSelected = fontSettings.fontFamily === f.value;
-                    return (
-                      <button
-                        key={f.value}
-                        type="button"
-                        onClick={() => setFontFamily(f.value)}
-                        className={`p-3 rounded-xl border text-left transition-all ${
-                          isSelected
-                            ? "border-primary bg-primary/10 text-primary shadow-sm"
-                            : "border-border bg-card hover:border-primary/40 hover:text-foreground"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold">{f.label}</span>
-                          {isSelected && <Check size={12} />}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-1 font-mono">{f.fontSample}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Font Size Scale */}
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold flex items-center gap-1.5">
-                  <TextSelect size={14} className="text-primary" />
-                  Font Size Scaling
-                </Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {FONT_SIZE_OPTIONS.map((s) => {
-                    const isSelected = fontSettings.fontSize === s.value;
-                    return (
-                      <button
-                        key={s.value}
-                        type="button"
-                        onClick={() => setFontSize(s.value)}
-                        className={`p-3 rounded-xl border text-center transition-all ${
-                          isSelected
-                            ? "border-primary bg-primary/10 text-primary shadow-sm"
-                            : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                        }`}
-                      >
-                        <p className="text-xs font-bold">{s.label}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{s.scaleText}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Sliders for Line Height & Letter Spacing */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 border-t border-border">
-                {/* Line Height */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold flex items-center gap-1.5">
-                      <AlignLeft size={14} className="text-primary" />
-                      Line Height
-                    </span>
-                    <span className="font-mono text-muted-foreground">{fontSettings.lineHeight.toFixed(1)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1.0"
-                    max="2.5"
-                    step="0.1"
-                    value={fontSettings.lineHeight}
-                    onChange={(e) => setLineHeight(parseFloat(e.target.value))}
-                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-muted accent-primary"
-                  />
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>1.0 Compact</span>
-                    <span>2.5 Spacious</span>
-                  </div>
-                </div>
-
-                {/* Letter Spacing */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold flex items-center gap-1.5">
-                      <SlidersHorizontal size={14} className="text-primary" />
-                      Letter Spacing
-                    </span>
-                    <span className="font-mono text-muted-foreground">{fontSettings.letterSpacing}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="-1"
-                    max="3"
-                    step="0.5"
-                    value={fontSettings.letterSpacing}
-                    onChange={(e) => setLetterSpacing(parseFloat(e.target.value))}
-                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-muted accent-primary"
-                  />
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>-1px Tight</span>
-                    <span>+3px Expanded</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 4. Live UI Preview Sandbox */}
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
-                  <Eye size={14} />
-                  Live Theme &amp; Typography Sandbox Preview
-                </span>
-                <span className="text-[10px] font-mono text-muted-foreground">Applies system-wide</span>
-              </div>
-
-              <div
-                className="p-5 rounded-xl border border-border bg-muted/30 space-y-4"
-                style={{
-                  fontFamily: "var(--font-family-custom)",
-                  lineHeight: "var(--line-height-custom)",
-                  letterSpacing: "var(--letter-spacing-custom)",
-                }}
-              >
-                <div>
-                  <h4 className="text-lg font-extrabold text-foreground">
-                    AI Business Operations &amp; Support Suite
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Multi-tenant knowledge orchestration, dynamic tool builder, and automated real-time incident resolution.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button size="sm" className="bg-primary text-primary-foreground text-xs font-semibold h-8 shadow-sm">
-                    Primary Action Button
-                  </Button>
-                  <Button size="sm" variant="outline" className="border-border text-xs h-8">
-                    Secondary Outline
-                  </Button>
-                  <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold">
-                    ACTIVE · 200 OK
-                  </span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* TAB 3: SECURITY & CREDENTIALS */}
+        {/* TAB 2: SECURITY & CREDENTIALS */}
         {/* ========================================================================= */}
         {activeTab === "security" && (
           <motion.div
@@ -1013,6 +679,31 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: FONT & TYPOGRAPHY CUSTOMIZATION */}
+        {/* ========================================================================= */}
+        {activeTab === "font" && (
+          <motion.div
+            key="font"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="rounded-3xl border border-border/80 bg-card p-6 md:p-8 shadow-sm space-y-6"
+          >
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Type className="text-primary" size={18} /> Font & Typography Preferences
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Customize your personal interface font family, sizing, line height, and letter spacing across the workspace.
+              </p>
+            </div>
+
+            <FontSettingsPanel />
           </motion.div>
         )}
       </AnimatePresence>

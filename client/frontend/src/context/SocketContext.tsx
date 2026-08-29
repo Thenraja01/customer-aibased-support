@@ -113,6 +113,18 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    socket.on("document:indexed", (data: any) => {
+      toast.success(
+        "Document Indexed",
+        `Document "${data?.title || "File"}" (${data?.chunkCount || 0} chunks) is live in RAG search.`
+      );
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      if (data?.documentId) {
+        queryClient.invalidateQueries({ queryKey: ["document", data.documentId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["ragMetrics"] });
+    });
+
     socket.on("typing:start", ({ chatId, userId: typingUserId }) => {
       if (typingUserId !== user._id) {
         setTypingUsers((prev) => ({ ...prev, [`${chatId}:${typingUserId}`]: true }));

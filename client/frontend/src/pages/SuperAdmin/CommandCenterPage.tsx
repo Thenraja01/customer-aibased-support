@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AdminAPI } from "@/api/admin.api";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-
+import TenantAppLoader from "@/components/branding/TenantAppLoader";
 
 export default function CommandCenterPage() {
   const navigate = useNavigate();
@@ -168,12 +168,12 @@ export default function CommandCenterPage() {
 
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <RefreshCw className="w-8 h-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground">Initializing Command Center Telemetry...</p>
-        </div>
-      </div>
+      <TenantAppLoader
+        title="Command Center"
+        orgName="SupportAI"
+        subtitle={["Initializing", "platform", "telemetry..."]}
+        bgTheme="auto"
+      />
     );
   }
 

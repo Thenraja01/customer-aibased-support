@@ -42,6 +42,36 @@ export const createOrg = async (req, res) => {
   }
 };
 
+export const uploadOrgLogo = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No image file uploaded" });
+    }
+
+    const orgId = req.params.id || req.params.orgId || req.user?.organizationId || req.user?.organization_id;
+    if (!orgId) {
+      return res.status(400).json({ success: false, message: "Organization ID is required" });
+    }
+
+    let logoUrl = req.file.path;
+    if (!logoUrl || (!logoUrl.startsWith("http") && !logoUrl.startsWith("/uploads"))) {
+      logoUrl = `/uploads/${req.file.filename}`;
+    }
+
+    const org = await orgService.updateOrganization(orgId, {
+      logo: { url: logoUrl, public_id: req.file.filename || "logo" }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Logo uploaded successfully",
+      data: { logoUrl, organization: org }
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 export const updateOrg = async (req, res) => {
   try {
     const org = await orgService.updateOrganization(req.params.id, req.body);
@@ -354,7 +384,7 @@ export const getUsageStats = async (req, res) => {
 
 export const createOrgApiKey = async (req, res) => {
   try {
-    const result = await adminService.createApiKey(req.params.id, req.body.name);
+    const result = await adminService.createApiKey(req.params.id, req.body.name, req.body.type || "public");
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -798,3 +828,78 @@ export const testGuardrails = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const testEmailTemplate = async (req, res) => {
+  try {
+    const orgId = req.query.orgId || req.body.organizationId || req.scope?.organizationId || req.user?.organizationId;
+    const { templateKey, recipientEmail, subject, body } = req.body;
+
+    const to = recipientEmail || req.user?.email;
+    if (!to) {
+      return res.status(400).json({ success: false, message: "Recipient email is required" });
+    }
+
+    const { interpolateTemplate, wrapInHtmlEmail } = await import("../../services/emailTemplate.service.js");
+    const { sendEmail } = await import("../../utils/email.js");
+    const Organization = (await import("../organization/organization.schema.js")).default;
+
+    const org = orgId ? await Organization.findById(orgId).lean() : null;
+
+    const mockData = {
+      org_name: org?.name || "SupportAI Inc.",
+      branch_name: "Headquarters Branch",
+      portal_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/tickets/TCK-DEMO`,
+      customer_name: req.user?.name || "Jane Doe",
+      agent_name: "Support Staff Agent",
+      ticket_id: "TCK-89241",
+      subject: "Sample Inquiry - Urgent Support Request",
+      priority: "HIGH",
+      ai_summary: "Customer requested escalation for account billing verification. Identified invoice discrepancy and applied credit note.",
+    };
+
+    const renderedSubject = `[TEST PREVIEW] ${interpolateTemplate(subject || "Support Notification", mockData)}`;
+    const renderedBody = interpolateTemplate(body || "This is a sample test notification.", mockData);
+
+    const htmlContent = wrapInHtmlEmail({
+      title: renderedSubject,
+      bodyText: renderedBody,
+      org,
+      actionUrl: mockData.portal_url,
+      actionLabel: "Open Ticket in Portal",
+    });
+
+    const result = await sendEmail({
+      to,
+      subject: renderedSubject,
+      html: htmlContent,
+      organizationId: orgId,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Test email successfully dispatched to ${to}`,
+      data: { subject: renderedSubject, html: htmlContent, result },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || "Failed to send test email" });
+  }
+};
+
+export const polishEmailTemplate = async (req, res) => {
+  try {
+    const orgId = req.query.orgId || req.body.organizationId || req.scope?.organizationId || req.user?.organizationId;
+    const { subject, body, tone } = req.body;
+
+    if (!body) {
+      return res.status(400).json({ success: false, message: "Body text is required to polish" });
+    }
+
+    const { polishTemplateWithAI } = await import("../../services/emailTemplate.service.js");
+    const result = await polishTemplateWithAI({ subject: subject || "", body, tone: tone || "professional", organizationId: orgId });
+
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || "AI polish failed" });
+  }
+};
+

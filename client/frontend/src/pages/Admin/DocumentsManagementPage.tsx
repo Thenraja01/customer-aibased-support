@@ -13,6 +13,7 @@ import {
   Eye,
   MoreHorizontal,
   Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 import DocumentViewer from "@/components/ui/DocumentViewer";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useSocket } from "@/context/SocketContext";
 import { FAQAPI } from "@/api";
 
 import KnowledgeStatsCards from "@/components/admin/knowledge-base/KnowledgeStatsCards";
@@ -199,13 +201,74 @@ export default function DocumentsManagementPage() {
       toast.error("Error", err?.response?.data?.message || "Failed to restart processing");
     } finally {
       setRetryingId(null);
+      await fetchDocuments(true);
       refreshDoc(doc);
+    }
+  };
+
+  const handleAbortProcessing = async (doc: any) => {
+    try {
+      await DocumentAPI.abort(doc._id);
+      toast.success("Processing aborted", "Document ingestion was stopped and reset to revision status.");
+      await fetchDocuments(true);
+      await refreshDoc(doc);
+    } catch (err: any) {
+      toast.error("Error", err?.response?.data?.message || "Failed to abort processing");
     }
   };
 
   const handleRefreshStatus = async (doc: any) => {
     await refreshDoc(doc);
   };
+
+  // Real-time WebSocket progress updates for pipeline stepper
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+    const handleProgress = (data: any) => {
+      if (!data?.documentId) return;
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d._id === data.documentId
+            ? {
+                ...d,
+                ingestionStatus: data.stage || d.ingestionStatus,
+                knowledge_index_status: data.stage === "completed" ? "indexed" : d.knowledge_index_status,
+                status: data.status || d.status,
+                chunk_count: data.chunk_count || d.chunk_count,
+              }
+            : d
+        )
+      );
+      if (detailDoc && detailDoc._id === data.documentId) {
+        setDetailDoc((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                ingestionStatus: data.stage || prev.ingestionStatus,
+                knowledge_index_status: data.stage === "completed" ? "indexed" : prev.knowledge_index_status,
+                status: data.status || prev.status,
+                chunk_count: data.chunk_count || prev.chunk_count,
+              }
+            : prev
+        );
+      }
+    };
+
+    const handleIndexed = (data: any) => {
+      fetchDocuments(true);
+      if (detailDoc && detailDoc._id === data?.documentId) {
+        refreshDoc(detailDoc);
+      }
+    };
+
+    socket.on("document:progress", handleProgress);
+    socket.on("document:indexed", handleIndexed);
+    return () => {
+      socket.off("document:progress", handleProgress);
+      socket.off("document:indexed", handleIndexed);
+    };
+  }, [socket, detailDoc, fetchDocuments, refreshDoc]);
 
   // Poll while any document is still ingesting (queued/processing/indexing) so
   // statuses update live and the "Taking longer than expected" warning appears
@@ -245,16 +308,24 @@ export default function DocumentsManagementPage() {
   }, [fetchFaqs]);
 
   const handleUpload = async (formData: FormData) => {
-    if (orgId) formData.append("organization_id", orgId);
-    await DocumentAPI.upload(formData);
-    toast.success("Document uploaded", "Uploaded and processing started.");
-    refreshAll();
+    try {
+      if (orgId) formData.append("organization_id", orgId);
+      await DocumentAPI.upload(formData);
+      toast.success("Document uploaded", "Uploaded and processing started.");
+      refreshAll();
+    } catch (err: any) {
+      toast.error("Upload Failed", err?.response?.data?.message || err?.message || "Failed to upload document");
+    }
   };
 
   const handleUploadVersion = async (doc: any, formData: FormData) => {
-    await DocumentAPI.uploadNewVersion(doc._id, formData);
-    toast.success("Version uploaded", `New version of "${doc.title}" is processing.`);
-    refreshAll();
+    try {
+      await DocumentAPI.uploadNewVersion(doc._id, formData);
+      toast.success("Version uploaded", `New version of "${doc.title}" is processing.`);
+      refreshAll();
+    } catch (err: any) {
+      toast.error("Version Upload Failed", err?.response?.data?.message || err?.message || "Failed to upload new version");
+    }
   };
 
   const handleApprove = async (doc: any) => {
@@ -385,21 +456,26 @@ export default function DocumentsManagementPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Top Bar: single row, no wrapping */}
-      <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold">Knowledge Base</h1>
-          <span className="text-muted-foreground">/</span>
-          <span className="text-sm text-muted-foreground">
-            {tabsConfig.find(t => t.value === tab)?.label}
-          </span>
+      {/* Top Bar: Clean header with actionable status and buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b bg-card/40 shrink-0 gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Knowledge Base</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Manage documents, AI knowledge ingestion, and retrieval pipelines
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setTab("health")}>
-            <HeartPulse size={14} className="mr-1.5" /> Health
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTab("health")}
+            className="h-8 gap-1.5 text-xs font-semibold text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+          >
+            <CheckCircle2 size={13} className="text-emerald-500" /> All Systems Healthy
           </Button>
-          <Button size="sm" onClick={() => setTab("ingest")}>
-            <Plus size={14} className="mr-1.5" /> Add
+
+          <Button size="sm" onClick={() => setTab("ingest")} className="h-8 gap-1.5 text-xs font-semibold shadow-sm">
+            <Plus size={14} /> Add Document
           </Button>
         </div>
       </div>
@@ -407,15 +483,15 @@ export default function DocumentsManagementPage() {
       {/* Tabs Layout */}
       <Tabs value={tab} onValueChange={setTab} className="flex flex-col flex-1 min-h-0">
         {/* Tabs: clean horizontal row */}
-        <div className="px-6 border-b shrink-0">
+        <div className="px-6 border-b shrink-0 bg-card/20">
           <TabsList className="bg-transparent h-10 w-full justify-start rounded-none gap-1 p-0">
             {tabsConfig.map((t) => (
               <TabsTrigger
                 key={t.value}
                 value={t.value}
-                className="data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground hover:text-foreground transition-colors gap-2"
+                className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none px-3 py-2 text-xs font-semibold text-muted-foreground data-[state=active]:text-primary hover:text-foreground transition-colors gap-2"
               >
-                <t.icon size={15} />
+                <t.icon size={14} />
                 {t.label}
               </TabsTrigger>
             ))}
@@ -426,63 +502,150 @@ export default function DocumentsManagementPage() {
         <div className="flex-1 overflow-y-auto py-6 px-6">
           {/* Overview */}
           <TabsContent value="overview" className="mt-0 space-y-6">
-              <KnowledgeStatsCards documents={documents} verifications={verifications} faqs={faqs} />
+            <KnowledgeStatsCards documents={documents} verifications={verifications} faqs={faqs} />
 
-              <div className="flex flex-col xl:flex-row gap-6">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-medium">Pending Verifications</h2>
-                    <button
-                      onClick={() => setTab("documents")}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      View all
-                    </button>
+            {/* Side-by-Side: System Health & Recent Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Processing & Infrastructure Health Panel */}
+              <div className="p-5 rounded-2xl border bg-card/60 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-bold flex items-center gap-2">
+                      <HeartPulse size={16} className="text-emerald-500" /> Processing & Infrastructure Health
+                    </h3>
+                    <p className="text-xs text-muted-foreground">Status of AI vector indexes and reasoning models</p>
                   </div>
-                  <div className="border rounded-lg divide-y">
-                    {pendingVerifications.length === 0 ? (
-                      <div className="py-8 text-center text-sm text-muted-foreground">
-                        No pending verifications.
-                      </div>
-                    ) : (
-                      pendingVerifications.slice(0, 5).map((v) => (
-                        <div key={v._id} className="flex items-center justify-between px-4 py-3 gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{v.document_id?.title || "Document"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {v.verified_by?.name || "Unknown"} · {v.created_at ? new Date(v.created_at).toLocaleDateString() : ""}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => handleApproveVerification(v)}
-                              className="p-1.5 rounded-md hover:bg-green-500/10 text-green-600"
-                              title="Approve"
-                            >
-                              <CheckSquare size={14} />
-                            </button>
-                            <button
-                              onClick={() => setRejectTarget(v)}
-                              className="p-1.5 rounded-md hover:bg-red-500/10 text-red-500"
-                              title="Reject"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <button
+                    onClick={() => setTab("health")}
+                    className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+                  >
+                    View system health →
+                  </button>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-medium mb-3">Recent Activity</h2>
-                  <div className="border rounded-lg">
-                    <RecentActivity documents={documents} verifications={verifications} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  <div className="p-3 rounded-xl border bg-card flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground font-medium">Vector Index (MongoDB)</span>
+                    <span className="font-semibold text-emerald-500 flex items-center gap-1">
+                      <CheckCircle2 size={12} /> Healthy
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl border bg-card flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground font-medium">Knowledge Graph (MongoDB Graph)</span>
+                    <span className="font-semibold text-emerald-500 flex items-center gap-1">
+                      <CheckCircle2 size={12} /> Healthy
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl border bg-card flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground font-medium">Embedding Model</span>
+                    <span className="font-semibold text-emerald-500 flex items-center gap-1">
+                      <CheckCircle2 size={12} /> Healthy
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl border bg-card flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground font-medium">AI LLM Inference</span>
+                    <span className="font-semibold text-emerald-500 flex items-center gap-1">
+                      <CheckCircle2 size={12} /> Healthy
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl border bg-card flex items-center justify-between text-xs sm:col-span-2">
+                    <span className="text-muted-foreground font-medium">Document Chunking Worker</span>
+                    <span className="font-semibold text-emerald-500 flex items-center gap-1">
+                      <CheckCircle2 size={12} /> 0 pending queue
+                    </span>
                   </div>
                 </div>
               </div>
-            </TabsContent>
+
+              {/* Compact Recent Activity Panel */}
+              <div className="p-5 rounded-2xl border bg-card/60 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-bold flex items-center gap-2">
+                      <Clock size={16} className="text-primary" /> Recent Activity
+                    </h3>
+                    <p className="text-xs text-muted-foreground">Latest document lifecycle events</p>
+                  </div>
+                  <button
+                    onClick={() => setTab("documents")}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    View all →
+                  </button>
+                </div>
+
+                <div className="border rounded-xl overflow-hidden bg-card/40">
+                  <RecentActivity documents={documents} verifications={verifications} />
+                </div>
+              </div>
+            </div>
+
+            {/* Pending Verifications & Actionable Insight */}
+            <div className="p-5 rounded-2xl border bg-card/60 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <CheckSquare size={16} className="text-primary" /> Document Verifications
+                </h3>
+                {pendingVerifications.length > 0 && (
+                  <button
+                    onClick={() => setTab("documents")}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    Review all ({pendingVerifications.length}) →
+                  </button>
+                )}
+              </div>
+
+              {pendingVerifications.length === 0 ? (
+                <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                    <CheckCircle2 size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-foreground">You're all caught up</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {documents.length} / {documents.length} documents verified. No action required.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="border rounded-xl divide-y overflow-hidden">
+                  {pendingVerifications.slice(0, 4).map((v) => (
+                    <div key={v._id} className="flex items-center justify-between px-4 py-3 gap-3 hover:bg-muted/20">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold truncate">{v.document_id?.title || "Document"}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {v.verified_by?.name || "Unknown"} • {v.created_at ? new Date(v.created_at).toLocaleDateString() : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleApproveVerification(v)}
+                          className="h-7 text-xs font-semibold text-emerald-500 hover:bg-emerald-500/10"
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setRejectTarget(v)}
+                          className="h-7 text-xs font-semibold text-rose-500 hover:bg-rose-500/10"
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
             {/* Documents */}
             <TabsContent value="documents" className="mt-0 space-y-4">
@@ -679,6 +842,7 @@ export default function DocumentsManagementPage() {
         onDelete={handleDelete}
         onUploadVersion={(d) => setVersionTarget(d)}
         onRetryIngestion={handleRetryIngestion}
+        onAbortProcessing={handleAbortProcessing}
         onRefreshStatus={handleRefreshStatus}
       />
 

@@ -109,6 +109,26 @@ class AdminAPIClass {
     return AxiosInstance.put(`/admin/v1/organizations/${id}`, data);
   }
 
+  getBranches(params: Record<string, unknown> = {}): Promise<any> {
+    return AxiosInstance.get("/branches", { params });
+  }
+
+  uploadOrgLogo(id: string, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return AxiosInstance.post(`/admin/v1/organizations/${id}/logo`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  }
+
+  uploadMyOrgLogo(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return AxiosInstance.post("/admin/v1/organization/logo", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  }
+
   deleteOrganization(id: string): Promise<any> {
     return AxiosInstance.delete(`/admin/v1/organizations/${id}`);
   }
@@ -300,8 +320,8 @@ class AdminAPIClass {
     return AxiosInstance.get("/admin/v1/knowledge-graph-stats");
   }
 
-  createOrgApiKey(id: string, name: string): Promise<any> {
-    return AxiosInstance.post(`/admin/v1/organizations/${id}/api-keys`, { name });
+  createOrgApiKey(id: string, name: string, type: "public" | "secret" = "public"): Promise<any> {
+    return AxiosInstance.post(`/admin/v1/organizations/${id}/api-keys`, { name, type });
   }
 
   async revokeOrgApiKey(id: string, keyId: string): Promise<any> {
@@ -312,9 +332,9 @@ class AdminAPIClass {
     return AxiosInstance.get("/admin/v1/permissions/categories");
   }
 
-  // AI Config (own-org)
-  getAIConfigs(): Promise<any> {
-    return AxiosInstance.get("/admin/v1/ai-configs");
+  // AI Config (own-org & super-admin)
+  getAIConfigs(params: Record<string, unknown> = {}): Promise<any> {
+    return AxiosInstance.get("/admin/v1/ai-configs", { params });
   }
 
   createAIConfig(data: Record<string, unknown>): Promise<any> {
@@ -331,6 +351,25 @@ class AdminAPIClass {
 
   testAIConfig(id: string): Promise<any> {
     return AxiosInstance.post(`/admin/v1/ai-configs/${id}/test`);
+  }
+
+  testEmailTemplate(payload: {
+    templateKey?: string;
+    recipientEmail?: string;
+    subject?: string;
+    body: string;
+    organizationId?: string;
+  }): Promise<any> {
+    return AxiosInstance.post("/admin/v1/email-templates/test", payload);
+  }
+
+  polishEmailTemplate(payload: {
+    subject?: string;
+    body: string;
+    tone?: "empathetic" | "professional" | "concise" | "friendly";
+    organizationId?: string;
+  }): Promise<any> {
+    return AxiosInstance.post("/admin/v1/email-templates/polish", payload);
   }
 
   // Billing (own-org)
@@ -350,7 +389,8 @@ class AdminAPIClass {
 
   downloadInvoiceUrl(invoiceId: string): string {
     const token = localStorage.getItem("auth_token") || "";
-    return `/admin/v1/billing/invoices/${invoiceId}/download?token=${token}`;
+    const backendUrl = (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/+$/, "");
+    return `${backendUrl}/admin/v1/billing/invoices/${invoiceId}/download?token=${encodeURIComponent(token)}`;
   }
 
   changePlan(plan: string): Promise<any> {

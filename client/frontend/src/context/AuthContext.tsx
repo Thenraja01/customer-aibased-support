@@ -13,7 +13,7 @@ import { AdminAPI } from "@/api";
 import { UsersAPI } from "@/api/user.api.js";
 import { requestForToken } from "@/config/firebase";
 import { AUTH_TOKEN_EVENT } from "@/api/axiosInstance";
-import { fetchTenantSettings } from "@/hooks/useTenant";
+import { fetchTenantSettings, applyBrandColors } from "@/hooks/useTenant";
 import {
   safeGetItem,
   safeSetItem,
@@ -21,6 +21,7 @@ import {
   clearSession,
   getUserFromStorage,
   getTokenFromStorage,
+  sanitizeOrgSettingsForStorage,
 } from "@/utils/localStorage";
 
 interface AuthContextType {
@@ -37,6 +38,7 @@ interface AuthContextType {
   login: (email: string, password: string, organizationId?: string) => Promise<boolean>;
   loginWithOrg: (email: string, password: string, organizationId: string) => Promise<boolean>;
   setSession: (data: any) => boolean;
+  updateUser: (data: any) => void;
   logout: () => void;
 }
 
@@ -133,7 +135,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (res?.data?.success) {
             const settings = res.data.data;
             setOrgSettings(settings);
-            safeSetItem("auth_org_settings", settings);
+            safeSetItem("auth_org_settings", sanitizeOrgSettingsForStorage(settings));
+            if (settings?.brand_colors) {
+              applyBrandColors(settings.brand_colors);
+            }
           }
         })
         .catch((error) => {
@@ -160,6 +165,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSubscribed = false;
     };
   }, [user?._id]);
+
+  useEffect(() => {
+    if (orgSettings?.brand_colors) {
+      applyBrandColors(orgSettings.brand_colors);
+    }
+  }, [orgSettings]);
 
   useEffect(() => {
     setLoading(false);
@@ -256,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const settings = settingsRes.data.data;
             setOrgSettings(settings);
             setTenant(settings);
-            safeSetItem("auth_org_settings", settings);
+            safeSetItem("auth_org_settings", sanitizeOrgSettingsForStorage(settings));
           }
         } catch (settingsError: any) {
           if (import.meta.env.DEV) console.warn("Org settings unavailable after login:", settingsError?.response?.status || settingsError?.message);
@@ -327,7 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const settings = res.data.data;
             setOrgSettings(settings);
             setTenant(settings);
-            safeSetItem("auth_org_settings", settings);
+            safeSetItem("auth_org_settings", sanitizeOrgSettingsForStorage(settings));
           }
         })
         .catch(() => {});
@@ -366,6 +377,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
 
+  const updateUser = useCallback((updatedUserData: any) => {
+    setUser((prev: any) => {
+      const merged = normalizeUser({ ...prev, ...updatedUserData });
+      const stored = getUserFromStorage();
+      safeSetItem("auth_user", { ...stored, ...merged });
+      return merged;
+    });
+  }, []);
+
+  // Synchronize latest user profile (profileImage, names, settings) from backend
+  useEffect(() => {
+    if (!token) return;
+    let isSubscribed = true;
+    UsersAPI.getProfile()
+      .then((res) => {
+        if (!isSubscribed) return;
+        if (res?.data?.success && res.data.data) {
+          const freshUser = res.data.data;
+          setUser((prev: any) => {
+            const merged = normalizeUser({ ...prev, ...freshUser });
+            const stored = getUserFromStorage();
+            safeSetItem("auth_user", { ...stored, ...merged });
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isSubscribed = false;
+    };
+  }, [token]);
+
   const value = {
     user,
     token,
@@ -380,6 +423,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     loginWithOrg,
     setSession,
+    updateUser,
     logout,
   };
 

@@ -81,16 +81,21 @@ const loadUser = async (userId) => {
  */
 export const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  let token = null;
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  } else if (req.query?.token) {
+    token = String(req.query.token);
+  }
+
+  if (!token) {
     return res
       .status(401)
       .json({ success: false, message: "Unauthorized: No token provided" });
   }
 
-  let token = authHeader.split(" ")[1];
-  if (token) {
-    token = token.replace(/^["']|["']$/g, "").trim();
-  }
+  token = token.replace(/^["']|["']$/g, "").trim();
 
   let decoded;
   try {

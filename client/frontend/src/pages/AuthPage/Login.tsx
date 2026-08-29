@@ -89,6 +89,7 @@ export default function Login() {
       const { success, status: userStatus, token, data, message } = res.data;
 
       if (success && token) {
+        sessionStorage.setItem("just_logged_in", "true");
         if (!setSession(res.data)) {
           setStatus({ type: "invalid_credentials" });
           return;

@@ -33,7 +33,6 @@ import { searchRouter } from "./modules/search/index.js";
 import { promptVersionRouter } from "./modules/prompt-version/index.js";
 import { knowledgeGapRouter } from "./modules/knowledge-gap/index.js";
 import { aiRouter } from "./modules/ai/index.js";
-import { communicationRouter } from "./modules/communication/index.js";
 import { feedbackRouter } from "./modules/feedback/index.js";
 import { superAdminRouter } from "./modules/super-admin/index.js";
 import { documentApprovalRouter } from "./modules/document-approval/index.js";
@@ -46,10 +45,10 @@ import { apiKeyRouter } from "./modules/api-key/index.js";
 import { archiveExpiredMemories } from "./modules/memory/memory.service.js";
 import { initFirebase } from "./config/firebase.js";
 import { initRedis } from "./config/redis.js";
-import { chromaService } from "./config/chroma.js";
 import { warmupEmbeddingModel } from "./services/embedding.service.js";
 import { runDocumentStatusMigration } from "./utils/migration.utils.js";
 import { startWorker } from "./modules/ai/worker.js";
+import { runDocumentWatchdog } from "./services/documentWatchdog.service.js";
 
 process.on("uncaughtException", (err) => {
   console.error("[UncaughtException]", err);
@@ -126,8 +125,6 @@ app.use("/admin/v1", adminRouter);
 app.use("/search/v1", searchRouter);
 app.use("/admin/v1/prompt", promptVersionRouter);
 app.use("/ai", aiRouter);
-app.use("/communication", communicationRouter);
-app.use("/communications", communicationRouter);
 app.use("/feedback", feedbackRouter);
 app.use("/agent", agentRoutes);
 app.use("/api/v1/api-keys", apiKeyRouter);
@@ -152,6 +149,8 @@ app.get("/api/health/v1", (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
+import { logger } from "./utils/logger.js";
+
 const port = env.PORT;
 
 const startServer = async () => {
@@ -160,10 +159,7 @@ const startServer = async () => {
 
     // Run database migrations for legacy document statuses and roles
     await runDocumentStatusMigration();
-
-    // Initialize Chroma DB for Vector Search
-    await chromaService.init();
-
+    
     // Initialize Redis cache layer
     await initRedis();
 
@@ -173,16 +169,23 @@ const startServer = async () => {
     // Warm up Ollama embedding model in background (non-blocking)
     if (process.env.OLLAMA_WARMUP_ON_START !== "false") {
       warmupEmbeddingModel().catch((err) =>
-        console.warn("[Startup] Embedding model warmup error:", err.message)
+        logger.warn("Startup", `Embedding model warmup warning: ${err.message}`)
       );
     }
 
     // Start Background Job Worker
     startWorker();
 
+    // Start Self-Healing Ingestion Watchdog (scans every 2 minutes)
+    setInterval(() => {
+      runDocumentWatchdog().catch((err) =>
+        logger.error("Watchdog", `Scan error: ${err.message}`)
+      );
+    }, 2 * 60 * 1000);
+
     setInterval(() => {
       archiveExpiredMemories().catch((err) =>
-        console.error("[Memory Archiver] Error:", err.message)
+        logger.error("MemoryArchiver", `Error: ${err.message}`)
       );
     }, 60 * 60 * 1000);
 
@@ -190,10 +193,10 @@ const startServer = async () => {
     initSocket(httpServer);
 
     httpServer.listen(port, () => {
-      console.log(`Server running on port ${port} [${env.NODE_ENV}]`);
+      logger.success("Server", `Server running on port ${port} [${env.NODE_ENV}]`);
     });
   } catch (error) {
-    console.error(`Failed to start server: ${error.message}`);
+    logger.error("Server", `Failed to start server: ${error.message}`, error);
     process.exit(1);
   }
 };

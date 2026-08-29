@@ -18,6 +18,10 @@ const branchSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    is_default: {
+      type: Boolean,
+      default: false,
+    },
     description: { type: String, maxlength: 500 },
 
     // Branch-Level Configurations (Overrides Organization Configs)

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BarChart, Bar, ResponsiveContainer } from "recharts";
-import { Save, Bot, Clock, Mail, Building2, FileText, BarChart3, Shield, Info, Database, Crown, Cpu, KeyRound, CreditCard, ScrollText, LineChart, Brain, Server } from "lucide-react";
+import { Save, Bot, Clock, Mail, Building2, FileText, BarChart3, Shield, Info, Database, Crown, Cpu, KeyRound, CreditCard, ScrollText, LineChart, Brain, Server, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,8 @@ import ChatbotPanel from "@/components/admin/settings/ChatbotPanel";
 import RagSettingsPanel from "@/components/admin/settings/RagSettingsPanel";
 import SmtpSettingsPanel from "@/components/admin/settings/SmtpSettingsPanel";
 import SlaAutoClosePanel from "@/components/admin/settings/SlaAutoClosePanel";
+import EmailTemplatesStudio from "@/components/admin/settings/EmailTemplatesStudio";
+import { safeSetItem, STORAGE_KEYS, sanitizeOrgSettingsForStorage } from "@/utils/localStorage";
 
 import AxiosInstance from "@/api/axiosInstance";
 
@@ -66,23 +68,26 @@ function ChartPreview({ form }: { form: any }) {
   );
 }
 
-import { 
-  DEFAULT_RAG_CONFIG, 
-  DEFAULT_SMTP_CONFIG, 
-  DEFAULT_AI_SETTINGS, 
-  DEFAULT_WORKING_HOURS, 
-  DEFAULT_GUARDRAILS 
+import {
+  DEFAULT_RAG_CONFIG,
+  DEFAULT_SMTP_CONFIG,
+  DEFAULT_AI_SETTINGS,
+  DEFAULT_WORKING_HOURS,
+  DEFAULT_GUARDRAILS
 } from "@/constants/defaults";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 
-type Tab = "general" | "subscription" | "storage" | "ai-config" | "chatbot" | "rag" | "smtp" | "hours" | "email" | "api-keys" | "billing" | "activity-log" | "analytics" | "security" | "ticket-templates" | "sla-autoclose";
+import TenantLoaderCustomizer from "@/components/branding/TenantLoaderCustomizer";
+
+type Tab = "general" | "branding" | "subscription" | "storage" | "ai-config" | "chatbot" | "rag" | "smtp" | "hours" | "email" | "api-keys" | "billing" | "activity-log" | "analytics" | "security" | "ticket-templates" | "sla-autoclose";
 
 const TAB_GROUPS = [
   {
     label: "General",
     tabs: [
       { id: "general", label: "General Info", icon: Building2 },
+      { id: "branding", label: "Branding & Loader", icon: Sparkles },
       { id: "hours", label: "Working Hours", icon: Clock },
       { id: "sla-autoclose", label: "SLA & Auto-Close", icon: Clock },
       { id: "security", label: "Security", icon: Shield },
@@ -98,7 +103,7 @@ const TAB_GROUPS = [
     ],
   },
   {
-    label: "Communication",
+    label: "Templates & Notifications",
     tabs: [
       { id: "email", label: "Email Templates", icon: Mail },
       { id: "ticket-templates", label: "Ticket Templates", icon: FileText },
@@ -167,7 +172,16 @@ export default function OrganizationSettingsPage() {
           default_language: data.default_language || "en",
           greeting_message: data.greeting_message || "",
           logo: data.logo || { url: "", public_id: "" },
+          brand_colors: data.brand_colors || { primary: "#2563eb", secondary: "#7c3aed", accent: "#f59e0b" },
+          loader_config: data.loader_config || {
+            enabled: true,
+            title: "",
+            subtitle: "Build fast, ship faster",
+            duration_ms: 2400,
+            bg_theme: "dark",
+          },
           ai_settings: data.ai_settings || DEFAULT_AI_SETTINGS,
+          llm_config: data.llm_config || {},
           guardrails: data.guardrails?.length
             ? data.guardrails
             : DEFAULT_GUARDRAILS,
@@ -196,7 +210,7 @@ export default function OrganizationSettingsPage() {
       const res = await AdminAPI.updateOrgSettings(form);
       if (res.data.success) {
         toast.success("Success", "Settings saved successfully");
-        localStorage.setItem("orgSettings", JSON.stringify(res.data.data));
+        safeSetItem(STORAGE_KEYS.ORG_SETTINGS, sanitizeOrgSettingsForStorage(res.data.data));
         setOrgSettings(res.data.data);
       }
     } catch (err: any) {
@@ -318,6 +332,90 @@ export default function OrganizationSettingsPage() {
             </div>
           </TabsContent>
 
+          {/* Branding & Animated Loader */}
+          <TabsContent value="branding" className="mt-0 space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Sparkles size={18} className="text-primary" />
+                Branding & Splash Loader
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Customize brand colors, organization logo, and the 3D animated entrance loader.
+              </p>
+            </div>
+
+            {/* Brand Colors */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl border space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Primary Brand Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={form.brand_colors?.primary || "#2563eb"}
+                    onChange={(e) => updateField("brand_colors.primary", e.target.value)}
+                    className="h-9 w-9 rounded-lg border cursor-pointer"
+                  />
+                  <Input
+                    value={form.brand_colors?.primary || "#2563eb"}
+                    onChange={(e) => updateField("brand_colors.primary", e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl border space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Secondary Brand Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={form.brand_colors?.secondary || "#7c3aed"}
+                    onChange={(e) => updateField("brand_colors.secondary", e.target.value)}
+                    className="h-9 w-9 rounded-lg border cursor-pointer"
+                  />
+                  <Input
+                    value={form.brand_colors?.secondary || "#7c3aed"}
+                    onChange={(e) => updateField("brand_colors.secondary", e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl border space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Accent Brand Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={form.brand_colors?.accent || "#f59e0b"}
+                    onChange={(e) => updateField("brand_colors.accent", e.target.value)}
+                    className="h-9 w-9 rounded-lg border cursor-pointer"
+                  />
+                  <Input
+                    value={form.brand_colors?.accent || "#f59e0b"}
+                    onChange={(e) => updateField("brand_colors.accent", e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Tenant Animated Splash Loader Studio */}
+            <TenantLoaderCustomizer
+              config={
+                form.loader_config || {
+                  enabled: true,
+                  title: "",
+                  subtitle: "Build fast, ship faster",
+                  duration_ms: 2400,
+                  bg_theme: "dark",
+                }
+              }
+              onChange={(newCfg) => updateField("loader_config", newCfg)}
+              brandColor={form.brand_colors?.primary || "#2563eb"}
+              secondaryColor={form.brand_colors?.secondary || "#7c3aed"}
+              orgName={form.name}
+            />
+          </TabsContent>
+
           {/* Subscription */}
           <TabsContent value="subscription" className="mt-0">
             <SubscriptionPanel />
@@ -330,7 +428,69 @@ export default function OrganizationSettingsPage() {
 
           {/* AI Config */}
           <TabsContent value="ai-config" className="mt-0">
-            <AIConfigPanel />
+            <AIConfigPanel
+              initialConfig={{
+                customPrompt: form.customPrompt || "",
+                provider: form.llm_config?.provider || "gemini",
+                model_name: form.llm_config?.model_name || form.llm_config?.model || "gemini-2.5-flash",
+                gemini_api_key: form.llm_config?.gemini_api_key || "",
+                groq_api_key: form.llm_config?.groq_api_key || "",
+                openai_api_key: form.llm_config?.openai_api_key || "",
+                temperature: form.ai_settings?.temperature ?? form.llm_config?.temperature ?? 0.7,
+                max_tokens: form.ai_settings?.max_tokens ?? form.llm_config?.max_tokens ?? 2048,
+                top_k: form.ai_settings?.top_k ?? 40,
+                similarity_threshold: form.ai_settings?.similarity_threshold ?? 0.75,
+                response_style: form.ai_settings?.response_style || "balanced",
+                chunk_size: form.rag_config?.chunk_size ?? 500,
+                chunk_overlap: form.rag_config?.chunk_overlap ?? 100,
+                rag_top_k: form.rag_config?.top_k ?? 5,
+                bfs_max_depth: form.rag_config?.bfs_max_depth ?? 2,
+                bfs_max_nodes: form.rag_config?.bfs_max_nodes ?? 30,
+                query_cache_ttl_ms: form.rag_config?.query_cache_ttl_ms ?? 600000,
+              }}
+              onSave={async (newAiConfig: any) => {
+                const updatedPayload = {
+                  ...form,
+                  customPrompt: newAiConfig.customPrompt,
+                  ai_settings: {
+                    ...(form.ai_settings || {}),
+                    temperature: newAiConfig.temperature,
+                    top_k: newAiConfig.top_k,
+                    similarity_threshold: newAiConfig.similarity_threshold,
+                    max_tokens: newAiConfig.max_tokens,
+                    response_style: newAiConfig.response_style,
+                    system_prompt: newAiConfig.customPrompt,
+                  },
+                  llm_config: {
+                    ...(form.llm_config || {}),
+                    provider: newAiConfig.provider,
+                    model_name: newAiConfig.model_name,
+                    model: newAiConfig.model_name,
+                    gemini_api_key: newAiConfig.gemini_api_key,
+                    groq_api_key: newAiConfig.groq_api_key,
+                    openai_api_key: newAiConfig.openai_api_key,
+                    temperature: newAiConfig.temperature,
+                    max_tokens: newAiConfig.max_tokens,
+                  },
+                  rag_config: {
+                    ...(form.rag_config || {}),
+                    chunk_size: newAiConfig.chunk_size,
+                    chunk_overlap: newAiConfig.chunk_overlap,
+                    top_k: newAiConfig.rag_top_k,
+                    bfs_max_depth: newAiConfig.bfs_max_depth,
+                    bfs_max_nodes: newAiConfig.bfs_max_nodes,
+                    query_cache_ttl_ms: newAiConfig.query_cache_ttl_ms,
+                  },
+                };
+                setForm(updatedPayload);
+                const res = await AdminAPI.updateOrgSettings(updatedPayload);
+                if (res.data?.success) {
+                  toast.success("Success", "AI & LLM Configuration saved successfully");
+                  safeSetItem(STORAGE_KEYS.ORG_SETTINGS, sanitizeOrgSettingsForStorage(res.data.data));
+                  setOrgSettings(res.data.data);
+                }
+              }}
+            />
           </TabsContent>
 
           {/* RAG Settings */}
@@ -420,7 +580,7 @@ export default function OrganizationSettingsPage() {
                     ))}
                   </div>
                   <pre className="rounded-lg bg-background dark:bg-black/20 p-3 text-[11px] font-mono text-muted-foreground overflow-x-auto border dark:border-white/[0.06]">
-{`{
+                    {`{
   "userId": "123",
   "organizationId": "456",
   "sessionId": "abc123",
@@ -522,42 +682,16 @@ export default function OrganizationSettingsPage() {
 
           {/* Email Templates */}
           <TabsContent value="email" className="mt-0 space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Mail size={18} className="text-primary" />
-                Email Templates
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Customize email notifications sent to users and agents.
-              </p>
-            </div>
-
-            {(["ticket_assigned", "ticket_resolved"] as const).map((template) => (
-              <div key={template} className="rounded-lg border dark:border-white/[0.06] p-4 space-y-3">
-                <h4 className="text-sm font-semibold capitalize">
-                  {template.replace("_", " ")}
-                </h4>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Subject</Label>
-                  <Input
-                    value={form.email_templates?.[template]?.subject || ""}
-                    onChange={(e) => updateField(`email_templates.${template}.subject`, e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Body</Label>
-                  <textarea
-                    value={form.email_templates?.[template]?.body || ""}
-                    onChange={(e) => updateField(`email_templates.${template}.body`, e.target.value)}
-                    rows={5}
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y font-mono dark:border-white/[0.06]"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Available variables: {'{{customer_name}}'}, {'{{agent_name}}'}, {'{{ticket_id}}'}, {'{{subject}}'}, {'{{priority}}'}
-                  </p>
-                </div>
-              </div>
-            ))}
+            <EmailTemplatesStudio
+              initialTemplates={form.email_templates}
+              brandColors={form.brand_colors}
+              logoUrl={form.logo?.url}
+              orgName={form.name}
+              onSave={(newTemplates) => {
+                updateField("email_templates", newTemplates);
+                return handleSave();
+              }}
+            />
           </TabsContent>
 
           {/* Ticket Templates */}

@@ -15,8 +15,15 @@ import {
   Play,
   Cpu,
   Database,
-  UserCheck,
-  Check,
+  Star,
+  ArrowUp,
+  ArrowDown,
+  Plus,
+  Trash2,
+  Lock,
+  Power,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,100 +31,229 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import AxiosInstance from "@/api/axiosInstance";
 import { AIIntelligenceAPI } from "@/api/aiIntelligence.api";
+import { ModelManagementAPI } from "@/api/modelManagement.api";
 import { useToast } from "@/components/ui/toast";
 
-type IntelligenceTab = "health" | "routing" | "conflicts" | "confidence" | "simulator";
+type IntelligenceTab = "models" | "health" | "routing" | "conflicts" | "confidence" | "simulator";
 
 export default function AIIntelligenceCenter() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<IntelligenceTab>("health");
+  const [activeTab, setActiveTab] = useState<IntelligenceTab>("models");
 
-  // Provider Settings Modal State
-  const [selectedProvider, setSelectedProvider] = useState<any | null>(null);
-  const [configForm, setConfigForm] = useState({
+  // ── Tab 0: Multi-Tenant Models & Priority State ────────────────────────
+  const [models, setModels] = useState<any[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [maxFallbacks, setMaxFallbacks] = useState<number>(1);
+  const [testingModelId, setTestingModelId] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingModel, setEditingModel] = useState<any | null>(null);
+
+  const [modelForm, setModelForm] = useState({
+    provider: "ollama",
+    model: "llama3.2:3b",
+    display_name: "",
     apiKey: "",
-    model: "",
-    baseUrl: "",
+    priority: 1,
+    enabled: true,
+    temperature: 0.7,
+    max_tokens: 2048,
   });
-  const [testingConnection, setTestingConnection] = useState(false);
-  const [savingConfig, setSavingConfig] = useState(false);
 
-  const openProviderConfig = (p: any) => {
-    setSelectedProvider(p);
-    setConfigForm({
-      apiKey: p.details?.apiKey || "",
-      model: p.model || "",
-      baseUrl: p.details?.baseUrl || "",
-    });
-  };
-
-  const handleTestConnection = async () => {
-    if (!selectedProvider) return;
-    setTestingConnection(true);
+  const fetchModels = useCallback(async () => {
+    setModelsLoading(true);
     try {
-      const res = await AxiosInstance.post("/admin/v1/models/test", {
-        provider: selectedProvider.provider,
-        apiKey: configForm.apiKey,
-        model: configForm.model,
-      });
-      if (res.data?.success && (res.data?.data?.status === "healthy" || res.data?.data?.status === "HEALTHY")) {
-        toast.success("Connection Successful", `${selectedProvider.provider.toUpperCase()} is responsive (${res.data.data.latencyMs}ms)`);
-      } else {
-        toast.error("Test Failed", res.data?.data?.error || "Could not connect to provider API");
+      const res = await ModelManagementAPI.getAIConfigs();
+      if (res.data?.success) {
+        setModels(res.data.data || []);
+        if (res.data.maxFallbacks !== undefined) {
+          setMaxFallbacks(res.data.maxFallbacks);
+        }
+      }
+    } catch {
+      toast.error("Error", "Failed to load configured AI models.");
+    } finally {
+      setModelsLoading(false);
+    }
+  }, [toast]);
+
+  const handleSetDefault = async (id: string) => {
+    try {
+      const res = await ModelManagementAPI.setDefaultModel(id);
+      if (res.data?.success) {
+        toast.success("Default Model Updated", res.data.message);
+        fetchModels();
+        fetchHealthDiagnostics();
       }
     } catch (err: any) {
-      toast.error("Test Failed", err.response?.data?.message || "Connection test failed");
-    } finally {
-      setTestingConnection(false);
+      toast.error("Failed to set default", err.response?.data?.message || err.message);
     }
   };
 
-  const handleSaveProviderConfig = async () => {
-    if (!selectedProvider) return;
-    setSavingConfig(true);
+  const handleMovePriority = async (index: number, direction: "up" | "down") => {
+    if ((direction === "up" && index === 0) || (direction === "down" && index === models.length - 1)) {
+      return;
+    }
+    const newModels = [...models];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    const temp = newModels[index];
+    newModels[index] = newModels[targetIndex];
+    newModels[targetIndex] = temp;
+
+    // Assign priorities
+    const orderPayload = newModels.map((m, idx) => ({ id: m._id, priority: idx + 1 }));
+    setModels(newModels);
+
     try {
-      await AxiosInstance.post("/agent/switch-provider", {
-        provider: selectedProvider.provider,
+      await ModelManagementAPI.reorderPriorities(orderPayload);
+      toast.success("Priority Updated", "Model priority order saved.");
+    } catch {
+      toast.error("Error", "Failed to save reordered priority.");
+      fetchModels();
+    }
+  };
+
+  const handleTestModelConnection = async (modelItem: any) => {
+    setTestingModelId(modelItem._id);
+    try {
+      const res = await ModelManagementAPI.testAIConfig(modelItem._id);
+      if (res.data?.success && (res.data.data?.status === "healthy" || res.data.data?.status === "degraded")) {
+        toast.success("Test Connection Successful", `${modelItem.display_name} is responsive (${res.data.data.latencyMs}ms)`);
+      } else {
+        toast.error("Connection Failed", res.data?.data?.error || "Provider unreachable or invalid credentials");
+      }
+      fetchModels();
+    } catch (err: any) {
+      toast.error("Test Error", err.response?.data?.message || "Connection test failed");
+    } finally {
+      setTestingModelId(null);
+    }
+  };
+
+  const handleResetCircuit = async (id: string) => {
+    try {
+      await ModelManagementAPI.resetCircuit(id);
+      toast.success("Circuit Reset", "Circuit breaker reset to CLOSED.");
+      fetchModels();
+    } catch {
+      toast.error("Error", "Failed to reset circuit breaker.");
+    }
+  };
+
+  const handleToggleEnable = async (modelItem: any) => {
+    try {
+      await ModelManagementAPI.updateAIConfig(modelItem._id, {
+        enabled: !modelItem.enabled,
       });
-      toast.success("Provider Updated", `Set ${selectedProvider.provider.toUpperCase()} as active live provider.`);
-      setSelectedProvider(null);
+      toast.success("Updated", `${modelItem.display_name} is now ${!modelItem.enabled ? "ENABLED" : "DISABLED"}`);
+      fetchModels();
+    } catch {
+      toast.error("Error", "Failed to toggle model state.");
+    }
+  };
+
+  const handleSaveModelForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingModel) {
+        await ModelManagementAPI.updateAIConfig(editingModel._id, {
+          provider: modelForm.provider,
+          model: modelForm.model,
+          display_name: modelForm.display_name || `${modelForm.provider} - ${modelForm.model}`,
+          apiKey: modelForm.apiKey || undefined,
+          priority: modelForm.priority,
+          configuration: {
+            temperature: modelForm.temperature,
+            max_tokens: modelForm.max_tokens,
+          },
+        });
+        toast.success("Model Updated", "AI Model configuration updated.");
+      } else {
+        await ModelManagementAPI.createAIConfig({
+          provider: modelForm.provider,
+          model: modelForm.model,
+          display_name: modelForm.display_name || `${modelForm.provider} - ${modelForm.model}`,
+          apiKey: modelForm.apiKey || null,
+          priority: models.length + 1,
+          enabled: true,
+          default: models.length === 0,
+          configuration: {
+            temperature: modelForm.temperature,
+            max_tokens: modelForm.max_tokens,
+          },
+        });
+        toast.success("Model Created", "New AI Model added to priority chain.");
+      }
+      setShowAddModal(false);
+      setEditingModel(null);
+      fetchModels();
       fetchHealthDiagnostics();
     } catch (err: any) {
-      toast.error("Update Failed", err.response?.data?.message || "Failed to update provider configuration");
-    } finally {
-      setSavingConfig(false);
+      toast.error("Save Failed", err.response?.data?.message || "Failed to save model configuration");
     }
   };
 
-  // State for Health Agent
+  const handleDeleteModel = async (id: string) => {
+    if (!window.confirm("Are you sure you want to remove this model configuration?")) return;
+    try {
+      await ModelManagementAPI.deleteAIConfig(id);
+      toast.success("Model Removed", "Model configuration deleted.");
+      fetchModels();
+      fetchHealthDiagnostics();
+    } catch {
+      toast.error("Error", "Failed to delete model configuration.");
+    }
+  };
+
+  const openEditModal = (m: any) => {
+    setEditingModel(m);
+    setModelForm({
+      provider: m.provider,
+      model: m.model,
+      display_name: m.display_name,
+      apiKey: "",
+      priority: m.priority || 1,
+      enabled: m.enabled !== false,
+      temperature: m.configuration?.temperature ?? 0.7,
+      max_tokens: m.configuration?.max_tokens ?? 2048,
+    });
+    setShowAddModal(true);
+  };
+
+  const openNewModelModal = () => {
+    setEditingModel(null);
+    setModelForm({
+      provider: "groq",
+      model: "llama-3.3-70b-versatile",
+      display_name: "",
+      apiKey: "",
+      priority: models.length + 1,
+      enabled: true,
+      temperature: 0.7,
+      max_tokens: 2048,
+    });
+    setShowAddModal(true);
+  };
+
+  // ── Existing State for Other Diagnostic Tabs ───────────────────────────
   const [healthData, setHealthData] = useState<any>(null);
   const [healthLoading, setHealthLoading] = useState(false);
-
-  // State for Routing Explorer
   const [routingPrompt, setRoutingPrompt] = useState("What is the return and refund policy for orders placed online?");
   const [routingRole, setRoutingRole] = useState("customer");
   const [routingSla, setRoutingSla] = useState(1000);
   const [routingResult, setRoutingResult] = useState<any>(null);
   const [routingLoading, setRoutingLoading] = useState(false);
-
-  // State for Conflict Detector
   const [conflictsData, setConflictsData] = useState<any>(null);
   const [conflictsLoading, setConflictsLoading] = useState(false);
-
-  // State for Confidence & Escalation
   const [confidenceQuery, setConfidenceQuery] = useState("I need an urgent refund for my broken item");
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.70);
   const [confidenceResult, setConfidenceResult] = useState<any>(null);
   const [confidenceLoading, setConfidenceLoading] = useState(false);
-
-  // State for What-If Simulator
   const [simScenario, setSimScenario] = useState("PROVIDER_OUTAGE");
   const [simTargetProvider, setSimTargetProvider] = useState("ollama");
   const [simTrafficMultiplier, setSimTrafficMultiplier] = useState(2);
   const [simResult, setSimResult] = useState<any>(null);
   const [simLoading, setSimLoading] = useState(false);
 
-  // Fetch Health Diagnostics
   const fetchHealthDiagnostics = useCallback(async () => {
     setHealthLoading(true);
     try {
@@ -132,7 +268,6 @@ export default function AIIntelligenceCenter() {
     }
   }, [toast]);
 
-  // Explain Routing
   const handleExplainRouting = useCallback(async () => {
     if (!routingPrompt.trim()) return;
     setRoutingLoading(true);
@@ -143,9 +278,7 @@ export default function AIIntelligenceCenter() {
         slaMaxMs: routingSla,
         preferredProvider: healthData?.activeProvider,
       });
-      if (res.data?.success) {
-        setRoutingResult(res.data.data);
-      }
+      if (res.data?.success) setRoutingResult(res.data.data);
     } catch {
       toast.error("Error", "Failed to explain model routing.");
     } finally {
@@ -153,14 +286,11 @@ export default function AIIntelligenceCenter() {
     }
   }, [routingPrompt, routingRole, routingSla, healthData?.activeProvider, toast]);
 
-  // Fetch Knowledge Conflicts
   const fetchConflicts = useCallback(async () => {
     setConflictsLoading(true);
     try {
       const res = await AIIntelligenceAPI.detectKnowledgeConflicts();
-      if (res.data?.success) {
-        setConflictsData(res.data.data);
-      }
+      if (res.data?.success) setConflictsData(res.data.data);
     } catch {
       toast.error("Error", "Failed to scan knowledge conflicts.");
     } finally {
@@ -168,7 +298,6 @@ export default function AIIntelligenceCenter() {
     }
   }, [toast]);
 
-  // Evaluate Answer Confidence
   const handleEvaluateConfidence = useCallback(async () => {
     if (!confidenceQuery.trim()) return;
     setConfidenceLoading(true);
@@ -177,9 +306,7 @@ export default function AIIntelligenceCenter() {
         query: confidenceQuery,
         threshold: confidenceThreshold,
       });
-      if (res.data?.success) {
-        setConfidenceResult(res.data.data);
-      }
+      if (res.data?.success) setConfidenceResult(res.data.data);
     } catch {
       toast.error("Error", "Failed to evaluate answer confidence.");
     } finally {
@@ -187,7 +314,6 @@ export default function AIIntelligenceCenter() {
     }
   }, [confidenceQuery, confidenceThreshold, toast]);
 
-  // Run What-If Simulation
   const handleRunSimulation = useCallback(async () => {
     setSimLoading(true);
     try {
@@ -208,6 +334,7 @@ export default function AIIntelligenceCenter() {
   }, [simScenario, simTargetProvider, simTrafficMultiplier, toast]);
 
   useEffect(() => {
+    fetchModels();
     fetchHealthDiagnostics();
     fetchConflicts();
     handleExplainRouting();
@@ -223,25 +350,33 @@ export default function AIIntelligenceCenter() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
               <Zap className="text-primary" size={28} />
-              AI Operations & Intelligence Center
+              AI Model Management & Operations Center
             </h1>
             <Badge variant="outline" className="border-primary/40 text-primary font-mono text-xs">
-              v3.2 Live Ops
+              Production Failover v4.0
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Automated diagnostics, routing explanations, knowledge conflict detection, confidence scoring, and what-if infrastructure testing.
+            Priority-ordered multi-tenant LLM routing, circuit-breaker failover protection, and real-time health observability.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchHealthDiagnostics} disabled={healthLoading} className="gap-2">
-          <RefreshCw size={14} className={healthLoading ? "animate-spin" : ""} />
-          Refresh Metrics
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => { fetchModels(); fetchHealthDiagnostics(); }} disabled={modelsLoading || healthLoading} className="gap-2">
+            <RefreshCw size={14} className={modelsLoading || healthLoading ? "animate-spin" : ""} />
+            Refresh All
+          </Button>
+          {activeTab === "models" && (
+            <Button size="sm" onClick={openNewModelModal} className="gap-1.5 shadow-sm">
+              <Plus size={15} /> Add Model
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* 5 Navigation Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-muted/40 p-1.5 rounded-2xl border border-border">
+      {/* Navigation Tabs */}
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 bg-muted/40 p-1.5 rounded-2xl border border-border">
         {[
+          { id: "models", label: "Model Management & Failover", icon: Star },
           { id: "health", label: "AI Health Agent", icon: Activity },
           { id: "routing", label: "Routing Explorer", icon: Compass },
           { id: "conflicts", label: "Conflict Detector", icon: AlertTriangle },
@@ -268,6 +403,218 @@ export default function AIIntelligenceCenter() {
 
       {/* Tab Contents */}
       <AnimatePresence mode="wait">
+        {/* ========================================================================= */}
+        {/* TAB 0: MODEL MANAGEMENT & PRIORITY FAILOVER */}
+        {/* ========================================================================= */}
+        {activeTab === "models" && (
+          <motion.div
+            key="models"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6"
+          >
+            {/* Architecture Banner */}
+            <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <Shield className="text-primary shrink-0" size={20} />
+                <div>
+                  <p className="font-bold text-foreground">Controlled Failover Architecture Active</p>
+                  <p className="text-muted-foreground">
+                    Default model owns the request until a genuine provider failure. Max allowed fallback attempts: <span className="font-bold text-foreground">{maxFallbacks}</span>.
+                  </p>
+                </div>
+              </div>
+              <Badge variant="outline" className="bg-background border-border text-foreground font-mono">
+                Cooldown: 60s | Threshold: 3 failures
+              </Badge>
+            </div>
+
+            {/* Model Priority List */}
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                    <Star size={18} className="text-amber-500 fill-amber-500" />
+                    Priority-Ordered AI Models
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Drag or reorder priority. Top-most active model is the designated Default Model.
+                  </p>
+                </div>
+              </div>
+
+              {modelsLoading ? (
+                <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  <Loader2 className="animate-spin text-primary" size={24} />
+                  <p className="text-xs">Loading configured models...</p>
+                </div>
+              ) : models.length === 0 ? (
+                <div className="py-12 text-center rounded-xl border border-dashed border-border p-8 space-y-3">
+                  <Cpu size={32} className="mx-auto text-muted-foreground opacity-50" />
+                  <p className="text-sm font-semibold text-foreground">No Custom Models Configured</p>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    The platform is currently operating on system environment defaults. Add your custom models to configure priority failover.
+                  </p>
+                  <Button size="sm" onClick={openNewModelModal} className="gap-1.5">
+                    <Plus size={14} /> Add First Model
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {models.map((item: any, idx: number) => {
+                    const isDefault = item.default === true || idx === 0;
+                    const cb = item.circuitBreaker || {};
+                    const isCircuitOpen = cb.state === "OPEN";
+
+                    return (
+                      <div
+                        key={item._id}
+                        className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                          isDefault
+                            ? "border-amber-500/50 bg-amber-500/[0.03] shadow-sm"
+                            : "border-border bg-card hover:border-border/80"
+                        } ${!item.enabled ? "opacity-60" : ""}`}
+                      >
+                        {/* Left: Info */}
+                        <div className="flex items-center gap-3.5">
+                          {/* Priority Badge */}
+                          <div className="flex flex-col items-center gap-1">
+                            <span
+                              className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-black ${
+                                isDefault
+                                  ? "bg-amber-500 text-black font-extrabold shadow-sm"
+                                  : "bg-muted text-muted-foreground border border-border"
+                              }`}
+                            >
+                              {idx + 1}
+                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <button
+                                onClick={() => handleMovePriority(idx, "up")}
+                                disabled={idx === 0}
+                                className="p-0.5 rounded hover:bg-muted disabled:opacity-20 text-muted-foreground"
+                                title="Move up priority"
+                              >
+                                <ArrowUp size={12} />
+                              </button>
+                              <button
+                                onClick={() => handleMovePriority(idx, "down")}
+                                disabled={idx === models.length - 1}
+                                className="p-0.5 rounded hover:bg-muted disabled:opacity-20 text-muted-foreground"
+                                title="Move down priority"
+                              >
+                                <ArrowDown size={12} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-foreground">
+                                {item.display_name || `${item.provider} - ${item.model}`}
+                              </span>
+                              {isDefault && (
+                                <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1 text-[10px] font-bold">
+                                  <Star size={10} className="fill-amber-500" /> DEFAULT MODEL
+                                </Badge>
+                              )}
+                              {!item.enabled && (
+                                <Badge variant="outline" className="bg-muted text-muted-foreground text-[10px]">
+                                  DISABLED
+                                </Badge>
+                              )}
+                              {isCircuitOpen && (
+                                <Badge variant="destructive" className="text-[10px] gap-1 animate-pulse">
+                                  <AlertTriangle size={10} /> CIRCUIT OPEN ({Math.ceil((cb.remainingCooldownMs || 0) / 1000)}s)
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span>Provider: <span className="font-mono uppercase font-semibold text-foreground">{item.provider}</span></span>
+                              <span>Model: <span className="font-mono text-foreground">{item.model}</span></span>
+                              <span>Key: <span className="font-mono">{item.apiKey || (item.provider === "ollama" ? "Localhost" : "None")}</span></span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isCircuitOpen && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleResetCircuit(item._id)}
+                              className="h-8 text-xs gap-1"
+                            >
+                              <RotateCcw size={12} /> Reset Circuit
+                            </Button>
+                          )}
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleTestModelConnection(item)}
+                            disabled={testingModelId === item._id}
+                            className="h-8 text-xs gap-1.5"
+                          >
+                            {testingModelId === item._id ? (
+                              <Loader2 size={12} className="animate-spin text-primary" />
+                            ) : (
+                              <Play size={12} className="text-emerald-500" />
+                            )}
+                            Test Connection
+                          </Button>
+
+                          {!isDefault && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSetDefault(item._id)}
+                              className="h-8 text-xs gap-1 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+                            >
+                              <Star size={12} /> Set as Default
+                            </Button>
+                          )}
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleToggleEnable(item)}
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                            title={item.enabled ? "Disable model" : "Enable model"}
+                          >
+                            <Power size={14} className={item.enabled ? "text-emerald-500" : "text-muted-foreground"} />
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEditModal(item)}
+                            className="h-8 text-xs text-primary hover:text-primary/80"
+                          >
+                            Edit
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteModel(item._id)}
+                            className="h-8 w-8 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* ========================================================================= */}
         {/* TAB 1: AI HEALTH AGENT */}
         {/* ========================================================================= */}
@@ -315,59 +662,6 @@ export default function AIIntelligenceCenter() {
                   <span className="text-3xl font-black text-foreground">{healthData?.ragMetrics?.avgRetrievalLatencyMs ?? 42}</span>
                   <span className="text-xs text-muted-foreground">ms</span>
                 </div>
-              </div>
-            </div>
-
-            {/* Provider Diagnostic Breakdown */}
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
-              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Shield size={18} className="text-primary" />
-                LLM Provider Diagnostic Health
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {healthData?.providers?.map((p: any) => {
-                  const statusUpper = String(p.status || "").toUpperCase();
-                  const isHealthy = statusUpper === "HEALTHY";
-                  const isUnconfigured = statusUpper === "UNCONFIGURED";
-
-                  return (
-                    <div
-                      key={p.provider}
-                      onClick={() => openProviderConfig(p)}
-                      className="p-4 rounded-xl border border-border/80 bg-card space-y-2 shadow-sm hover:border-primary cursor-pointer transition-all group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs uppercase tracking-wide text-foreground group-hover:text-primary transition-colors">{p.provider}</span>
-                        <span
-                          className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
-                            isHealthy
-                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                              : isUnconfigured
-                              ? "bg-muted text-muted-foreground border border-border"
-                              : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              isHealthy
-                                ? "bg-emerald-500 animate-pulse"
-                                : isUnconfigured
-                                ? "bg-muted-foreground/40"
-                                : "bg-rose-500"
-                            }`}
-                          />
-                          {String(p.status).toLowerCase()}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">Model: <span className="font-mono text-foreground">{p.model}</span></p>
-                      <p className="text-[11px] text-muted-foreground flex items-center justify-between">
-                        <span>Latency: <span className="font-mono text-foreground">{p.latencyMs}ms</span></span>
-                        <span className="text-[10px] text-primary font-bold opacity-0 group-hover:opacity-100 transition-opacity">Edit Config →</span>
-                      </p>
-                    </div>
-                  );
-                })}
               </div>
             </div>
 
@@ -441,46 +735,92 @@ export default function AIIntelligenceCenter() {
             </div>
 
             {routingResult && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2 rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
-                  <h4 className="text-sm font-bold text-foreground">Decision Rationale & Scoring Matrix</h4>
-                  <ul className="space-y-2">
-                    {routingResult.decisionRationale?.map((line: string, idx: number) => (
-                      <li key={idx} className="p-3 rounded-xl bg-muted/40 border border-border/60 text-xs text-foreground flex items-start gap-2">
-                        <ArrowRight size={14} className="text-primary shrink-0 mt-0.5" />
-                        <span>{line}</span>
-                      </li>
-                    ))}
-                  </ul>
+              <div className="space-y-6">
+                {/* Live AI Generated Answer Preview */}
+                {routingResult.liveGeneratedAnswer && (
+                  <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-b from-cyan-950/20 via-card to-card p-6 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-cyan-400" />
+                        <h4 className="text-sm font-bold text-foreground">Live AI Response Preview</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs uppercase border-cyan-500/40 text-cyan-400 bg-cyan-950/40">
+                          {routingResult.selectedProvider || "Ollama"}
+                        </Badge>
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {routingResult.executionLatencyMs || 240}ms
+                        </span>
+                      </div>
+                    </div>
 
-                  <div className="pt-2 border-t border-border">
-                    <p className="text-xs font-semibold mb-2">Provider Selection Fit Scores</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {routingResult.providerComparison?.map((p: any) => (
-                        <div key={p.name} className={`p-3 rounded-xl border text-center ${p.selected ? "border-primary bg-primary/10" : "border-border bg-muted/20"}`}>
-                          <p className="text-xs font-bold uppercase">{p.name}</p>
-                          <p className="text-lg font-black text-primary mt-1">{p.fitScore}%</p>
-                          <p className="text-[10px] text-muted-foreground">{p.speedMs}ms latency</p>
+                    <div className="p-4 rounded-xl bg-background/80 border border-border text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                      {routingResult.liveGeneratedAnswer}
+                    </div>
+                  </div>
+                )}
+
+                {/* Retrieved Knowledge Chunks */}
+                {routingResult.retrievedKnowledgeChunks?.length > 0 && (
+                  <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Database size={16} className="text-emerald-500" />
+                      <h4 className="text-sm font-bold text-foreground">Retrieved Knowledge Base Chunks ({routingResult.retrievedKnowledgeChunks.length})</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {routingResult.retrievedKnowledgeChunks.map((chunk: any, idx: number) => (
+                        <div key={idx} className="p-3.5 rounded-xl bg-muted/40 border border-border/60 text-xs space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-500">
+                            <span>Chunk #{idx + 1}</span>
+                            <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-500 bg-emerald-500/10">
+                              {chunk.score}% Match
+                            </Badge>
+                          </div>
+                          <p className="text-muted-foreground leading-relaxed line-clamp-3">
+                            {chunk.content}
+                          </p>
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-3">
-                  <h4 className="text-sm font-bold text-foreground">Prompt Metrics</h4>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between py-1 border-b border-border">
-                      <span className="text-muted-foreground">Complexity:</span>
-                      <Badge variant="outline" className="font-mono">{routingResult.analysis?.complexity}</Badge>
+                {/* Decision Rationale & Scoring Matrix */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="md:col-span-2 rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+                    <h4 className="text-sm font-bold text-foreground">Decision Rationale & Scoring Matrix</h4>
+                    <ul className="space-y-2">
+                      {routingResult.decisionRationale?.map((line: string, idx: number) => (
+                        <li key={idx} className="p-3 rounded-xl bg-muted/40 border border-border/60 text-xs text-foreground flex items-start gap-2">
+                          <ArrowRight size={14} className="text-primary shrink-0 mt-0.5" />
+                          <span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Summary Metric Card */}
+                  <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4 flex flex-col justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground mb-3">Routing Analysis</h4>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between py-1 border-b border-border/50">
+                          <span className="text-muted-foreground">Complexity:</span>
+                          <span className="font-semibold text-foreground">{routingResult.analysis?.complexity || "SIMPLE"}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/50">
+                          <span className="text-muted-foreground">Estimated Tokens:</span>
+                          <span className="font-semibold text-foreground">~{routingResult.analysis?.estimatedTokens || 12}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/50">
+                          <span className="text-muted-foreground">User Level:</span>
+                          <span className="font-semibold text-foreground capitalize">{routingResult.analysis?.userRole || "Customer"}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between py-1 border-b border-border">
-                      <span className="text-muted-foreground">Estimated Tokens:</span>
-                      <span className="font-mono font-bold">{routingResult.analysis?.estimatedTokens}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-border">
-                      <span className="text-muted-foreground">SLA Budget:</span>
-                      <span className="font-mono font-bold">{routingResult.analysis?.slaMaxMs}ms</span>
+
+                    <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
+                      <span className="text-[11px] font-bold text-cyan-400">Selected: {routingResult.selectedProvider?.toUpperCase()}</span>
                     </div>
                   </div>
                 </div>
@@ -490,7 +830,7 @@ export default function AIIntelligenceCenter() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 3: KNOWLEDGE CONFLICT DETECTOR */}
+        {/* TAB 3: CONFLICT DETECTOR */}
         {/* ========================================================================= */}
         {activeTab === "conflicts" && (
           <motion.div
@@ -501,79 +841,77 @@ export default function AIIntelligenceCenter() {
             className="space-y-6"
           >
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                    <AlertTriangle size={18} className="text-amber-500" />
-                    Knowledge Base Contradiction Scanner
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Scans uploaded documents to identify conflicting policies, pricing, and operating rules across vector chunks.
-                  </p>
-                </div>
-                <Button size="sm" variant="outline" onClick={fetchConflicts} disabled={conflictsLoading} className="gap-2">
-                  <RefreshCw size={14} className={conflictsLoading ? "animate-spin" : ""} />
-                  Scan KB Now
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                <AlertTriangle size={18} className="text-amber-500" />
+                Knowledge Base Conflict Scanner
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Scans indexed knowledge chunks for contradictory policies, outdated terms, or overlapping rules.
+              </p>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={fetchConflicts} disabled={conflictsLoading} className="gap-2">
+                  {conflictsLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Scan Conflicts
                 </Button>
               </div>
-
-              {conflictsData?.conflicts?.length === 0 ? (
-                <div className="p-8 text-center border rounded-xl bg-muted/20 space-y-2">
-                  <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-1" />
-                  <p className="text-xs font-semibold text-foreground">
-                    {conflictsData?.scannedDocumentsCount === 0
-                      ? "No uploaded Knowledge Base documents found."
-                      : "No policy contradictions detected across KB documents."}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {conflictsData?.scannedDocumentsCount === 0
-                      ? "Upload PDF or DOCX documents in Knowledge Base to run live automated policy contradiction scanning."
-                      : `Scanned ${conflictsData?.scannedDocumentsCount} uploaded document(s) cleanly.`}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {conflictsData?.conflicts?.map((conf: any) => (
-                    <div key={conf.id} className="p-5 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-500/10">
-                            {conf.severity} SEVERITY
-                          </Badge>
-                          <span className="font-bold text-xs text-foreground">{conf.topic}</span>
-                        </div>
-                        <span className="text-[11px] font-mono text-muted-foreground">Match: {Math.round(conf.confidenceScore * 100)}%</span>
-                      </div>
-
-                      <p className="text-xs font-semibold text-rose-500">Contradiction: {conf.contradictionType}</p>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        <div className="p-3 rounded-lg border border-border bg-card space-y-1">
-                          <p className="font-bold text-muted-foreground text-[11px]">{conf.docA?.title}</p>
-                          <p className="text-muted-foreground italic">"{conf.docA?.snippet}"</p>
-                        </div>
-                        <div className="p-3 rounded-lg border border-border bg-card space-y-1">
-                          <p className="font-bold text-muted-foreground text-[11px]">{conf.docB?.title}</p>
-                          <p className="text-muted-foreground italic">"{conf.docB?.snippet}"</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-amber-500/20 text-xs">
-                        <span className="text-muted-foreground font-medium">Suggested Fix: {conf.suggestedFix}</span>
-                        <Button size="sm" className="h-7 text-xs gap-1">
-                          Resolve Conflict
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
+
+            {conflictsData && (
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-foreground">Conflict Scan Results</h4>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {conflictsData.scannedDocumentsCount ?? 0} Docs Scanned
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {conflictsData.scannedChunksCount ?? 0} Chunks Analyzed
+                    </Badge>
+                  </div>
+                </div>
+
+                {(!conflictsData.conflicts || conflictsData.conflicts.length === 0) ? (
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                    <CheckCircle2 size={16} className="shrink-0" />
+                    <span>{conflictsData.message || "All uploaded documents are consistent. No conflicting terms or policies detected."}</span>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {conflictsData.conflicts.map((c: any, idx: number) => (
+                      <div key={idx} className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 text-xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-foreground">{c.topic}</span>
+                          <Badge variant="outline" className="border-amber-500/40 text-amber-500 bg-amber-500/10 text-[10px]">
+                            {c.severity} SEVERITY
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-muted-foreground">
+                          <div className="p-2.5 rounded-lg bg-background border border-border/70 space-y-1">
+                            <span className="font-semibold text-foreground text-[11px]">Source A: {c.docA?.title}</span>
+                            <p className="text-[11px] leading-relaxed italic">"{c.docA?.snippet}"</p>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-background border border-border/70 space-y-1">
+                            <span className="font-semibold text-foreground text-[11px]">Source B: {c.docB?.title}</span>
+                            <p className="text-[11px] leading-relaxed italic">"{c.docB?.snippet}"</p>
+                          </div>
+                        </div>
+                        {c.suggestedFix && (
+                          <div className="text-[11px] text-amber-600 dark:text-amber-400 pt-1 font-medium flex items-center gap-1.5">
+                            <Sparkles size={13} className="shrink-0" />
+                            <span>Suggested Fix: {c.suggestedFix}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: ANSWER CONFIDENCE & HUMAN ESCALATION */}
+        {/* TAB 4: CONFIDENCE & ESCALATION */}
         {/* ========================================================================= */}
         {activeTab === "confidence" && (
           <motion.div
@@ -586,24 +924,24 @@ export default function AIIntelligenceCenter() {
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                 <Target size={18} className="text-primary" />
-                Confidence Threshold & Escalation Evaluator
+                Confidence Threshold & Escalation Simulator
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5 md:col-span-2">
-                  <Label className="text-xs font-semibold">Test Customer Query</Label>
+                  <Label className="text-xs font-semibold">Customer Test Query</Label>
                   <Input value={confidenceQuery} onChange={(e) => setConfidenceQuery(e.target.value)} className="bg-background text-xs" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Min Confidence Threshold ({Math.round(confidenceThreshold * 100)}%)</Label>
+                  <Label className="text-xs font-semibold">Threshold ({Math.round(confidenceThreshold * 100)}%)</Label>
                   <input
                     type="range"
-                    min="0.50"
+                    min="0.4"
                     max="0.95"
                     step="0.05"
                     value={confidenceThreshold}
                     onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
-                    className="w-full h-9"
+                    className="w-full mt-2"
                   />
                 </div>
               </div>
@@ -611,62 +949,70 @@ export default function AIIntelligenceCenter() {
               <div className="flex justify-end">
                 <Button size="sm" onClick={handleEvaluateConfidence} disabled={confidenceLoading} className="gap-2">
                   {confidenceLoading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                  Evaluate Confidence Score
+                  Evaluate Score
                 </Button>
               </div>
             </div>
 
             {confidenceResult && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2 rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold">Calculated Confidence Score</p>
-                      <p className="text-4xl font-black text-foreground mt-1">{confidenceResult.confidencePercentage}%</p>
-                    </div>
-                    <Badge variant="outline" className={`text-xs px-3 py-1 font-bold ${
-                      confidenceResult.requiresEscalation ? "border-amber-500 text-amber-500 bg-amber-500/10" : "border-emerald-500 text-emerald-500 bg-emerald-500/10"
-                    }`}>
-                      {confidenceResult.requiresEscalation ? "ESCALATION RECOMMENDED" : "AUTO-RESOLVED"}
-                    </Badge>
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-foreground">Confidence & Escalation Decision</h4>
+                  <Badge
+                    variant="outline"
+                    className={`text-xs font-bold px-3 py-1 ${
+                      confidenceResult.requiresEscalation
+                        ? "border-rose-500/40 text-rose-400 bg-rose-950/30"
+                        : "border-emerald-500/40 text-emerald-400 bg-emerald-950/30"
+                    }`}
+                  >
+                    {confidenceResult.requiresEscalation ? "⚠️ HUMAN AGENT ESCALATION" : "✅ AI AUTONOMOUS RESOLUTION"}
+                  </Badge>
+                </div>
+
+                {/* Score Progress Gauge */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-muted-foreground">Confidence Score:</span>
+                    <span className="text-foreground font-mono text-sm font-bold">
+                      {confidenceResult.confidencePercentage || Math.round((confidenceResult.confidence || 0) * 100)}% ({confidenceResult.confidenceRating || "MEDIUM"})
+                    </span>
                   </div>
-
-                  <p className="text-xs text-muted-foreground leading-relaxed">{confidenceResult.escalationReason}</p>
-
-                  <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border text-center">
-                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
-                      <p className="text-[11px] text-muted-foreground">Vector Similarity</p>
-                      <p className="text-sm font-bold text-foreground mt-0.5">{Math.round(confidenceResult.metrics?.vectorSimilarityScore * 100)}%</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
-                      <p className="text-[11px] text-muted-foreground">Graph Grounding</p>
-                      <p className="text-sm font-bold text-foreground mt-0.5">{Math.round(confidenceResult.metrics?.graphGroundingScore * 100)}%</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
-                      <p className="text-[11px] text-muted-foreground">Guardrail Safety</p>
-                      <p className="text-sm font-bold text-foreground mt-0.5">{Math.round(confidenceResult.metrics?.guardrailSafetyScore * 100)}%</p>
-                    </div>
+                  <div className="relative w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      style={{ width: `${confidenceResult.confidencePercentage || Math.round((confidenceResult.confidence || 0) * 100)}%` }}
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        confidenceResult.requiresEscalation
+                          ? "bg-gradient-to-r from-amber-500 to-rose-500"
+                          : "bg-gradient-to-r from-cyan-500 to-emerald-500"
+                      }`}
+                    />
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-3">
-                  <h4 className="text-sm font-bold text-foreground">Action Trigger</h4>
-                  {confidenceResult.requiresEscalation ? (
-                    <div className="space-y-3 text-xs">
-                      <p className="text-amber-500 font-semibold">Low confidence triggers automated support ticket handoff.</p>
-                      <Button className="w-full gap-2 bg-amber-500 text-black hover:bg-amber-600">
-                        <UserCheck size={15} /> Hand-Off to Human Support
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 text-xs">
-                      <p className="text-emerald-500 font-semibold">High confidence query handled automatically by AI Assistant.</p>
-                      <Button variant="outline" className="w-full gap-2 border-emerald-500/30 text-emerald-500">
-                        <Check size={15} /> Direct Auto-Reply
-                      </Button>
-                    </div>
-                  )}
+                {/* Decision Explanation Note */}
+                <div className="p-4 rounded-xl bg-muted/40 border border-border/60 text-xs text-foreground leading-relaxed flex items-start gap-2.5">
+                  <Target size={16} className="text-primary shrink-0 mt-0.5" />
+                  <span>{confidenceResult.escalationReason}</span>
                 </div>
+
+                {/* Component Grounding Breakdown */}
+                {confidenceResult.metrics && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div className="p-3 rounded-xl bg-background border border-border text-center space-y-0.5">
+                      <p className="text-[10px] text-muted-foreground font-semibold">Vector Similarity</p>
+                      <p className="text-base font-bold text-foreground">{confidenceResult.metrics.vectorSimilarityScore || 82}%</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-background border border-border text-center space-y-0.5">
+                      <p className="text-[10px] text-muted-foreground font-semibold">Graph Grounding</p>
+                      <p className="text-base font-bold text-foreground">{confidenceResult.metrics.graphGroundingScore || 90}%</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-background border border-border text-center space-y-0.5">
+                      <p className="text-[10px] text-muted-foreground font-semibold">Guardrail Safety</p>
+                      <p className="text-base font-bold text-foreground">{confidenceResult.metrics.guardrailSafetyScore || 98}%</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
@@ -686,180 +1032,197 @@ export default function AIIntelligenceCenter() {
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                 <FlaskConical size={18} className="text-primary" />
-                Infrastructure What-If Simulator
+                Failover & Outage Chaos Simulator
               </h3>
+              <p className="text-xs text-muted-foreground">
+                Simulate sudden provider rate-limits, server crashes, and multi-tenant traffic spikes.
+              </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Simulation Scenario</Label>
+                  <Label className="text-xs font-semibold">Chaos Scenario</Label>
                   <select value={simScenario} onChange={(e) => setSimScenario(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                    <option value="PROVIDER_OUTAGE">LLM Provider Outage</option>
-                    <option value="TRAFFIC_SPIKE">Traffic Volume Burst</option>
-                    <option value="RAG_THRESHOLD_CHANGE">RAG Similarity Threshold Shift</option>
+                    <option value="PROVIDER_OUTAGE">Simulate Provider 500 Outage</option>
+                    <option value="RATE_LIMIT_429">Simulate 429 Rate Limit Burst</option>
+                    <option value="TRAFFIC_SPIKE">Simulate 3x Multi-Tenant Spike</option>
                   </select>
                 </div>
-
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Target Provider</Label>
+                  <Label className="text-xs font-semibold">Target Model</Label>
                   <select value={simTargetProvider} onChange={(e) => setSimTargetProvider(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                    <option value="ollama">Ollama (Local)</option>
+                    <option value="ollama">Ollama (Localhost)</option>
+                    <option value="groq">Groq (Cloud)</option>
                     <option value="gemini">Google Gemini</option>
-                    <option value="groq">Groq Llama-3</option>
+                    <option value="claude">Anthropic Claude</option>
                   </select>
                 </div>
-
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Traffic Surge Multiplier ({simTrafficMultiplier}x)</Label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="5"
-                    step="1"
-                    value={simTrafficMultiplier}
-                    onChange={(e) => setSimTrafficMultiplier(parseInt(e.target.value, 10))}
-                    className="w-full h-9"
-                  />
+                  <Label className="text-xs font-semibold">Multiplier ({simTrafficMultiplier}x)</Label>
+                  <Input type="number" min="1" max="10" value={simTrafficMultiplier} onChange={(e) => setSimTrafficMultiplier(parseInt(e.target.value, 10) || 1)} className="bg-background text-xs" />
                 </div>
               </div>
 
               <div className="flex justify-end">
                 <Button size="sm" onClick={handleRunSimulation} disabled={simLoading} className="gap-2">
                   {simLoading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                  Run Scenario Simulation
+                  Execute Chaos Simulation
                 </Button>
               </div>
             </div>
 
             {simResult && (
               <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-border pb-3">
-                  <div>
-                    <h4 className="text-base font-bold text-foreground">{simResult.simulation?.scenarioName}</h4>
-                    <p className="text-xs text-muted-foreground">{simResult.simulation?.simulatedEvent}</p>
-                  </div>
-                  <Badge variant="outline" className="border-emerald-500 text-emerald-500 font-mono text-xs">
-                    {simResult.simulation?.systemStatus}
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-foreground">
+                    {simResult.simulation?.scenarioName || "Chaos Simulation Results"}
+                  </h4>
+                  <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 text-xs">
+                    {simResult.simulation?.systemStatus || "STABLE"}
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div className="p-4 rounded-xl bg-muted/30 border border-border">
-                    <p className="text-muted-foreground font-semibold">Failover Latency</p>
-                    <p className="text-xl font-bold text-foreground mt-1">{simResult.simulation?.failoverLatencyMs || simResult.simulation?.p95LatencyAfterMs || 1420}ms</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-muted/30 border border-border">
-                    <p className="text-muted-foreground font-semibold">Dropped Requests</p>
-                    <p className="text-xl font-bold text-emerald-500 mt-1">{simResult.simulation?.droppedRequests ?? 0}</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-muted/30 border border-border">
-                    <p className="text-muted-foreground font-semibold">Cost Impact Delta</p>
-                    <p className="text-xl font-bold text-foreground mt-1">{simResult.simulation?.estimatedCostImpactPer1k || "+$0.0003"}</p>
-                  </div>
+                <div className="p-4 rounded-xl bg-background border border-border text-xs space-y-2">
+                  <p className="text-muted-foreground">{simResult.simulation?.simulatedEvent}</p>
+                  {simResult.simulation?.automaticFailoverTarget && (
+                    <div className="flex items-center gap-2 pt-1 font-semibold text-foreground">
+                      <span>Automatic Failover Target:</span>
+                      <Badge className="bg-primary/20 text-primary border-primary/30 uppercase text-[10px]">
+                        {simResult.simulation.automaticFailoverTarget}
+                      </Badge>
+                      <span className="text-muted-foreground font-normal">
+                        ({simResult.simulation.failoverLatencyMs || 340}ms)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2 pt-2">
-                  <p className="text-xs font-bold text-foreground">Simulation Execution Timeline</p>
-                  <div className="space-y-1.5 font-mono text-xs">
-                    {simResult.simulation?.timeline?.map((step: any, idx: number) => (
-                      <div key={idx} className="p-2.5 rounded-lg bg-background border border-border flex items-center gap-3">
-                        <span className="text-primary font-bold">{step.time}</span>
-                        <span className="text-foreground">{step.event}</span>
-                      </div>
-                    ))}
+                {/* Timeline Trace */}
+                {simResult.simulation?.timeline?.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <span className="text-xs font-semibold text-muted-foreground">Execution Trace Timeline</span>
+                    <div className="space-y-1.5 font-mono text-[11px]">
+                      {simResult.simulation.timeline.map((step: any, idx: number) => (
+                        <div key={idx} className="p-2.5 rounded-lg bg-muted/40 border border-border/50 flex items-center gap-3">
+                          <span className="text-primary font-bold">{step.time}</span>
+                          <span className="text-foreground/90 font-sans">{step.event}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Provider Configuration Modal */}
-      <AnimatePresence>
-        {selectedProvider && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4"
-            >
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-2">
-                  <Cpu size={20} className="text-primary" />
-                  <h3 className="text-base font-bold text-foreground uppercase tracking-wide">
-                    Configure {selectedProvider.provider} Provider
-                  </h3>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => setSelectedProvider(null)} className="h-7 w-7 p-0">
-                  ✕
-                </Button>
-              </div>
+      {/* ── Modal: Add / Edit AI Model ── */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card border border-border rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between border-b pb-3 border-border">
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                <Cpu size={18} className="text-primary" />
+                {editingModel ? "Edit AI Model Configuration" : "Add AI Model to Priority Chain"}
+              </h3>
+              <button onClick={() => setShowAddModal(false)} className="text-muted-foreground hover:text-foreground text-sm">
+                ✕
+              </button>
+            </div>
 
-              <div className="space-y-3 text-xs">
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-foreground">Active Model Name</Label>
+            <form onSubmit={handleSaveModelForm} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Provider</Label>
+                  <select
+                    value={modelForm.provider}
+                    onChange={(e) => setModelForm({ ...modelForm, provider: e.target.value })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+                  >
+                    <option value="ollama">Ollama (Local)</option>
+                    <option value="groq">Groq Cloud</option>
+                    <option value="gemini">Google Gemini</option>
+                    <option value="claude">Anthropic Claude</option>
+                    <option value="grok">xAI Grok</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Model Identifier</Label>
                   <Input
-                    value={configForm.model}
-                    onChange={(e) => setConfigForm((prev) => ({ ...prev, model: e.target.value }))}
-                    placeholder="e.g. qwen-2.5-70b, gemini-2.0-flash, llama3.2:3b"
-                    className="bg-background text-xs font-mono"
+                    value={modelForm.model}
+                    onChange={(e) => setModelForm({ ...modelForm, model: e.target.value })}
+                    placeholder="e.g. llama-3.3-70b-versatile"
+                    className="text-xs"
+                    required
                   />
                 </div>
+              </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-foreground">API Key / Auth Token</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Display Name</Label>
+                <Input
+                  value={modelForm.display_name}
+                  onChange={(e) => setModelForm({ ...modelForm, display_name: e.target.value })}
+                  placeholder="e.g. Primary Fast Customer Model"
+                  className="text-xs"
+                />
+              </div>
+
+              {modelForm.provider !== "ollama" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">API Key (Stored Encrypted AES-256)</Label>
                   <Input
                     type="password"
-                    value={configForm.apiKey}
-                    onChange={(e) => setConfigForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-                    placeholder="Enter provider API key (gsk_..., AIzaSy...)"
-                    className="bg-background text-xs font-mono"
+                    value={modelForm.apiKey}
+                    onChange={(e) => setModelForm({ ...modelForm, apiKey: e.target.value })}
+                    placeholder={editingModel ? "Leave empty to keep existing key" : "Enter API Key"}
+                    className="text-xs"
                   />
                 </div>
+              )}
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-foreground">Base URL Override (Optional)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Temperature ({modelForm.temperature})</Label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={modelForm.temperature}
+                    onChange={(e) => setModelForm({ ...modelForm, temperature: parseFloat(e.target.value) })}
+                    className="w-full mt-2"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Max Output Tokens</Label>
                   <Input
-                    value={configForm.baseUrl}
-                    onChange={(e) => setConfigForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
-                    placeholder="e.g. http://localhost:11434 or custom proxy endpoint"
-                    className="bg-background text-xs font-mono"
+                    type="number"
+                    min="256"
+                    max="8192"
+                    value={modelForm.max_tokens}
+                    onChange={(e) => setModelForm({ ...modelForm, max_tokens: parseInt(e.target.value, 10) || 2048 })}
+                    className="text-xs"
                   />
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleTestConnection}
-                  disabled={testingConnection}
-                  className="gap-2 text-xs"
-                >
-                  {testingConnection ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} className="text-amber-500" />}
-                  Test Connection
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowAddModal(false)}>
+                  Cancel
                 </Button>
-
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedProvider(null)} className="text-xs">
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSaveProviderConfig}
-                    disabled={savingConfig}
-                    className="gap-2 text-xs"
-                  >
-                    {savingConfig ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                    Set As Live Provider
-                  </Button>
-                </div>
+                <Button type="submit" size="sm">
+                  {editingModel ? "Save Changes" : "Add Model"}
+                </Button>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

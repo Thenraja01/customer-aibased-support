@@ -80,7 +80,7 @@ export default function AIAgentOperations() {
         realFeed.push({
           id: `doc-${idx}`,
           title: "Knowledge Base Indexed",
-          detail: `📄 ${d.original_name || d.title || "Document.pdf"}`,
+          detail: `${d.original_name || d.title || "Document.pdf"}`,
           status: d.status === "completed" || d.status === "ready" ? "Ready" : "Processing",
           time: new Date(d.created_at || d.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           icon: FileText,

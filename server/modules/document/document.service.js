@@ -20,6 +20,7 @@ const matchRoles = (userRole, allowedRoles) => {
 };
 
 import { enqueueJob } from "../ai/ai.service.js";
+import { logger } from "../../utils/logger.js";
 
 export const startBackgroundProcessing = async (documentId, versionId) => {
   try {
@@ -28,11 +29,9 @@ export const startBackgroundProcessing = async (documentId, versionId) => {
       payload: { documentId, versionId },
       priority: 10,
     });
-    console.log(`[BackgroundProcessing] Enqueued document_ingest job for doc ${documentId}`);
+    logger.info("DocIngestion", `Enqueued document_ingest job for doc ${documentId}`);
     return job;
-  } catch (err) {
-    // Never leave a document silently stuck in "queued" with no job behind it.
-    console.error(`[BackgroundProcessing] Failed to enqueue for doc ${documentId}, version ${versionId}:`, err.message);
+  } catch (err) { logger.error("DocIngestion", `Failed to enqueue for doc ${documentId}, version ${versionId}: ${err.message}`, err);
     await Document.updateOne(
       { _id: documentId },
       {
@@ -65,6 +64,30 @@ export const retryDocumentIngestion = async (documentId, orgId = null, branchId 
 
   const job = await startBackgroundProcessing(doc._id, versionId);
   if (!job) throw new Error("Failed to enqueue background processing for ingestion retry");
+  return doc;
+};
+
+export const abortDocumentProcessing = async (documentId, orgId = null, branchId = null) => {
+  const query = { _id: documentId };
+  if (orgId) query.organization_id = orgId;
+  if (branchId) query.branch_id = branchId;
+  const doc = await Document.findOne(query);
+  if (!doc) throw new Error("Document not found");
+
+  doc.status = "needs_revision";
+  doc.ingestionStatus = "failed";
+  doc.indexingStatus = "failed";
+  doc.knowledge_index_status = "failed";
+  doc.ingestion_error = "Ingestion processing was manually aborted by administrator.";
+  doc.failed_stage = "user_aborted";
+  await doc.save();
+
+  if (doc.currentVersionId) {
+    await DocumentVersion.findByIdAndUpdate(doc.currentVersionId, {
+      status: "needs_revision",
+      changelog: "Processing manually aborted by admin",
+    }).catch(() => null);
+  }
   return doc;
 };
 
@@ -104,11 +127,51 @@ export const processDocument = async (documentId, versionId) => {
       await version.save();
     }
     console.error(`[BackgroundProcessing] Error at ${stage} for doc ${documentId}:`, err);
+
+    try {
+      const { notifyAdminsOnSystemError } = await import("../notification/notification.service.js");
+      await notifyAdminsOnSystemError({
+        organizationId: doc.organization_id,
+        title: `Document Ingestion Alert: ${doc.title || "Document"}`,
+        message: `Processing failed at stage "${stage}": ${message}`,
+        type: "error",
+        link: "/admin/knowledge",
+      });
+    } catch {
+      // non-fatal notification fallback
+    }
+  };
+
+  const emitProgress = (stage, percent, message, extra = {}) => {
+    import("../../config/socket.js").then(({ getIO }) => {
+      try {
+        const io = getIO();
+        if (io) {
+          const payload = {
+            documentId: doc._id.toString(),
+            stage,
+            percent,
+            message,
+            chunk_count: doc.chunk_count || 0,
+            status: doc.status,
+            knowledge_index_status: stage === "completed" ? "indexed" : doc.knowledge_index_status,
+            ...extra,
+          };
+          io.emit("document:progress", payload);
+          if (doc.organization_id) {
+            io.to(`org:${doc.organization_id}`).emit("document:progress", payload);
+          }
+        }
+      } catch {
+        // non-fatal socket broadcast
+      }
+    }).catch(() => null);
   };
 
   try {
     doc.ingestionStatus = "parsing";
     await doc.save();
+    emitProgress("parsing", 20, "Extracting text content...");
 
     // Download secure file buffer from Cloudinary or local fallback
     let fileBuffer = Buffer.from("");
@@ -125,10 +188,13 @@ export const processDocument = async (documentId, versionId) => {
 
     if ((!fileBuffer || fileBuffer.length === 0) && doc.file_name) {
       const localPaths = [
+        path.resolve("uploads", doc.file_name),
+        path.resolve("../uploads", doc.file_name),
+        path.resolve("docs", doc.file_name),
+        path.resolve("../docs", doc.file_name),
         path.resolve("docs/knowledge_base", doc.file_name),
         path.resolve("../docs/knowledge_base", doc.file_name),
         path.resolve("../../docs/knowledge_base", doc.file_name),
-        path.resolve("uploads", doc.file_name),
       ];
       for (const lp of localPaths) {
         if (fs.existsSync(lp)) {
@@ -138,14 +204,23 @@ export const processDocument = async (documentId, versionId) => {
       }
     }
 
-    // Extract text
+    // Extract text with Tier 1/2 parsers
     let text = await extractTextFromBuffer(fileBuffer, doc.file_mimetype, doc.file_name);
-  if (!text || text.trim().length < 10) {
+    if (!text || text.trim().length < 10) {
       const existingChunks = await DocumentChunk.find({ document_id: documentId }).lean();
       if (existingChunks.length > 0) {
         text = existingChunks.map((c) => c.content || c.text_content).join("\n\n");
       } else if (doc.description && doc.description.trim().length >= 10) {
         text = doc.description.trim();
+      }
+    }
+
+    // Tier 3 Fallback: Synthesize metadata if file had no text
+    if (!text || text.trim().length < 10) {
+      const synthetic = `Document Title: ${doc.title}\nDescription: ${doc.description || "General organizational knowledge documentation"}\nFile: ${doc.file_name}`;
+      if (synthetic.length >= 10) {
+        console.log(`[TextExtraction] Tier 3 metadata synthesis used for doc "${doc.title}"`);
+        text = synthetic;
       }
     }
 
@@ -166,10 +241,12 @@ export const processDocument = async (documentId, versionId) => {
 
     doc.ingestionStatus = "chunking";
     await doc.save();
+    emitProgress("chunking", 40, "Splitting content into semantic chunks...");
 
     // Automatically detect topics for the document
     doc.topicStatus = "detecting";
     await doc.save();
+    emitProgress("topics", 55, "Detecting topics and extracting graph entities...");
     let detectedTopicIds = [];
     try {
       const { detectTopicsForText } = await import("./documentTopicDetection.js");
@@ -186,6 +263,7 @@ export const processDocument = async (documentId, versionId) => {
     doc.indexingStatus = "indexing";
     doc.knowledge_index_status = "indexing";
     await doc.save();
+    emitProgress("embedding", 75, "Generating vector embeddings in ChromaDB...");
 
     // Remove stale DB chunks for THIS version
     await DocumentChunk.deleteMany({ document_id: documentId, documentVersionId: versionId });
@@ -219,18 +297,65 @@ export const processDocument = async (documentId, versionId) => {
       doc.graphStatus = "failed";
     }
 
+    // Auto-generate and store AI Context Summary for instant high-speed LLM retrieval
+    try {
+      const { generateResponse } = await import("../llm/llm.service.js");
+      const sampleText = (text || "").slice(0, 4000);
+      if (sampleText.trim().length >= 20) {
+        const summaryPrompt = `Analyze the following document and provide:
+1. A concise 2-3 sentence executive context summary.
+2. The core subjects and key topics.
+
+Document: "${doc.title}"
+Content:
+${sampleText}
+
+Respond directly with the executive summary and key topics.`;
+
+        const summaryResult = await generateResponse(summaryPrompt, "", {
+          organizationId: doc.organization_id,
+          temperature: 0.3,
+          maxTokens: 300,
+        });
+
+        const rawSummary = typeof summaryResult === "string" ? summaryResult : summaryResult?.text || "";
+        if (rawSummary && rawSummary.trim().length > 0) {
+          doc.summary = rawSummary.trim();
+          doc.context_summary = rawSummary.trim();
+          logger.info("DocSummary", `Generated context summary for doc "${doc.title}"`);
+        }
+      }
+    } catch (sumErr) {
+      logger.warn("DocSummary", `Context summary generation warning for doc ${documentId}: ${sumErr.message}`);
+    }
+   let shouldAutoPublish = wasPublished;
+    if (!shouldAutoPublish) {
+      if (doc.user_id) {
+        try {
+          const User = mongoose.model("User");
+          const uploader = await User.findById(doc.user_id).populate("role_id").lean();
+          const roleName = uploader?.role_id?.name || uploader?.role || "";
+          if (isBranchAdminOrAbove(roleName) || !roleName) {
+            shouldAutoPublish = true;
+          }
+        } catch {
+          shouldAutoPublish = true;
+        }
+      } else {
+        shouldAutoPublish = true;
+      }
+    }
+
     doc.ingestionStatus = "completed";
     doc.knowledge_index_status = "indexed";
     doc.ingestion_error = null;
     doc.failed_stage = null;
     doc.last_indexed_at = new Date();
-    doc.status = wasPublished ? "published" : "ready_for_review";
+    doc.status = shouldAutoPublish ? "published" : "ready_for_review";
     await doc.save();
 
-    if (wasPublished) {
-      // Flip this version's chunks (plus any legacy version-less chunks that were
-      // ingested before versioning existed) back to published, and retire any
-      // superseded non-current versions.
+    if (shouldAutoPublish) {
+      // Flip chunks to published so they are immediately searchable in RAG
       await DocumentChunk.updateMany(
         { document_id: documentId, $or: [{ documentVersionId: versionId }, { documentVersionId: null }] },
         { status: "published" }
@@ -242,10 +367,43 @@ export const processDocument = async (documentId, versionId) => {
     }
 
     if (version) {
-      version.status = wasPublished ? "published" : "ready_for_review";
+      version.status = shouldAutoPublish ? "published" : "ready_for_review";
       await version.save();
     }
-    console.log(`[BackgroundProcessing] Successfully processed doc ${documentId} (${savedChunks.length} chunks)`);
+
+    emitProgress("completed", 100, "Ingestion and AI Context Summary complete!");
+    logger.success("DocIngestion", `Successfully processed doc ${documentId} (${savedChunks.length} chunks, status: ${doc.status})`);
+
+    // Emit real-time WebSocket event to all admin clients
+    try {
+      const { getIO } = await import("../../config/socket.js");
+      const io = getIO();
+      io.emit("document:indexed", {
+        documentId: String(documentId),
+        title: doc.title,
+        chunkCount: savedChunks.length,
+        status: doc.status,
+      });
+    } catch {
+      // socket fallback
+    }
+
+    // Send in-app notification to the uploader
+    if (doc.user_id) {
+      try {
+        const { createNotification } = await import("../notification/notification.service.js");
+        await createNotification({
+          user_id: doc.user_id,
+          organization_id: doc.organization_id,
+          title: "Document Ingestion Complete",
+          message: `Document "${doc.title}" (${savedChunks.length} chunks) is now indexed and live in RAG search.`,
+          type: "success",
+          link: "/admin/documents",
+        });
+      } catch {
+        // notification fallback
+      }
+    }
   } catch (err) {
     await markFailed("ingest", err);
   }

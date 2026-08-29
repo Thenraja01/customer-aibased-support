@@ -60,11 +60,15 @@ export class GoogleProvider extends LLMProvider {
   async generate(prompt, options = {}) {
     const apiKey = this._apiKey(options);
     if (!apiKey) {
-      console.warn("[GoogleProvider] No API key available for request");
-      return null;
+      const err = new Error("No API key configured for Google");
+      err.status = 401;
+      throw err;
     }
 
-    const modelName = options.model || this.modelName;
+    let modelName = options.model || this.modelName;
+    if (!modelName || !modelName.startsWith("gemini-") || modelName.includes("llama")) {
+      modelName = "gemini-1.5-flash";
+    }
 
     try {
       const googleAI = new GoogleGenerativeAI(apiKey);
@@ -79,8 +83,8 @@ export class GoogleProvider extends LLMProvider {
       });
       return result.response.text();
     } catch (err) {
-      console.error(`[GoogleProvider] API error:`, err.message);
-      return null;
+      console.error(`[GoogleProvider] API error (${modelName}):`, err.message);
+      throw err;
     }
   }
 }

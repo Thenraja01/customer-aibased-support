@@ -7,3 +7,7 @@ server/config/device-management.json
 .vscode/
 dist/
 build/
+server/uploads/
+uploads/
+inspect-db.js
+

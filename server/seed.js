@@ -7,7 +7,6 @@ dotenv.config();
 import Organization from './modules/organization/organization.schema.js';
 import Branch from './modules/branch/branch.schema.js';
 import User from './modules/user/user.schema.js';
-import { chromaService } from './config/chroma.js';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/supportai';
 
@@ -57,12 +56,6 @@ async function seedDefault() {
     console.log(`Branch ensured: ${branch.name}`);
   }
 
-  try {
-    await chromaService.init();
-    console.log('Chroma DB Initialized');
-  } catch (err) {
-    console.log('Chroma DB init skipped or failed (is it running?):', err.message);
-  }
 
   const existing = await User.findOne({ email: ADMIN_EMAIL });
   if (existing) {

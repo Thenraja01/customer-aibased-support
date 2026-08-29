@@ -14,8 +14,18 @@ import {
 } from "@/components/ui/card";
 import { AuthAPI } from "@/api/auth.api";
 
-interface OrgOption { _id: string; name: string }
-interface RoleOption { _id: string; role_name: string; description?: string }
+interface OrgOption {
+  _id: string;
+  name: string;
+  organization_id?: string;
+  allowed_registration_roles?: string[];
+  plan?: string;
+}
+interface RoleOption {
+  _id: string;
+  role_name: string;
+  description?: string;
+}
 
 interface FormData {
   name: string;
@@ -74,19 +84,60 @@ export default function Register() {
   useEffect(() => {
     Promise.all([
       AuthAPI.getOrganizations()
-        .then((r: any) => setOrganizations(r.data.data || []))
+        .then((r: any) => setOrganizations(r.data?.data || []))
         .catch((err) => console.error("Failed to fetch organizations:", err)),
       AuthAPI.getRoles()
-        .then((r: any) => setRoles(r.data.data || []))
-        .catch((err) => console.error("Failed to fetch roles:", err)),
-    ]).finally(() => { setOrgsLoading(false); setRolesLoading(false); });
+        .then((r: any) => {
+          const fetchedRoles = r.data?.data || [];
+          if (fetchedRoles.length > 0) {
+            setRoles(fetchedRoles);
+          } else {
+            setRoles([
+              { _id: "admin", role_name: "Organization Admin" },
+              { _id: "branch_admin", role_name: "Branch Admin" },
+              { _id: "support", role_name: "Support Agent" },
+              { _id: "customer", role_name: "Customer" },
+            ]);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch roles:", err);
+          setRoles([
+            { _id: "admin", role_name: "Organization Admin" },
+            { _id: "branch_admin", role_name: "Branch Admin" },
+            { _id: "support", role_name: "Support Agent" },
+            { _id: "customer", role_name: "Customer" },
+          ]);
+        }),
+    ]).finally(() => {
+      setOrgsLoading(false);
+      setRolesLoading(false);
+    });
   }, []);
+
+  const selectedOrg = organizations.find((o) => o._id === form.organization_id || o.organization_id === form.organization_id);
+  const availableRoles = roles.filter((r) => {
+    if (!selectedOrg || !Array.isArray(selectedOrg.allowed_registration_roles) || selectedOrg.allowed_registration_roles.length === 0) {
+      return true;
+    }
+    return selectedOrg.allowed_registration_roles.includes(r._id);
+  });
 
   const handleChange = useCallback((
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === "organization_id") {
+      const org = organizations.find((o) => o._id === value || o.organization_id === value);
+      const allowed = org?.allowed_registration_roles;
+      setForm((prev) => ({
+        ...prev,
+        organization_id: value,
+        role: allowed && allowed.length > 0 && !allowed.includes(prev.role) ? "" : prev.role,
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
       if (name === "password") {
         let s = 0;
         if (value.length >= 8) s++;
@@ -309,7 +360,7 @@ export default function Register() {
                         className={`select-field pl-10 h-11 ${errors.role ? "border-destructive" : ""}`}
                         aria-invalid={!!errors.role} required>
                         <option value="">{rolesLoading ? "Loading..." : "Select"}</option>
-                        {roles.filter(r => r._id === "support" || r._id === "customer").map((r) => (
+                        {availableRoles.map((r) => (
                           <option key={r._id} value={r._id}>{r.role_name}</option>
                         ))}
                       </select>

@@ -14,6 +14,7 @@ import {
   recalculateSlaForPriority,
 } from "./sla.service.js";
 import { enqueueAssignment, getAgentWorkloads } from "../assignment/assignment.service.js";
+import { sendLifecycleEmail } from "../../services/emailTemplate.service.js";
 
 // After this window a resolved/closed ticket cannot be reopened; a new linked
 // ticket must be created instead.
@@ -56,6 +57,30 @@ export const createTicket = async (data, organizationId, branchId = null) => {
     branchId: ticket.branch_id,
     strategy: DEFAULT_ASSIGNMENT_STRATEGY,
   }).catch((err) => console.error("[Ticket] Assignment enqueue failed:", err.message));
+
+  // Asynchronously dispatch ticket_created email to customer
+  if (ticket.user_id) {
+    User.findById(ticket.user_id)
+      .select("name email")
+      .lean()
+      .then((customer) => {
+        if (customer?.email) {
+          sendLifecycleEmail({
+            templateKey: "ticket_created",
+            recipientEmail: customer.email,
+            data: {
+              customer_name: customer.name || "Customer",
+              ticket_id: ticket.ticket_number || ticket._id,
+              subject: ticket.subject,
+              priority: ticket.priority,
+            },
+            organizationId: ticket.organization_id,
+            branchId: ticket.branch_id,
+          }).catch((err) => console.error("[LifecycleEmail] ticket_created failed:", err.message));
+        }
+      })
+      .catch(() => {});
+  }
 
   return ticket;
 };
@@ -209,6 +234,23 @@ export const assignTicket = async (id, supportId, assignedBy = null, note = null
     .populate("assigned_to", "name email role")
     .populate("previously_assigned_to", "name email role");
 
+  // Asynchronously dispatch ticket_assigned email to assigned agent
+  if (ticket?.assigned_to?.email) {
+    sendLifecycleEmail({
+      templateKey: "ticket_assigned",
+      recipientEmail: ticket.assigned_to.email,
+      data: {
+        agent_name: ticket.assigned_to.name || "Support Agent",
+        customer_name: ticket.user_id?.name || "Customer",
+        ticket_id: ticket.ticket_number || ticket._id,
+        subject: ticket.subject,
+        priority: ticket.priority,
+      },
+      organizationId: ticket.organization_id,
+      branchId: ticket.branch_id,
+    }).catch((err) => console.error("[LifecycleEmail] ticket_assigned failed:", err.message));
+  }
+
   return ticket;
 };
 
@@ -263,8 +305,25 @@ export const resolveTicket = async (id, userId) => {
     id,
     { status: "resolved", resolved_by: userId, resolved_at: new Date() },
     { new: true }
-  );
+  ).populate("user_id", "name email");
   if (!ticket) throw new Error("Ticket not found");
+
+  // Asynchronously dispatch ticket_resolved email to customer
+  if (ticket.user_id?.email) {
+    sendLifecycleEmail({
+      templateKey: "ticket_resolved",
+      recipientEmail: ticket.user_id.email,
+      data: {
+        customer_name: ticket.user_id.name || "Customer",
+        ticket_id: ticket.ticket_number || ticket._id,
+        subject: ticket.subject,
+        priority: ticket.priority,
+      },
+      organizationId: ticket.organization_id,
+      branchId: ticket.branch_id,
+    }).catch((err) => console.error("[LifecycleEmail] ticket_resolved failed:", err.message));
+  }
+
   return ticket;
 };
 

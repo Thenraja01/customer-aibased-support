@@ -29,6 +29,10 @@ const aiConfigSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    priority: {
+      type: Number,
+      default: 1,
+    },
     apiKey: {
       type: String,
       default: null,
@@ -63,5 +67,6 @@ const aiConfigSchema = new mongoose.Schema(
 // Compound index for org-specific model lookups
 aiConfigSchema.index({ organization_id: 1, provider: 1, model: 1 }, { unique: true });
 aiConfigSchema.index({ organization_id: 1, default: 1 });
+aiConfigSchema.index({ organization_id: 1, priority: 1 });
 
 export default mongoose.model("AIConfig", aiConfigSchema);

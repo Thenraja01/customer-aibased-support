@@ -46,6 +46,39 @@ export function safeSetItem(key: string, value: unknown): boolean {
   }
 }
 
+/**
+ * Strips out heavy server configuration, credentials, guardrails, LLM models,
+ * email templates, and ticket forms so ONLY lightweight client branding essentials
+ * are persisted in localStorage.
+ */
+export function sanitizeOrgSettingsForStorage(settings: any) {
+  if (!settings || typeof settings !== "object") return null;
+  return {
+    _id: settings._id,
+    organization_id: settings.organization_id,
+    name: settings.name,
+    brand_colors: settings.brand_colors
+      ? {
+          primary: settings.brand_colors.primary,
+          secondary: settings.brand_colors.secondary,
+          accent: settings.brand_colors.accent,
+        }
+      : undefined,
+    loader_config: settings.loader_config
+      ? {
+          enabled: settings.loader_config.enabled,
+          title: settings.loader_config.title,
+          subtitle: settings.loader_config.subtitle,
+          duration_ms: settings.loader_config.duration_ms,
+          bg_theme: settings.loader_config.bg_theme,
+        }
+      : undefined,
+    chatbot_name: settings.chatbot_name,
+    widget_theme: settings.widget_theme,
+    widget_position: settings.widget_position,
+  };
+}
+
 // ── User session helpers ────────────────────────────────────────────
 
 export interface SessionUser {
@@ -119,7 +152,7 @@ function extractSessionFields(user: any): {
 }
 
 /**
- * Persist the complete session: token, refresh token, user object, and the
+ * Persist the complete session: token, refresh token, sanitized user object, and the
  * discrete user_id, role_id, org_id, etc. fields — each under its own key.
  */
 export function saveSession(data: SessionData): boolean {
@@ -127,11 +160,25 @@ export function saveSession(data: SessionData): boolean {
 
   const { userId, roleId, role, orgId, branchId, name, email, status } = extractSessionFields(user);
 
+  // Minimal sanitized user for storage
+  const sanitizedUser = user ? {
+    _id: userId,
+    name,
+    email,
+    role,
+    roleName: user.roleName || role,
+    roles: user.roles || (role ? [role] : []),
+    organization_id: orgId,
+    branch_id: branchId,
+    status,
+    avatar: user.avatar,
+  } : null;
+
   const ok =
     safeSetItem(STORAGE_KEYS.TOKEN, token) &&
     safeSetItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken) &&
     safeSetItem(STORAGE_KEYS.USER_ID, userId) &&
-    safeSetItem(STORAGE_KEYS.USER, user) &&
+    safeSetItem(STORAGE_KEYS.USER, sanitizedUser) &&
     safeSetItem(STORAGE_KEYS.ROLE_ID, roleId) &&
     safeSetItem(STORAGE_KEYS.ROLE, role) &&
     safeSetItem(STORAGE_KEYS.ORG_ID, orgId) &&
@@ -141,7 +188,7 @@ export function saveSession(data: SessionData): boolean {
     safeSetItem(STORAGE_KEYS.STATUS, status);
 
   if (orgSettings) {
-    safeSetItem(STORAGE_KEYS.ORG_SETTINGS, orgSettings);
+    safeSetItem(STORAGE_KEYS.ORG_SETTINGS, sanitizeOrgSettingsForStorage(orgSettings));
   }
 
   if (orgId) {
@@ -187,4 +234,10 @@ export function clearSession(): void {
       /* ignore */
     }
   });
+  // Clear any legacy un-namespaced keys
+  try {
+    localStorage.removeItem("orgSettings");
+  } catch {
+    /* ignore */
+  }
 }

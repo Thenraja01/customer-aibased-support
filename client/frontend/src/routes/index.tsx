@@ -9,12 +9,17 @@ import { branchRoutes } from "./BranchRoutes";
 import { customerRoutes } from "./CustomerRoutes";
 import { profileRoute } from "./ProfileRoute";
 import NotFound from "@/pages/NotFound";
+import EmbedChatWidgetPage from "@/pages/Embed/EmbedChatWidgetPage";
+
 export default function AppRoutes() {
   return (
     <Routes>
+      {/* Standalone Embeddable React Chat Widget (for <iframe> embedding) */}
+      <Route path="/widget" element={<EmbedChatWidgetPage />} />
+      <Route path="/embed/chat" element={<EmbedChatWidgetPage />} />
+
       <Route element={<Layout />}>
         {publicRoutes}
-        <Route path="*" element={<NotFound />} />
       </Route>
 
       <Route element={<AppShell />}>
@@ -25,6 +30,9 @@ export default function AppRoutes() {
         {customerRoutes}
         {profileRoute}
       </Route>
+
+      {/* Standalone Fullscreen 404 Page (No Sidebar, No Layout) */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

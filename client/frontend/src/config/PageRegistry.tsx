@@ -53,7 +53,6 @@ const AdminDocumentTypes = lazy(() => import('@/pages/Admin/DocumentTypesPage'))
 const AdminSettings = lazy(() => import('@/pages/Admin/OrganizationSettingsPage'));
 const AdminSendNotification = lazy(() => import('@/pages/Admin/SendNotificationPage'));
 const AdminChatbot = lazy(() => import('@/pages/Customer/ChatPage'));
-const AdminCommunication = lazy(() => import('@/pages/Admin/AdminCommunicationPage'));
 const AdminTickets = lazy(() => import('@/pages/Admin/AdminTicketManagementPage'));
 const EscalatedTickets = lazy(() => import('@/pages/Admin/EscalatedTicketsPage'));
 const TicketTemplates = lazy(() => import('@/pages/Admin/TicketTemplatesPage'));
@@ -130,7 +129,6 @@ export const pageRegistry: Record<ActiveView, React.LazyExoticComponent<any> | n
   "admin-settings": AdminSettings,
   "admin-send-notification": AdminSendNotification,
   "admin-chatbot": AdminChatbot,
-  "admin-communication": AdminCommunication,
   "admin-profile": CustomerProfile,
   "admin-tickets": AdminTickets,
   "admin-tickets-escalated": EscalatedTickets,
@@ -150,7 +148,6 @@ export const pageRegistry: Record<ActiveView, React.LazyExoticComponent<any> | n
   "superadmin-roles": SuperAdminRoles,
   "superadmin-ai-analytics": SuperAdminAnalytics,
   "superadmin-chat-history": SuperAdminChatHistory,
-  "superadmin-communication": null,
   "superadmin-search": SuperAdminSearch,
   "superadmin-notifications": SuperAdminNotifications,
   "superadmin-notifications-send": SuperAdminSendNotification,

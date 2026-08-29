@@ -10,9 +10,9 @@ export type ActiveView =
   // Support Views
   | "support-dashboard" | "support-tickets" | "support-queue" | "support-documents" | "support-faq" | "support-notifications" | "support-chat" | "support-chat-history" | "support-profile"
   // Admin Views
-  | "admin-dashboard" | "admin-users" | "admin-team" | "admin-roles" | "admin-branches" | "admin-pending-approvals" | "admin-faq" | "admin-ai" | "admin-knowledge-gaps" | "admin-queue" | "admin-chat-history" | "admin-notifications" | "admin-documents" | "admin-topics" | "admin-verifications" | "admin-document-types" | "admin-settings" | "admin-send-notification" | "admin-ai-analytics" | "admin-chatbot" | "admin-ai-sessions" | "admin-communication" | "admin-profile" | "admin-tickets" | "admin-tickets-escalated" | "admin-tickets-templates" | "admin-tickets-form-customization"
+  | "admin-dashboard" | "admin-users" | "admin-team" | "admin-roles" | "admin-branches" | "admin-pending-approvals" | "admin-faq" | "admin-ai" | "admin-knowledge-gaps" | "admin-queue" | "admin-chat-history" | "admin-notifications" | "admin-documents" | "admin-topics" | "admin-verifications" | "admin-document-types" | "admin-settings" | "admin-send-notification" | "admin-ai-analytics" | "admin-chatbot" | "admin-ai-sessions" | "admin-profile" | "admin-tickets" | "admin-tickets-escalated" | "admin-tickets-templates" | "admin-tickets-form-customization"
   // SuperAdmin Views
-  | "superadmin-dashboard" | "superadmin-command-center" | "superadmin-organizations" | "superadmin-users" | "superadmin-pending-org-admins" | "superadmin-roles" | "superadmin-ai-analytics" | "superadmin-chat-history" | "superadmin-communication" | "superadmin-search" | "superadmin-notifications" | "superadmin-notifications-send" | "superadmin-audit-logs" | "superadmin-profile" | "superadmin-tickets" | "superadmin-tickets-escalated" | "superadmin-tickets-templates" | "superadmin-tickets-form-customization"
+  | "superadmin-dashboard" | "superadmin-command-center" | "superadmin-organizations" | "superadmin-users" | "superadmin-pending-org-admins" | "superadmin-roles" | "superadmin-ai-analytics" | "superadmin-chat-history" | "superadmin-search" | "superadmin-notifications" | "superadmin-notifications-send" | "superadmin-audit-logs" | "superadmin-profile" | "superadmin-tickets" | "superadmin-tickets-escalated" | "superadmin-tickets-templates" | "superadmin-tickets-form-customization"
   // Branch Views
   | "branch-dashboard" | "branch-tickets" | "branch-ticket-detail" | "branch-agents" | "branch-customers" | "branch-knowledge" | "branch-faq" | "branch-sla" | "branch-analytics" | "branch-notifications" | "branch-settings" | "branch-documents" | "branch-branches" | "branch-profile" | "support-ticket-detail" | "customer-ticket-detail"
   // AI Workspace
@@ -79,7 +79,6 @@ export function getPathView(path: string): ActiveView | null {
   else if (path === "/admin/chatbot") return "admin-chatbot";
   else if (path === "/admin/ai-sessions") return "admin-ai-sessions";
   else if (path === "/admin/ai-analytics") return "admin-ai-analytics";
-  else if (path === "/admin/communication") return "admin-communication";
   else if (path === "/admin/profile") return "admin-profile";
 
   // SuperAdmin sync
@@ -140,7 +139,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     // Admin
     "admin-dashboard", "admin-users", "admin-team", "admin-roles", "admin-branches", "admin-pending-approvals", "admin-faq", "admin-ai", "admin-knowledge-gaps", "admin-queue", "admin-chat-history", "admin-notifications", "admin-documents", "admin-topics", "admin-verifications", "admin-document-types", "admin-settings", "admin-send-notification", "admin-ai-analytics", "admin-chatbot", "admin-ai-sessions",
     // SuperAdmin
-    "superadmin-dashboard", "superadmin-command-center", "superadmin-organizations", "superadmin-users", "superadmin-pending-org-admins", "superadmin-roles", "superadmin-ai-analytics", "superadmin-chat-history", "superadmin-communication", "superadmin-search", "superadmin-notifications", "superadmin-notifications-send", "superadmin-audit-logs",
+    "superadmin-dashboard", "superadmin-command-center", "superadmin-organizations", "superadmin-users", "superadmin-pending-org-admins", "superadmin-roles", "superadmin-ai-analytics", "superadmin-chat-history", "superadmin-search", "superadmin-notifications", "superadmin-notifications-send", "superadmin-audit-logs",
     // Branch
     "branch-dashboard", "branch-documents", "branch-branches"
   ], []);
@@ -200,7 +199,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     else if (path === "/admin/dashboard") primaryId = "dashboard";
     else if (path.startsWith("/admin/users") || path.startsWith("/admin/team") || path.startsWith("/admin/roles") || path.startsWith("/admin/branches") || path.startsWith("/admin/pending-approvals")) primaryId = "organization";
     else if (path.startsWith("/admin/documents") || path.startsWith("/admin/topics") || path.startsWith("/admin/verifications") || path.startsWith("/admin/document-types") || path.startsWith("/admin/faq") || path.startsWith("/admin/knowledge-gaps")) primaryId = "knowledge";
-    else if (path.startsWith("/admin/queue") || path.startsWith("/admin/chat-history") || path.startsWith("/admin/notifications") || path.startsWith("/admin/communication")) primaryId = "support";
+    else if (path.startsWith("/admin/queue") || path.startsWith("/admin/chat-history") || path.startsWith("/admin/notifications")) primaryId = "support";
     else if (path.startsWith("/admin/ai") || path.startsWith("/admin/chatbot") || path.startsWith("/admin/ai-sessions") || path.startsWith("/admin/ai-analytics")) primaryId = "ai";
     else if (path.startsWith("/admin/settings")) primaryId = "settings";
 
@@ -208,7 +207,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     else if (path === "/superadmin/dashboard") primaryId = "dashboard";
     else if (path.startsWith("/superadmin/organizations") || path.startsWith("/superadmin/users") || path.startsWith("/superadmin/roles") || path.startsWith("/superadmin/pending-org-admins")) primaryId = "organization";
     else if (path.startsWith("/superadmin/ai-analytics")) primaryId = "knowledge";
-    else if (path.startsWith("/superadmin/chat-history") || path.startsWith("/superadmin/communication") || path.startsWith("/superadmin/search")) primaryId = "support";
+    else if (path.startsWith("/superadmin/chat-history") || path.startsWith("/superadmin/search")) primaryId = "support";
     else if (path.startsWith("/superadmin/notifications") || path.startsWith("/superadmin/audit-logs") || path.startsWith("/superadmin/app-settings")) primaryId = "platform";
 
     // Branch
