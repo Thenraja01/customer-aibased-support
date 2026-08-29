@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Award, Building2, AlertCircle, Globe } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Eye, EyeOff, Mail, Lock, ArrowRight, Award, Building2,
+  AlertCircle, CheckCircle2, Clock, XCircle, Globe, Loader2, ExternalLink,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,162 +14,130 @@ import {
 import { useAuthContext } from "@/context/AuthContext";
 import { AuthAPI } from "@/api/auth.api";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import OAuthButtons from "@/components/OAuthButtons";
 
-interface OrgOption {
-  _id: string;
-  name: string;
-}
+type LoginStatus =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "invalid_credentials" }
+  | { type: "pending_approval"; email: string }
+  | { type: "otp_required"; email: string }
+  | { type: "rejected"; reason?: string };
 
-interface FormErrors {
-  organization?: string;
-  email?: string;
-  password?: string;
-}
+interface OrgOption { _id: string; name: string }
 
 export default function Login() {
-  const { loginWithOrg, tenant, tenantLoading } = useAuthContext();
+  const { tenant, tenantLoading, setSession } = useAuthContext();
   const { settings: appSettings } = useAppSettings();
   const navigate = useNavigate();
 
   const [organizations, setOrganizations] = useState<OrgOption[]>([]);
   const [orgsLoading, setOrgsLoading] = useState(true);
-  const [orgsError, setOrgsError] = useState("");
 
-  const [formData, setFormData] = useState({
-    organizationId: "",
-    email: "",
-    password: "",
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(false);
-  const [apiError, setApiError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [orgId, setOrgId] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [status, setStatus] = useState<LoginStatus>({ type: "idle" });
 
   useEffect(() => {
-    if (tenant) {
-      setFormData((prev) => ({ ...prev, organizationId: tenant._id }));
-      setOrgsLoading(false);
-      return;
-    }
+    const saved = localStorage.getItem("rememberedEmail");
+    if (saved) { setEmail(saved); setRememberMe(true); }
+  }, []);
 
+  useEffect(() => {
+    if (tenant) { setOrgId(tenant._id); setOrgsLoading(false); return; }
     if (tenantLoading) return;
-
     setOrgsLoading(true);
-    setOrgsError("");
     AuthAPI.getOrganizations()
       .then((res: any) => setOrganizations(res.data.data || []))
-      .catch(() => setOrgsError("Failed to load organizations"))
+      .catch((err) => console.error("Failed to fetch organizations:", err))
       .finally(() => setOrgsLoading(false));
   }, [tenant, tenantLoading]);
 
-  const validateField = useCallback((name: string, value: string): string => {
-    switch (name) {
-      case "organizationId":
-        return value ? "" : "Please select an organization";
-      case "email":
-        if (!value) return "Email is required";
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Invalid email format";
-        return "";
-      case "password":
-        if (!value) return "Password is required";
-        if (value.length < 6) return "Password must be at least 6 characters";
-        return "";
-      default:
-        return "";
-    }
-  }, []);
+  const isLoading = status.type === "loading";
+  const showOrgSelector = !tenant && !tenantLoading;
 
-  const validateForm = useCallback((): boolean => {
-    const newErrors: FormErrors = {};
-    let isValid = true;
-
-    if (!tenant) {
-      const orgErr = validateField("organizationId", formData.organizationId);
-      if (orgErr) { newErrors.organization = orgErr; isValid = false; }
-    }
-
-    const emailErr = validateField("email", formData.email);
-    if (emailErr) { newErrors.email = emailErr; isValid = false; }
-
-    const passErr = validateField("password", formData.password);
-    if (passErr) { newErrors.password = passErr; isValid = false; }
-
-    setErrors(newErrors);
-    setTouched({ organizationId: true, email: true, password: true });
-    return isValid;
-  }, [formData, validateField, tenant]);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (touched[name]) {
-      setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
-    }
-    if (apiError) setApiError("");
-  }, [touched, validateField, apiError]);
-
-  const handleBlur = useCallback((e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setTouched((prev) => ({ ...prev, [name]: true }));
-    setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
-  }, [validateField]);
+  const navigateToDashboard = useCallback((role?: string) => {
+    const r = (role || "").toLowerCase().replace(/[\s_]+/g, "_");
+    if (r === "super_admin") navigate("/superadmin/dashboard", { replace: true });
+    else if (r === "admin" || r === "branch_admin") navigate("/admin/dashboard", { replace: true });
+    else if (r === "branch_admin") navigate("/branch/dashboard", { replace: true });
+    else if (r === "support") navigate("/support/dashboard", { replace: true });
+    else navigate("/dashboard", { replace: true });
+  }, [navigate]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return;
-    if (!validateForm()) return;
+    if (isLoading) return;
+    if (!email || !password) { setStatus({ type: "invalid_credentials" }); return; }
+    if (showOrgSelector && !orgId) { setStatus({ type: "invalid_credentials" }); return; }
 
-    setLoading(true);
-    setApiError("");
+    setStatus({ type: "loading" });
+
+    if (rememberMe) localStorage.setItem("rememberedEmail", email);
+    else localStorage.removeItem("rememberedEmail");
 
     try {
-      const success = await loginWithOrg(
-        formData.email.trim(),
-        formData.password.trim(),
-        formData.organizationId
-      );
+      const res = await AuthAPI.login({
+        email: email.trim(),
+        password,
+        ...(showOrgSelector ? { organization_id: orgId } : {}),
+      });
 
-      if (!success) {
-        setApiError("Invalid email, password, or organization.");
+      const { success, status: userStatus, token, data, message } = res.data;
+
+      if (success && token) {
+        sessionStorage.setItem("just_logged_in", "true");
+        if (!setSession(res.data)) {
+          setStatus({ type: "invalid_credentials" });
+          return;
+        }
+        navigateToDashboard(data?.role || data?.roleName);
         return;
       }
 
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      const role = user?.role_id?.role_name?.toLowerCase();
-
-      switch (role) {
-        case "super_admin":
-          navigate("/superadmin", { replace: true });
-          break;
-        case "admin":
-          navigate("/admin/dashboard", { replace: true });
-          break;
-        case "support":
-          navigate("/support/dashboard", { replace: true });
-          break;
-        case "customer":
-        case "user":
-          navigate("/dashboard", { replace: true });
-          break;
-        default:
-          navigate("/", { replace: true });
+      if (res.data.twoFactorRequired) {
+        setStatus({ type: "otp_required", email: email.trim() });
+        navigate("/verify-otp", { state: { email: email.trim(), mode: "2fa" } });
+        return;
       }
-    } catch {
-      setApiError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [loading, validateForm, loginWithOrg, formData, navigate]);
 
-  const showOrgSelector = !tenant && !tenantLoading;
+      if (userStatus === "PENDING_APPROVAL") {
+        setStatus({ type: "pending_approval", email: email.trim() });
+      } else if (userStatus === "OTP_REQUIRED") {
+        setStatus({ type: "otp_required", email: email.trim() });
+      } else if (userStatus === "ACCOUNT_REJECTED") {
+        setStatus({ type: "rejected", reason: message });
+      } else {
+        setStatus({ type: "invalid_credentials" });
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "";
+      const s = err?.response?.data?.status;
+      if (s === "PENDING_APPROVAL") {
+        setStatus({ type: "pending_approval", email: email.trim() });
+      } else if (s === "OTP_REQUIRED") {
+        setStatus({ type: "otp_required", email: email.trim() });
+      } else if (s === "ACCOUNT_REJECTED") {
+        setStatus({ type: "rejected", reason: msg });
+      } else {
+        setStatus({ type: "invalid_credentials" });
+      }
+    }
+  }, [email, password, orgId, rememberMe, showOrgSelector, isLoading, navigateToDashboard]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    if (name === "email") setEmail(value);
+    else if (name === "password") setPassword(value);
+    else if (name === "orgId") setOrgId(value);
+    if (status.type !== "idle") setStatus({ type: "idle" });
+  }, [status]);
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-primary/5">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent dark:from-primary/10" />
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/10 animate-pulse-glow" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-secondary/5 blur-3xl dark:bg-secondary/10 animate-pulse-glow [animation-delay:1.5s]" />
-
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
         <motion.div
           className="w-full max-w-md"
@@ -178,19 +149,11 @@ export default function Login() {
             <CardHeader className="text-center space-y-3 pb-6">
               {tenant?.logo?.url ? (
                 <div className="mx-auto mb-2">
-                  <img
-                    src={tenant.logo.url}
-                    alt={tenant.name || "Organization logo"}
-                    className="max-h-14 w-auto object-contain"
-                  />
+                  <img src={tenant.logo.url} alt={tenant.name || "Logo"} className="max-h-14 w-auto object-contain" />
                 </div>
               ) : appSettings?.logo?.url ? (
                 <div className="mx-auto mb-2">
-                  <img
-                    src={appSettings.logo.url}
-                    alt={appSettings.app_name || "Logo"}
-                    className="max-h-14 w-auto object-contain"
-                  />
+                  <img src={appSettings.logo.url} alt={appSettings.app_name || "Logo"} className="max-h-14 w-auto object-contain" />
                 </div>
               ) : (
                 <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25">
@@ -210,61 +173,126 @@ export default function Login() {
             </CardHeader>
 
             <CardContent>
+              {/* Status cards */}
+              <AnimatePresence mode="wait">
+                {status.type === "pending_approval" && (
+                  <motion.div
+                    key="pending"
+                    initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                    className="mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4"
+                    role="alert"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Clock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Pending Approval</p>
+                        <p className="text-xs text-amber-600/80 dark:text-amber-400/80">
+                          Your registration is awaiting administrator approval. We'll notify you once approved.
+                        </p>
+                        <Link
+                          to="/registration-status"
+                          state={{ email: status.email }}
+                          className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline"
+                        >
+                          <ExternalLink size={12} />
+                          Check Status
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {status.type === "otp_required" && (
+                  <motion.div
+                    key="otp"
+                    initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                    className="mb-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4"
+                    role="alert"
+                  >
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Account Approved</p>
+                        <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80">
+                          Your account has been approved. Please verify the OTP sent to your email.
+                        </p>
+                        <Link
+                          to="/verify-otp"
+                          state={{ email: status.email, mode: "2fa" }}
+                          className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                        >
+                          <ExternalLink size={12} />
+                          Verify OTP
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {status.type === "rejected" && (
+                  <motion.div
+                    key="rejected"
+                    initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                    className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
+                    role="alert"
+                  >
+                    <div className="flex items-start gap-3">
+                      <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-destructive">Registration Rejected</p>
+                        <p className="text-xs text-destructive/80">
+                          {status.reason ? `Reason: ${status.reason}` : "Your registration was rejected."}
+                        </p>
+                        <Link to="/contact" className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-destructive hover:underline">
+                          <ExternalLink size={12} />
+                          Contact Support
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {status.type === "invalid_credentials" && (
+                  <motion.div
+                    key="invalid"
+                    initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                    className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3"
+                    role="alert"
+                  >
+                    <div className="flex items-center gap-2 text-sm text-destructive">
+                      <AlertCircle size={14} />
+                      <span>Incorrect email or password.</span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <form onSubmit={handleSubmit} noValidate className="space-y-4 sm:space-y-5">
                 {showOrgSelector && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="organizationId" className="flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      Organization
-                    </Label>
+                    <Label htmlFor="orgId">Organization</Label>
                     <div className="relative">
                       <select
-                        id="organizationId"
-                        name="organizationId"
-                        value={formData.organizationId}
+                        id="orgId"
+                        name="orgId"
+                        value={orgId}
                         onChange={handleChange}
-                        onBlur={handleBlur}
-                        className={`select-field pl-10 h-11 dark:border-white/[0.06] dark:focus:border-primary/40 ${
-                          errors.organization && touched.organizationId ? "border-destructive" : ""
-                        }`}
+                        disabled={isLoading || orgsLoading}
+                        className="select-field pl-10 h-11 dark:border-white/[0.06] dark:focus:border-primary/40"
                         required
-                        disabled={orgsLoading}
-                        aria-invalid={!!(errors.organization && touched.organizationId)}
-                        aria-describedby={errors.organization ? "org-error" : undefined}
                       >
-                        <option value="">
-                          {orgsLoading ? "Loading organizations..." : "Select your organization"}
-                        </option>
-                        {organizations.map((org) => (
-                          <option key={org._id} value={org._id}>
-                            {org.name}
-                          </option>
-                        ))}
+                        <option value="">{orgsLoading ? "Loading organizations..." : "Select your organization"}</option>
+                        {organizations.map((o) => <option key={o._id} value={o._id}>{o.name}</option>)}
                       </select>
                       <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     </div>
-                    {errors.organization && touched.organizationId && (
-                      <p id="org-error" className="text-xs text-destructive flex items-center gap-1 mt-1" role="alert">
-                        <AlertCircle size={12} />
-                        {errors.organization}
-                      </p>
-                    )}
-                    {orgsError && (
-                      <p className="text-xs text-destructive flex items-center gap-1 mt-1" role="alert">
-                        <AlertCircle size={12} />
-                        {orgsError}
-                      </p>
-                    )}
                   </div>
                 )}
 
                 {tenant && !tenantLoading && (
                   <div className="rounded-lg border dark:border-white/[0.06] bg-muted/30 px-4 py-3 flex items-center gap-3">
                     <Globe size={16} className="text-primary shrink-0" />
-                    <div className="text-sm">
-                      <span className="font-medium">{tenant.name}</span>
-                      <span className="text-muted-foreground ml-1">— signing in to this organization</span>
-                    </div>
+                    <span className="text-sm"><span className="font-medium">{tenant.name}</span><span className="text-muted-foreground ml-1">— signing in</span></span>
                   </div>
                 )}
 
@@ -273,17 +301,11 @@ export default function Login() {
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      autoComplete="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`pl-10 h-11 dark:border-white/[0.06] dark:focus:border-primary/40 ${
-                        errors.email && touched.email ? "border-destructive" : ""
-                      }`}
+                      id="email" name="email" type="email" placeholder="Enter your email"
+                      autoComplete="email" autoFocus
+                      value={email} onChange={handleChange}
+                      disabled={isLoading}
+                      className="pl-10 h-11 dark:border-white/[0.06] dark:focus:border-primary/40"
                       required
                       aria-invalid={!!(errors.email && touched.email)}
                       aria-describedby={errors.email ? "email-error" : undefined}
@@ -298,21 +320,22 @@ export default function Login() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="password">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+                      Forgot Password?
+                    </Link>
+                  </div>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="password"
-                      name="password"
+                      id="password" name="password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       autoComplete="current-password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`pl-10 pr-12 h-11 dark:border-white/[0.06] dark:focus:border-primary/40 ${
-                        errors.password && touched.password ? "border-destructive" : ""
-                      }`}
+                      value={password} onChange={handleChange}
+                      disabled={isLoading}
+                      className="pl-10 pr-12 h-11 dark:border-white/[0.06] dark:focus:border-primary/40"
                       required
                       aria-invalid={!!(errors.password && touched.password)}
                       aria-describedby={errors.password ? "password-error" : undefined}
@@ -320,6 +343,7 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
@@ -334,27 +358,33 @@ export default function Login() {
                   )}
                 </div>
 
-                {apiError && (
-                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive flex items-center gap-2" role="alert">
-                    <AlertCircle size={14} />
-                    <span>{apiError}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    id="remember"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={isLoading}
+                    className="h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <Label htmlFor="remember" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                    Remember Me
+                  </Label>
+                </div>
 
-                {Object.keys(errors).length > 0 && !apiError && Object.values(errors).some(Boolean) && (
-                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive flex items-center gap-2" role="alert">
-                    <AlertCircle size={14} />
-                    <span>Please fix the errors above before signing in.</span>
-                  </div>
-                )}
+                {/* OAuth Providers */}
+                <OAuthButtons />
 
                 <Button
                   type="submit"
-                  disabled={loading || orgsLoading || tenantLoading}
+                  disabled={isLoading}
                   className="w-full h-11 bg-gradient-to-r from-primary via-primary/90 to-secondary hover:from-primary/90 hover:via-primary/80 hover:to-secondary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 disabled:opacity-50"
                 >
-                  {loading ? (
-                    <div className="h-5 w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={18} className="mr-2 animate-spin" />
+                      Signing in...
+                    </>
                   ) : (
                     <>
                       Sign In
@@ -364,11 +394,16 @@ export default function Login() {
                 </Button>
               </form>
 
-              <div className="mt-6 text-center text-sm">
-                Don't have an account?{" "}
-                <Link to="/register" className="font-medium text-primary hover:underline">
-                  Sign Up
-                </Link>
+              <div className="mt-6 space-y-2 text-center text-sm">
+                <p>
+                  Don't have an account?{" "}
+                  <Link to="/register" className="font-medium text-primary hover:underline">Sign Up</Link>
+                </p>
+                <p>
+                  <Link to="/registration-status" className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2">
+                    Check Registration Status
+                  </Link>
+                </p>
               </div>
             </CardContent>
           </Card>

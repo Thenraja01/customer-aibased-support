@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberTech Laptops | Next-Gen AI Workstations & Gaming Rigs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f3f4f6;
+    }
+
+    .glow-effect {
+      box-shadow: 0 0 50px -10px rgba(99, 102, 241, 0.25);
+    }
+
+    .card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(99, 102, 241, 0.2);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-6">
+
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3">
+        <div
+          class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+        </div>
+        <span
+          class="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">CyberTech
+          Laptops</span>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-400">
+        <a href="#featured" class="text-white hover:text-indigo-400 transition">Featured Laptops</a>
+        <a href="#gaming" class="hover:text-indigo-400 transition">Gaming Rigs</a>
+        <a href="#workstation" class="hover:text-indigo-400 transition">AI Workstations</a>
+        <a href="#support" class="hover:text-indigo-400 transition">Customer Support</a>
+      </nav>
+
+      <!-- Cart & Actions -->
+      <div class="flex items-center gap-4">
+        <button
+          class="relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+          <span
+            class="absolute -top-1.5 -right-1.5 bg-indigo-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md">2</span>
+        </button>
+
+        <a href="#support"
+          class="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition">
+          Live AI Assistance
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO SECTION -->
+  <section
+    class="relative overflow-hidden py-16 md:py-24 border-b border-slate-800/60 bg-gradient-to-b from-slate-950 via-slate-900/50 to-slate-950">
+    <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+
+      <div class="lg:col-span-7 space-y-6">
+        <div
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold">
+          <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+          NEW RELEASE: CyberBook Ultra Pro Gen 5
+        </div>
+
+        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white leading-tight">
+          Next-Gen AI Performance <br />
+          <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-teal-300 bg-clip-text text-transparent">Built
+            for Power Creators</span>
+        </h1>
+
+        <p class="text-slate-400 text-base md:text-lg leading-relaxed max-w-2xl">
+          Equipped with Intel® Core™ Ultra 9 processors, NVIDIA® GeForce RTX™ 4090 GPUs, and up to 64GB DDR5 RAM.
+          Experience instant 24/7 customer assistance via embedded SupportAI.
+        </p>
+
+        <div class="flex flex-wrap items-center gap-4 pt-2">
+          <a href="#featured"
+            class="px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-xl shadow-indigo-600/30 transition transform active:scale-95">
+            Explore Models
+          </a>
+          <button onclick="if(window.SupportAI) window.SupportAI.open()"
+            class="px-6 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-sm transition">
+            💬 Ask Support AI
+          </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6 pt-6 border-t border-slate-800/80 text-slate-400 text-xs">
+          <div>
+            <div class="text-lg font-extrabold text-white">4.9/5★</div>
+            <div>Over 12,000+ Reviews</div>
+          </div>
+          <div>
+            <div class="text-lg font-extrabold text-white">24/7</div>
+            <div>Live Support AI</div>
+          </div>
+          <div>
+            <div class="text-lg font-extrabold text-white">Free Express</div>
+            <div>2-Day Delivery</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Laptop Graphic Card -->
+      <div class="lg:col-span-5 relative">
+        <div
+          class="relative rounded-3xl bg-gradient-to-b from-slate-900 to-slate-950 p-6 border border-slate-800 glow-effect">
+          <div
+            class="relative h-64 sm:h-80 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800/80 flex items-center justify-center p-4">
+            <svg class="w-48 h-48 text-indigo-500/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <div
+              class="absolute bottom-4 left-4 bg-slate-900/90 backdrop-blur px-3 py-2 rounded-xl border border-slate-700/60 text-xs">
+              <div class="text-slate-400 font-medium">Top Pick</div>
+              <div class="font-bold text-white">CyberBook Pro Ultra • $2,499</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- LAPTOP PRODUCTS GRID -->
+  <main id="featured" class="max-w-7xl mx-auto px-6 py-16 space-y-10 flex-1">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <h2 class="text-2xl md:text-3xl font-extrabold text-white">Featured High-Performance Laptops</h2>
+        <p class="text-slate-400 text-sm mt-1">Select from our premium lineup designed for gaming, AI research, and
+          creative workflows.</p>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-semibold">
+        <span class="text-slate-400">Sort By:</span>
+        <select class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none">
+          <option>Popularity</option>
+          <option>Price: High to Low</option>
+          <option>Newest Arrivals</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+      <!-- Laptop Card 1 -->
+      <div class="rounded-2xl bg-slate-900/70 border border-slate-800 p-5 space-y-4 card-hover transition duration-300">
+        <div class="h-48 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-4 relative">
+          <span
+            class="absolute top-3 left-3 bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">BESTSELLER</span>
+          <svg class="w-24 h-24 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-bold text-base text-white">ApexBook Pro 16" OLED</h3>
+          <p class="text-xs text-slate-400 mt-1">Intel i9-14900HX • RTX 4080 • 32GB RAM • 2TB NVMe SSD</p>
+        </div>
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+          <div>
+            <span class="text-xs text-slate-400 block line-through">$2,699</span>
+            <span class="text-xl font-extrabold text-indigo-400">$2,399</span>
+          </div>
+          <button
+            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition">
+            Add to Cart
+          </button>
+        </div>
+      </div>
+
+      <!-- Laptop Card 2 -->
+      <div class="rounded-2xl bg-slate-900/70 border border-slate-800 p-5 space-y-4 card-hover transition duration-300">
+        <div class="h-48 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-4 relative">
+          <span
+            class="absolute top-3 left-3 bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">GAMING
+            RIG</span>
+          <svg class="w-24 h-24 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-bold text-base text-white">Zenith Legion X17 Gaming</h3>
+          <p class="text-xs text-slate-400 mt-1">AMD Ryzen 9 7945HX • RTX 4090 • 64GB RAM • 240Hz QHD</p>
+        </div>
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+          <div>
+            <span class="text-xs text-slate-400 block line-through">$3,299</span>
+            <span class="text-xl font-extrabold text-emerald-400">$2,899</span>
+          </div>
+          <button
+            class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition">
+            Add to Cart
+          </button>
+        </div>
+      </div>
+
+      <!-- Laptop Card 3 -->
+      <div class="rounded-2xl bg-slate-900/70 border border-slate-800 p-5 space-y-4 card-hover transition duration-300">
+        <div class="h-48 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-4 relative">
+          <span class="absolute top-3 left-3 bg-amber-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">AI
+            WORKSTATION</span>
+          <svg class="w-24 h-24 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-bold text-base text-white">Nova Studio Creator 14</h3>
+          <p class="text-xs text-slate-400 mt-1">Apple M3 Max Equivalent • 36GB Unified • Liquid Retina 120Hz</p>
+        </div>
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+          <div>
+            <span class="text-xs text-slate-400 block line-through">$1,999</span>
+            <span class="text-xl font-extrabold text-amber-400">$1,799</span>
+          </div>
+          <button
+            class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-md transition">
+            Add to Cart
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-12 text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div>
+        <div class="font-bold text-slate-200 text-sm">CyberTech Laptops Inc.</div>
+        <p class="mt-1">Powered by SupportAI Embedded Live Chat & RAG Intelligence.</p>
+      </div>
+      <div class="flex items-center gap-6 text-slate-400">
+        <a href="#" class="hover:text-white">Privacy Policy</a>
+        <a href="#" class="hover:text-white">Terms of Service</a>
+        <a href="#" class="hover:text-white">Warranty Information</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- SupportAI Widget Embed Snippet (Minimal 1-Line Embed) -->
+  <script src="http://localhost:3030/widget.js"
+    data-api-key="pk_live_5523b1df1a712674de25bdb259b939b29fafdfc0db969ff278d660fe703a923e"
+    defer></script>
+
+</body>
+
+</html>

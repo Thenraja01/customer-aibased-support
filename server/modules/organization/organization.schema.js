@@ -13,13 +13,20 @@ const organizationSchema = new mongoose.Schema(
   {
     organization_id: { type: String, unique: true, required: true },
     name: { type: String, trim: true },
-    domain: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
+    domain: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true,
+      set: (v) => (v === null || v === undefined || !String(v).trim() ? undefined : String(v).trim().toLowerCase()),
+    },
     address: { type: String },
     phone: { type: String, maxlength: 20 },
     email: { type: String, unique: true, lowercase: true, maxlength: 255 },
     status: {
       type: String,
-      enum: ["active", "inactive", "suspended"],
+      enum: ["active", "inactive", "suspended", "DELETION_PENDING"],
       default: "active",
     },
     plan: {
@@ -40,6 +47,19 @@ const organizationSchema = new mongoose.Schema(
       accent: { type: String, default: "#f59e0b" },
     },
 
+    // Tenant Animated Splash Loader Configuration
+    loader_config: {
+      enabled: { type: Boolean, default: true },
+      title: { type: String, default: "" },
+      subtitle: { type: String, default: "Build fast, ship faster" },
+      duration_ms: { type: Number, default: 2400 },
+      bg_theme: {
+        type: String,
+        enum: ["dark", "light", "brand", "glass"],
+        default: "dark",
+      },
+    },
+
     // Chart Colors
     chart_colors: {
       primary: { type: String, default: "#2563eb" },
@@ -51,11 +71,30 @@ const organizationSchema = new mongoose.Schema(
       background: { type: String, default: "#ffffff" },
     },
     show_charts: { type: Boolean, default: true },
+    ai_session_logging: { type: Boolean, default: true },
 
-    // Chatbot
+    // Chatbot & Embedded Widget Settings
     chatbot_name: { type: String, default: "Support AI" },
     default_language: { type: String, default: "en" },
     greeting_message: { type: String, default: "Hello! How can I help you today?" },
+    widget_position: { type: String, enum: ["right", "left"], default: "right" },
+    widget_theme: { type: String, enum: ["dark", "light", "custom"], default: "dark" },
+    widget_enabled: { type: Boolean, default: true },
+
+    // Ticket Auto-Assignment & Dispatch Configuration
+    ticket_assignment_config: {
+      method: {
+        type: String,
+        enum: ["round_robin", "least_busy", "skill_based", "hybrid", "manual"],
+        default: "round_robin",
+      },
+      auto_assign_on_create: { type: Boolean, default: true },
+      only_active_agents: { type: Boolean, default: true },
+      max_tickets_per_agent: { type: Number, default: 10 },
+      reassign_on_sla_warning: { type: Boolean, default: false },
+      inactivity_timeout_mins: { type: Number, default: 60 },
+      fallback_to_branch_admin: { type: Boolean, default: true },
+    },
 
     // AI Settings
     ai_settings: {
@@ -63,11 +102,59 @@ const organizationSchema = new mongoose.Schema(
       top_k: { type: Number, default: 40 },
       similarity_threshold: { type: Number, default: 0.75, min: 0, max: 1 },
       max_tokens: { type: Number, default: 2048 },
+      system_prompt: { type: String, default: "You are a helpful AI customer support assistant. Always be polite and try to resolve the customer's issue." },
+      confidence_threshold: {
+        high: { type: Number, default: 0.9, min: 0, max: 1, description: "Above this: auto-respond" },
+        medium: { type: Number, default: 0.6, min: 0, max: 1, description: "Between medium-high: suggest + offer human" },
+      },
       response_style: {
         type: String,
         enum: ["concise", "balanced", "detailed"],
         default: "balanced",
       },
+    },
+
+    // Tenant-Level Configurations (Overrides Global .env)
+    smtp_config: {
+      host: { type: String, default: "" },
+      port: { type: Number, default: 587 },
+      secure: { type: Boolean, default: false },
+      user: { type: String, default: "" },
+      pass: { type: String, default: "" },
+      from: { type: String, default: "" },
+      enabled: { type: Boolean, default: false },
+    },
+    llm_config: {
+      provider: { type: String, default: "" },
+      api_key: { type: String, default: "" },
+      model: { type: String, default: "" },
+      model_name: { type: String, default: "" },
+      base_url: { type: String, default: "" },
+      groq_api_key: { type: String, default: "" },
+      gemini_api_key: { type: String, default: "" },
+      openai_api_key: { type: String, default: "" },
+      grok_api_key: { type: String, default: "" },
+      claude_api_key: { type: String, default: "" },
+      timeout_ms: { type: Number, default: 5000 },
+      max_retries: { type: Number, default: 2 },
+      temperature: { type: Number, default: 0.7 },
+      max_tokens: { type: Number, default: 2048 },
+      max_fallbacks: { type: Number, default: 1 },
+    },
+    cloudinary_config: {
+      cloud_name: { type: String, default: "" },
+      api_key: { type: String, default: "" },
+      api_secret: { type: String, default: "" },
+      url: { type: String, default: "" },
+    },
+    rag_config: {
+      chunk_size: { type: Number, default: 500 },
+      chunk_overlap: { type: Number, default: 100 },
+      top_k: { type: Number, default: 5 },
+      min_score: { type: Number, default: 0.35 },
+      bfs_max_depth: { type: Number, default: 2 },
+      bfs_max_nodes: { type: Number, default: 30 },
+      query_cache_ttl_ms: { type: Number, default: 600000 },
     },
 
     // Guardrails
@@ -90,16 +177,80 @@ const organizationSchema = new mongoose.Schema(
       sunday: { type: workingDaySchema, default: () => ({ open: "10:00", close: "14:00", enabled: false }) },
     },
 
+    // Per-priority SLA overrides (in minutes). Structure:
+    // { urgent: { first_response_minutes, resolution_minutes }, high: {...}, ... }
+    sla_settings: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
+
+    // Ticket Auto-close settings after resolution
+    auto_close_settings: {
+      enabled: { type: Boolean, default: true },
+      closing_period_hours: { type: Number, default: 48, min: 1, max: 720 },
+    },
+
+    // Ticket Form Customization Config
+    ticket_form_config: [
+      {
+        field_key: { type: String, required: true },
+        label: { type: String, required: true },
+        enabled: { type: Boolean, default: true },
+        required: { type: Boolean, default: true },
+        order: { type: Number, default: 0 },
+      },
+    ],
+
     // Email Templates
     email_templates: {
+      ticket_created: {
+        subject: { type: String, default: "Ticket #{{ticket_id}} Created: {{subject}}" },
+        body: { type: String, default: "Hello {{customer_name}},\n\nThank you for reaching out. We have received your support ticket #{{ticket_id}} regarding \"{{subject}}\".\n\nPriority: {{priority}}\nBranch: {{branch_name}}\n\nOur support team is reviewing your request and will get back to you shortly.\n\nBest regards,\n{{org_name}} Support Team" },
+      },
       ticket_assigned: {
-        subject: { type: String, default: "New ticket assigned: {{ticket_id}}" },
-        body: { type: String, default: "Hello {{agent_name}},\n\nTicket {{ticket_id}} has been assigned to you.\n\nSubject: {{subject}}\nPriority: {{priority}}\n\nPlease respond within the SLA period." },
+        subject: { type: String, default: "Ticket Assigned: #{{ticket_id}} - {{subject}}" },
+        body: { type: String, default: "Hello {{agent_name}},\n\nTicket #{{ticket_id}} has been assigned to you.\n\nSubject: {{subject}}\nCustomer: {{customer_name}}\nPriority: {{priority}}\nBranch: {{branch_name}}\n\nPlease review and respond within the SLA deadline.\n\nPortal: {{portal_url}}" },
       },
       ticket_resolved: {
-        subject: { type: String, default: "Ticket resolved: {{ticket_id}}" },
-        body: { type: String, default: "Hello {{customer_name}},\n\nYour ticket {{ticket_id}} has been resolved.\n\nPlease confirm if you're satisfied with the resolution." },
+        subject: { type: String, default: "Ticket #{{ticket_id}} Resolved: {{subject}}" },
+        body: { type: String, default: "Hello {{customer_name}},\n\nYour support ticket #{{ticket_id}} has been marked as resolved.\n\nResolution Summary:\n{{ai_summary}}\n\nIf you have any further questions or if your issue persists, please reply to this email or visit our portal.\n\nBest regards,\n{{org_name}} Customer Care" },
       },
+      ai_escalation: {
+        subject: { type: String, default: "⚠️ AI Escalation Alert: Ticket #{{ticket_id}} requires human assistance" },
+        body: { type: String, default: "Hello Support Team,\n\nA customer chat session has been escalated by the AI assistant and requires human agent takeover.\n\nTicket: #{{ticket_id}}\nCustomer: {{customer_name}}\nTopic: {{subject}}\nBranch: {{branch_name}}\n\nPlease open the ticket immediately to assist the customer.\n\nPortal: {{portal_url}}" },
+      },
+      sla_warning: {
+        subject: { type: String, default: "⏰ SLA Deadline Warning: Ticket #{{ticket_id}} is approaching breach" },
+        body: { type: String, default: "Attention {{agent_name}},\n\nSupport Ticket #{{ticket_id}} (Priority: {{priority}}) is approaching its SLA response/resolution deadline.\n\nSubject: {{subject}}\nCustomer: {{customer_name}}\nBranch: {{branch_name}}\n\nPlease take immediate action to avoid an SLA breach." },
+      },
+      announcement_update: {
+        subject: { type: String, default: "📢 Announcement from {{org_name}}: {{subject}}" },
+        body: { type: String, default: "Dear {{customer_name}},\n\nWe would like to share an important update regarding {{org_name}}:\n\n{{subject}}\n\nIf you have any questions or need assistance, our support team is always here to help.\n\nBest regards,\n{{org_name}} Team" },
+      },
+    },
+
+    default_branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
+    },
+    allowed_domains: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+    ],
+    allowed_registration_roles: {
+      type: [String],
+      default: ["admin", "branch_admin", "support", "customer"],
+    },
+    plan_customization: {
+      custom_price: { type: Number },
+      custom_name: { type: String },
+      custom_storage_mb: { type: Number },
+      custom_ai_requests: { type: Number },
+      features: [{ type: String }],
     },
 
     storage_used: { type: Number, default: 0 },
@@ -112,6 +263,7 @@ const organizationSchema = new mongoose.Schema(
     api_keys: [
       {
         key: { type: String, required: true },
+        key_hash: { type: String, default: null },
         name: { type: String, required: true },
         created_at: { type: Date, default: Date.now },
         last_used: { type: Date },
@@ -123,5 +275,26 @@ const organizationSchema = new mongoose.Schema(
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
   }
 );
+
+organizationSchema.pre("save", function () {
+  if (this.domain === "" || (typeof this.domain === "string" && !this.domain.trim())) {
+    this.domain = undefined;
+  }
+});
+
+organizationSchema.pre("findOneAndUpdate", function () {
+  const update = this.getUpdate();
+  if (update) {
+    if (update.domain === "" || (typeof update.domain === "string" && !update.domain.trim())) {
+      delete update.domain;
+    }
+    if (update.$set && (update.$set.domain === "" || (typeof update.$set.domain === "string" && !update.$set.domain.trim()))) {
+      delete update.$set.domain;
+    }
+    if (update.$setOnInsert && (update.$setOnInsert.domain === "" || (typeof update.$setOnInsert.domain === "string" && !update.$setOnInsert.domain.trim()))) {
+      delete update.$setOnInsert.domain;
+    }
+  }
+});
 
 export default mongoose.model("Organization", organizationSchema);

@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check } from "lucide-react";
+import { Check, ArrowRight } from "lucide-react";
 
 const staggerContainer = {
   hidden: {},
@@ -64,7 +64,7 @@ export default function Pricing() {
         transition={{ duration: 0.5 }}
         className="max-w-3xl mx-auto text-center mb-16"
       >
-        <h1 className="text-4xl font-bold tracking-tight mb-4">Pricing</h1>
+        <h1 className="text-4xl font-bold  mb-4">Pricing</h1>
         <p className="text-lg text-muted-foreground">
           Simple, transparent pricing for businesses of all sizes.
         </p>
@@ -116,7 +116,7 @@ export default function Pricing() {
                     variant: plan.popular ? "default" : "outline",
                   })}
                 >
-                  {plan.cta}
+                  {plan.cta} <ArrowRight />
                 </Link>
               </CardContent>
             </Card>

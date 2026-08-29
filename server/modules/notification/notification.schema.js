@@ -8,6 +8,17 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    organization_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      index: true,
+    },
+    branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
+      index: true,
+    },
     title: { type: String, required: true, maxlength: 255 },
     message: { type: String, required: true },
     type: {

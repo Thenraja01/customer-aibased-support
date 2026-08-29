@@ -7,7 +7,7 @@ export default function Privacy() {
   if (privacyContent) {
     return (
       <div className="container mx-auto px-4 py-16 max-w-4xl">
-        <h1 className="text-4xl font-bold tracking-tight mb-8">Privacy Policy</h1>
+        <h1 className="text-4xl font-bold  mb-8">Privacy Policy</h1>
         <div className="prose prose-slate dark:prose-invert max-w-none">
           {privacyContent.split("\n").map((paragraph, i) => (
             paragraph.trim() ? <p key={i} className="text-muted-foreground mb-4">{paragraph}</p> : null
@@ -19,7 +19,7 @@ export default function Privacy() {
 
   return (
     <div className="container mx-auto px-4 py-16 max-w-4xl">
-      <h1 className="text-4xl font-bold tracking-tight mb-8">Privacy Policy</h1>
+      <h1 className="text-4xl font-bold  mb-8">Privacy Policy</h1>
       
       <div className="prose prose-slate dark:prose-invert max-w-none">
         <p className="text-muted-foreground mb-6">

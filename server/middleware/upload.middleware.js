@@ -86,6 +86,23 @@ export const uploadMultiple = multer({
   fileFilter,
 }).array("files", 5);
 
+const ALLOWED_AVATAR_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5 MB
+
+const avatarFileFilter = (req, file, cb) => {
+  if (ALLOWED_AVATAR_MIME_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Invalid file type. Only JPEG, PNG, GIF, and WEBP images are allowed."), false);
+  }
+};
+
+export const uploadAvatar = multer({
+  storage,
+  limits: { fileSize: MAX_AVATAR_SIZE },
+  fileFilter: avatarFileFilter,
+}).single("avatar");
+
 export const handleUpload = (uploadFn) => (req, res, next) => {
   uploadFn(req, res, (err) => {
     if (err instanceof multer.MulterError) {

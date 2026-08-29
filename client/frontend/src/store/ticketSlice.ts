@@ -32,7 +32,11 @@ export const createTicket = createAsyncThunk(
       const res = await TicketAPI.create(data);
       return res.data.data;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to create ticket");
+      return rejectWithValue(
+        err.response?.data?.errors?.[0]?.message ||
+        err.response?.data?.message ||
+        "Failed to create ticket"
+      );
     }
   }
 );

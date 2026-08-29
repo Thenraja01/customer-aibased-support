@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+device-management.json
+server/config/device-management.json
+*.log
+.vscode/
+dist/
+build/
+server/uploads/
+uploads/
+inspect-db.js
+

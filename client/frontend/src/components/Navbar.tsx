@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, Bot, User, LogOut, ChevronDown, LayoutDashboard } from "lucide-react";
+import { Menu, X, Bot, User, LogOut, ChevronDown, LayoutDashboard, LogIn, ArrowRight } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -18,7 +18,7 @@ const publicLinks = [
 
 const roleNavLinks: Record<string, { name: string; path: string }[]> = {
   super_admin: [
-    { name: "Dashboard", path: "/superadmin" },
+    { name: "Dashboard", path: "/superadmin/dashboard" },
     { name: "Organizations", path: "/superadmin/organizations" },
     { name: "Users", path: "/superadmin/users" },
     { name: "Roles", path: "/superadmin/roles" },
@@ -27,13 +27,20 @@ const roleNavLinks: Record<string, { name: string; path: string }[]> = {
   admin: [
     { name: "Dashboard", path: "/admin/dashboard" },
     { name: "Team", path: "/admin/team" },
+    { name: "Branches", path: "/admin/branches" },
     { name: "Documents", path: "/admin/documents" },
     { name: "FAQ", path: "/admin/faq" },
     { name: "Settings", path: "/admin/settings" },
   ],
+  branch_admin: [
+    { name: "Dashboard", path: "/branch/dashboard" },
+    { name: "Documents", path: "/branch/documents" },
+    { name: "Branches", path: "/branch/branches" },
+    { name: "FAQ", path: "/admin/faq" },
+  ],
   support: [
     { name: "Dashboard", path: "/support/dashboard" },
-    { name: "Chats", path: "/support/chats" },
+    { name: "Chats", path: "/support/chat" },
     { name: "Tickets", path: "/support/tickets" },
     { name: "FAQ", path: "/support/faq" },
   ],
@@ -80,6 +87,7 @@ export default function Navbar() {
     switch (role) {
       case "super_admin": return "/superadmin";
       case "admin": return "/admin/dashboard";
+      case "branch_admin": return "/branch/dashboard";
       case "support": return "/support/dashboard";
       default: return "/dashboard";
     }
@@ -138,8 +146,21 @@ export default function Navbar() {
                 onClick={() => setUserMenuOpen((prev) => !prev)}
                 className="flex items-center gap-2"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                  <User className="h-4 w-4 text-primary" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 overflow-hidden">
+                  {user?.profileImage || (user as any)?.avatar ? (
+                    <img
+                      src={user?.profileImage?.startsWith("http") || user?.profileImage?.startsWith("data:")
+                        ? user.profileImage
+                        : `${(import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/+$/, "")}/${(user?.profileImage || (user as any)?.avatar).replace(/^\/+/, "")}`}
+                      alt={user.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <User className="h-4 w-4 text-primary" />
+                  )}
                 </div>
                 <span>{user.name}</span>
                 <ChevronDown className="h-4 w-4" />
@@ -180,8 +201,8 @@ export default function Navbar() {
             </div>
           ) : (
             <>
-              <Link to="/login" className={buttonVariants({ variant: "ghost" })}>Log In</Link>
-              <Link to="/register" className={buttonVariants({ variant: "default" })}>Get Started</Link>
+              <Link to="/login" className={buttonVariants({ variant: "ghost" })}><LogIn /> Log In</Link>
+              <Link to="/register" className={buttonVariants({ variant: "default" })}>Get Started <ArrowRight /></Link>
             </>
           )}
         </div>
@@ -239,8 +260,8 @@ export default function Navbar() {
                 </>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <Link to="/login" onClick={() => setMobileOpen(false)} className={buttonVariants({ variant: "outline" })}>Log In</Link>
-                  <Link to="/register" onClick={() => setMobileOpen(false)} className={buttonVariants({ variant: "default" })}>Get Started</Link>
+                  <Link to="/login" onClick={() => setMobileOpen(false)} className={buttonVariants({ variant: "outline" })}><LogIn /> Log In</Link>
+                  <Link to="/register" onClick={() => setMobileOpen(false)} className={buttonVariants({ variant: "default" })}>Get Started <ArrowRight /></Link>
                 </div>
               )}
             </div>

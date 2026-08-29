@@ -1,23 +1,24 @@
 import express from "express";
 import * as dvController from "./documentVerification.controller.js";
-import { protect, restrict } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { createVerificationSchema, rejectVerificationSchema } from "../../validation/index.js";
+
+// RBAC: staff (admin / branch_admin / support) run document verification.
+const STAFF = ["admin", "branch_admin", "support"];
 
 const router = express.Router();
 
 router.use(protect);
 
-// Admin and Support: View verification queue
-router.get("/", restrict("super admin", "tenant admin", "admin", "support"), dvController.getAll);
-router.get("/document/:documentId", restrict("super admin", "tenant admin", "admin", "support"), dvController.getByDocument);
-router.get("/status/:status", restrict("super admin", "tenant admin", "admin", "support"), dvController.getByStatus);
+router.get("/", checkRole(...STAFF), dvController.getAll);
+router.get("/document/:documentId", checkRole(...STAFF), dvController.getByDocument);
+router.get("/status/:status", checkRole(...STAFF), dvController.getByStatus);
 
-// Admin only: Approve/Reject documents (triggers RAG indexing on approve)
-router.patch("/:id/approve", restrict("super admin", "tenant admin", "admin"), dvController.approve);
-router.patch("/:id/reject", restrict("super admin", "tenant admin", "admin"), validate(rejectVerificationSchema), dvController.reject);
+router.patch("/:id/approve", checkRole(...STAFF), dvController.approve);
+router.patch("/:id/reject", checkRole(...STAFF), validate(rejectVerificationSchema), dvController.reject);
 
-// Admin only: Delete verification entries
-router.delete("/:id", restrict("super admin", "tenant admin", "admin"), dvController.remove);
+router.delete("/:id", checkRole("admin"), dvController.remove);
 
 export default router;

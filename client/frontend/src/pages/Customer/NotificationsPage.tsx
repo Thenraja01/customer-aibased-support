@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationAPI } from "@/api";
 import { Bell, Check, CheckCheck, Trash2, BellOff } from "lucide-react";
+import { NotificationDetailModal } from "@/components/NotificationDetailModal";
 
 interface Notification {
   _id: string;
@@ -17,6 +18,7 @@ export default function NotificationsPage() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
 
   useEffect(() => {
     loadNotifications();
@@ -92,7 +94,7 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
+        <h1 className="text-2xl font-bold ">Notifications</h1>
         <p className="text-sm text-muted-foreground">
           Stay updated with your alerts and messages.
         </p>
@@ -126,7 +128,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden">
+      <div className="rounded-lg border bg-card dark:bg-card/50 dark:border-white/[0.06] overflow-hidden">
         {notifications.length === 0 ? (
           <div className="p-8 text-center">
             <BellOff size={48} className="mx-auto text-muted-foreground mb-4" />
@@ -137,7 +139,13 @@ export default function NotificationsPage() {
             {notifications.map((notification) => (
               <div
                 key={notification._id}
-                className={`px-6 py-4 hover:bg-muted/50 dark:hover:bg-white/[0.03] transition-colors ${
+                onClick={() => {
+                  setSelectedNotif(notification);
+                  if (!notification.is_read) {
+                    markAsRead(notification._id);
+                  }
+                }}
+                className={`px-6 py-4 hover:bg-muted/50 dark:hover:bg-white/[0.03] transition-colors cursor-pointer ${
                   !notification.is_read ? "bg-primary/5 dark:bg-primary/10" : ""
                 }`}
               >
@@ -168,7 +176,7 @@ export default function NotificationsPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     {!notification.is_read && (
                       <button
                         onClick={() => markAsRead(notification._id)}
@@ -192,6 +200,13 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+
+      <NotificationDetailModal
+        notification={selectedNotif}
+        onClose={() => setSelectedNotif(null)}
+        onMarkRead={markAsRead}
+        onDelete={deleteNotification}
+      />
     </div>
   );
 }

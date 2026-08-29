@@ -62,7 +62,7 @@ export default function SupportTicketsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Tickets</h1>
+        <h1 className="text-2xl font-bold ">Tickets</h1>
         <p className="text-sm text-muted-foreground">Manage support tickets</p>
       </div>
 
@@ -90,7 +90,7 @@ export default function SupportTicketsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card shadow-xs">
+      <div className="rounded-lg border bg-card shadow-xs">
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">
             <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />

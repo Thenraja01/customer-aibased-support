@@ -11,7 +11,8 @@ export const create = async (req, res) => {
 
 export const getAll = async (req, res) => {
   try {
-    const vs = await dvService.getAllVerifications();
+    const orgId = req.query.organization_id || req.user?.organizationId || null;
+    const vs = await dvService.getAllVerifications(orgId);
     res.status(200).json({ success: true, data: vs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -29,7 +30,8 @@ export const getByDocument = async (req, res) => {
 
 export const getByStatus = async (req, res) => {
   try {
-    const vs = await dvService.getVerificationsByStatus(req.params.status);
+    const orgId = req.query.organization_id || req.user?.organizationId || null;
+    const vs = await dvService.getVerificationsByStatus(req.params.status, orgId);
     res.status(200).json({ success: true, data: vs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -38,7 +40,7 @@ export const getByStatus = async (req, res) => {
 
 export const approve = async (req, res) => {
   try {
-    const v = await dvService.approveVerification(req.params.id);
+    const v = await dvService.approveVerification(req.params.id, req.user.userId);
     res.status(200).json({ success: true, data: v });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -47,7 +49,7 @@ export const approve = async (req, res) => {
 
 export const reject = async (req, res) => {
   try {
-    const v = await dvService.rejectVerification(req.params.id, req.body.remarks);
+    const v = await dvService.rejectVerification(req.params.id, req.body.remarks, req.user.userId);
     res.status(200).json({ success: true, data: v });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

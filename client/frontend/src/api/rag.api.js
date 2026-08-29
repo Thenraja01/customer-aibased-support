@@ -1,4 +1,4 @@
-import AxiosInstance from "./axiosInstance.js";
+import AxiosInstance from "./axiosInstance.ts";
 
 export const RAGAPI = {
   ingest: (data) => AxiosInstance.post("/rag/ingest", data),

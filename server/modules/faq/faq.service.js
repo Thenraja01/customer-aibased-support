@@ -1,15 +1,25 @@
 import Faq from "./faq.schema.js";
-import { escapeRegex } from "../../utils/escapeRegex.js";
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
-const ADMIN_ROLES = ["super admin", "tenant admin", "admin"];
+export const createFaq = async (data, user, organizationId = null, branchId = null) => {
+  const orgId = data.organization_id || organizationId || user.organizationId || user.organization_id?._id || user.organization_id;
+  const bId = data.branch_id || branchId || user.branchId || user.branch_id?._id || user.branch_id;
 
-export const createFaq = async (data, user) => {
-  const payload = { ...data, created_by: user.userId };
+  if (!orgId) throw new Error("Organization ID is required to create an FAQ");
 
-  if (ADMIN_ROLES.includes(user.roleName?.toLowerCase())) {
+  const payload = {
+    ...data,
+    organization_id: orgId,
+    branch_id: bId || null,
+    created_by: user.userId || user._id,
+  };
+
+  const role = normalizeRoleName(user.roleName || user.role);
+  if (isNormalizedAdminRole(role) || role === "branch_admin") {
     payload.status = "approved";
-    payload.approved_by = user.userId;
+    payload.approved_by = user.userId || user._id;
     payload.approved_at = new Date();
+    payload.is_active = true;
   } else {
     payload.status = "pending";
   }
@@ -17,26 +27,37 @@ export const createFaq = async (data, user) => {
   return await Faq.create(payload);
 };
 
-export const getActiveFaqs = async (organizationId) => {
+export const getActiveFaqs = async (organizationId = null, branchId = null) => {
   const query = { is_active: true, status: "approved" };
   if (organizationId) query.organization_id = organizationId;
+  if (branchId) {
+    query.$or = [{ branch_id: branchId }, { branch_id: null }];
+  }
   return await Faq.find(query).sort({ created_at: -1 });
 };
 
-export const getAllFaqs = async (organizationId = null) => {
+export const getAllFaqs = async (organizationId = null, branchId = null) => {
   const filter = {};
   if (organizationId) filter.organization_id = organizationId;
+  if (branchId) {
+    filter.$or = [{ branch_id: branchId }, { branch_id: null }];
+  }
   return await Faq.find(filter)
     .populate("organization_id", "name")
+    .populate("branch_id", "name code")
     .populate("created_by", "name email")
     .populate("approved_by", "name email")
     .sort({ created_at: -1 });
 };
 
-export const getFaqsByStatus = async (status, organizationId = null) => {
+export const getFaqsByStatus = async (status, organizationId = null, branchId = null) => {
   const filter = { status };
   if (organizationId) filter.organization_id = organizationId;
+  if (branchId) {
+    filter.$or = [{ branch_id: branchId }, { branch_id: null }];
+  }
   return await Faq.find(filter)
+    .populate("branch_id", "name code")
     .populate("created_by", "name email")
     .populate("approved_by", "name email")
     .sort({ created_at: -1 });
@@ -45,6 +66,7 @@ export const getFaqsByStatus = async (status, organizationId = null) => {
 export const getFaqById = async (id) => {
   const faq = await Faq.findById(id)
     .populate("organization_id", "name")
+    .populate("branch_id", "name code")
     .populate("created_by", "name email")
     .populate("approved_by", "name email");
   if (!faq) throw new Error("FAQ not found");
@@ -80,9 +102,10 @@ export const rejectFaq = async (id) => {
   return faq;
 };
 
-export const getFaqsByUser = async (userId, organizationId = null) => {
+export const getFaqsByUser = async (userId, organizationId = null, branchId = null) => {
   const filter = { created_by: userId };
   if (organizationId) filter.organization_id = organizationId;
+  if (branchId) filter.branch_id = branchId;
   return await Faq.find(filter)
     .populate("created_by", "name email")
     .populate("approved_by", "name email")

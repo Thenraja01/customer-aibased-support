@@ -1,39 +1,155 @@
 import { useState, useEffect, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Save, AlertCircle, CheckCircle2, Palette, Bot, Clock, Mail, Building2, Eye, Headphones, MessageCircle, FileText, BarChart3 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { BarChart, Bar, ResponsiveContainer } from "recharts";
+import { Save, Bot, Clock, Mail, Building2, FileText, BarChart3, Shield, Info, Database, Crown, Cpu, KeyRound, CreditCard, ScrollText, LineChart, Brain, Server, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AdminAPI } from "@/api/admin.api";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ui/toast";
+import { Switch } from "@/components/ui/switch";
 import TicketTemplatesManager from "@/components/admin/TicketTemplatesManager";
+import AIConfigPanel from "@/components/admin/settings/AIConfigPanel";
+import BillingPanel from "@/components/admin/settings/BillingPanel";
+import AnalyticsPanel from "@/components/admin/settings/AnalyticsPanel";
+import ActivityLogPanel from "@/components/admin/settings/ActivityLogPanel";
+import ApiKeysPanel from "@/components/admin/settings/ApiKeysPanel";
+import SubscriptionPanel from "@/components/admin/settings/SubscriptionPanel";
+import StoragePanel from "@/components/admin/settings/StoragePanel";
+import ChatbotPanel from "@/components/admin/settings/ChatbotPanel";
+import RagSettingsPanel from "@/components/admin/settings/RagSettingsPanel";
+import SmtpSettingsPanel from "@/components/admin/settings/SmtpSettingsPanel";
+import SlaAutoClosePanel from "@/components/admin/settings/SlaAutoClosePanel";
+import EmailTemplatesStudio from "@/components/admin/settings/EmailTemplatesStudio";
+import { safeSetItem, STORAGE_KEYS, sanitizeOrgSettingsForStorage } from "@/utils/localStorage";
+
+import AxiosInstance from "@/api/axiosInstance";
+
+function ChartPreview({ form }: { form: any }) {
+  const [chartData, setChartData] = useState<{ name: string; val: number }[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const res = await AxiosInstance.get("/admin/v1/analytics/overview");
+        if (res.data?.success && Array.isArray(res.data.data?.series) && isMounted) {
+          const series = res.data.data.series.slice(-7).map((s: any) => ({
+            name: s.date ? String(s.date).slice(5) : "Day",
+            val: Number(s.tickets || s.chats || s.calls || 0),
+          }));
+          if (series.length > 0) {
+            setChartData(series);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load chart preview data from backend", err);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
+
+  return (
+    <div className="h-40 w-full bg-card p-4 rounded-xl border border-border">
+      {chartData.length === 0 ? (
+        <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+          Loading backend analytics preview...
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData}>
+            <Bar dataKey="val" fill={form.chart_colors?.primary || "#6366f1"} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+import {
+  DEFAULT_RAG_CONFIG,
+  DEFAULT_SMTP_CONFIG,
+  DEFAULT_AI_SETTINGS,
+  DEFAULT_WORKING_HOURS,
+  DEFAULT_GUARDRAILS
+} from "@/constants/defaults";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 
-const DEFAULT_GUARDRAILS = [
-  "Answer only from approved documents",
-  "Don't answer unrelated questions",
-  "Always cite document sources",
-  "Escalate to a ticket if confidence is low",
+import TenantLoaderCustomizer from "@/components/branding/TenantLoaderCustomizer";
+
+type Tab = "general" | "branding" | "subscription" | "storage" | "ai-config" | "chatbot" | "rag" | "smtp" | "hours" | "email" | "api-keys" | "billing" | "activity-log" | "analytics" | "security" | "ticket-templates" | "sla-autoclose";
+
+const TAB_GROUPS = [
+  {
+    label: "General",
+    tabs: [
+      { id: "general", label: "General Info", icon: Building2 },
+      { id: "branding", label: "Branding & Loader", icon: Sparkles },
+      { id: "hours", label: "Working Hours", icon: Clock },
+      { id: "sla-autoclose", label: "SLA & Auto-Close", icon: Clock },
+      { id: "security", label: "Security", icon: Shield },
+    ],
+  },
+  {
+    label: "AI & Integrations",
+    tabs: [
+      { id: "ai-config", label: "AI Config", icon: Cpu },
+      { id: "chatbot", label: "Chatbot", icon: Bot },
+      { id: "rag", label: "RAG Settings", icon: Brain },
+      { id: "smtp", label: "SMTP", icon: Server },
+    ],
+  },
+  {
+    label: "Templates & Notifications",
+    tabs: [
+      { id: "email", label: "Email Templates", icon: Mail },
+      { id: "ticket-templates", label: "Ticket Templates", icon: FileText },
+    ],
+  },
+  {
+    label: "Management",
+    tabs: [
+      { id: "subscription", label: "Subscription", icon: Crown },
+      { id: "storage", label: "Storage", icon: Database },
+      { id: "billing", label: "Billing", icon: CreditCard },
+      { id: "api-keys", label: "API Keys", icon: KeyRound },
+    ],
+  },
+  {
+    label: "Analytics & Logs",
+    tabs: [
+      { id: "analytics", label: "Analytics", icon: LineChart },
+      { id: "activity-log", label: "Activity Log", icon: ScrollText },
+    ],
+  },
 ];
 
-type Tab = "general" | "hours" | "email" | "ticket-templates" | "charts";
-
-const tabs: { id: Tab; label: string; icon: any }[] = [
-  { id: "general", label: "General", icon: Building2 },
-  { id: "hours", label: "Working Hours", icon: Clock },
-  { id: "email", label: "Email Templates", icon: Mail },
-  { id: "ticket-templates", label: "Ticket Templates", icon: FileText },
-  { id: "charts", label: "Charts", icon: BarChart3 },
-];
 
 export default function OrganizationSettingsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+  const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab") as Tab | null;
+  const [activeTab, setActiveTabState] = useState<Tab>(() => {
+    if (tabParam) return tabParam;
+    return "general";
+  });
+
+  const setActiveTab = (tab: Tab) => {
+    setActiveTabState(tab);
+    setSearchParams({ tab });
+  };
+
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTabState(tabParam);
+    }
+  }, [tabParam]);
   const [form, setForm] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
   const { setOrgSettings } = useAuth();
 
   useEffect(() => {
@@ -57,38 +173,32 @@ export default function OrganizationSettingsPage() {
           greeting_message: data.greeting_message || "",
           logo: data.logo || { url: "", public_id: "" },
           brand_colors: data.brand_colors || { primary: "#2563eb", secondary: "#7c3aed", accent: "#f59e0b" },
-          chart_colors: data.chart_colors || {
-            primary: "#2563eb",
-            secondary: "#7c3aed",
-            tertiary: "#059669",
-            quaternary: "#f59e0b",
-            grid: "#e2e8f0",
-            text: "#64748b",
-            background: "#ffffff",
+          loader_config: data.loader_config || {
+            enabled: true,
+            title: "",
+            subtitle: "Build fast, ship faster",
+            duration_ms: 2400,
+            bg_theme: "dark",
           },
-          show_charts: data.show_charts !== undefined ? data.show_charts : true,
-          ai_settings: data.ai_settings || {
-            temperature: 0.7,
-            top_k: 40,
-            similarity_threshold: 0.75,
-            max_tokens: 2048,
-            response_style: "balanced",
-          },
+          ai_settings: data.ai_settings || DEFAULT_AI_SETTINGS,
+          llm_config: data.llm_config || {},
           guardrails: data.guardrails?.length
             ? data.guardrails
-            : DEFAULT_GUARDRAILS.map((rule) => ({ rule, enabled: true })),
-          working_hours: data.working_hours || {
-            timezone: "UTC",
-            ...Object.fromEntries(DAYS.map((d) => [d, { open: "09:00", close: "17:00", enabled: d === "saturday" || d === "sunday" ? false : true }])),
-          },
+            : DEFAULT_GUARDRAILS,
+          working_hours: data.working_hours || DEFAULT_WORKING_HOURS,
+          ai_session_logging: data.ai_session_logging !== undefined ? data.ai_session_logging : true,
           email_templates: data.email_templates || {
             ticket_assigned: { subject: "", body: "" },
             ticket_resolved: { subject: "", body: "" },
           },
+          rag_config: data.rag_config || DEFAULT_RAG_CONFIG,
+          smtp_config: data.smtp_config || DEFAULT_SMTP_CONFIG,
+          sla_settings: data.sla_settings || {},
+          auto_close_settings: data.auto_close_settings || { enabled: true, closing_period_hours: 48 },
         });
       }
     } catch (err) {
-      setMessage({ type: "error", text: "Failed to load settings" });
+      toast.error("Error", "Failed to load settings");
     } finally {
       setLoading(false);
     }
@@ -96,16 +206,15 @@ export default function OrganizationSettingsPage() {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    setMessage(null);
     try {
       const res = await AdminAPI.updateOrgSettings(form);
       if (res.data.success) {
-        setMessage({ type: "success", text: "Settings saved successfully" });
-        localStorage.setItem("orgSettings", JSON.stringify(res.data.data));
+        toast.success("Success", "Settings saved successfully");
+        safeSetItem(STORAGE_KEYS.ORG_SETTINGS, sanitizeOrgSettingsForStorage(res.data.data));
         setOrgSettings(res.data.data);
       }
     } catch (err: any) {
-      setMessage({ type: "error", text: err?.response?.data?.message || "Failed to save settings" });
+      toast.error("Error", err?.response?.data?.message || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -134,57 +243,68 @@ export default function OrganizationSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-5">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Organization Settings</h1>
-          <p className="text-muted-foreground">Manage your organization branding, AI behavior, and preferences.</p>
+          <h1 className="text-2xl font-bold">Organization Settings</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage branding, AI behavior, integrations, and preferences.</p>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save size={16} className="mr-1" />
+        <Button onClick={handleSave} disabled={saving} size="sm">
+          <Save size={15} className="mr-1.5" />
           {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 
-      {message && (
-        <div
-          className={`flex items-center gap-2 px-4 py-3 rounded-lg border text-sm ${
-            message.type === "success"
-              ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
-              : "border-destructive/30 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-          {message.text}
+      {/* Vertical sidebar layout */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as Tab)}
+        orientation="vertical"
+        className="flex flex-col md:flex-row gap-6 items-start"
+      >
+        {/* ── Left nav sidebar ── */}
+        <div className="w-full md:w-60 shrink-0 rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl dark:bg-card/40 dark:border-white/[0.08] p-3 sticky top-4 shadow-sm">
+          <TabsList className="flex flex-col w-full h-auto bg-transparent p-0 gap-1 rounded-none">
+            {TAB_GROUPS.map((group) => (
+              <div key={group.label} className="mb-2 last:mb-0">
+                {/* Group label */}
+                <p className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 select-none">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5 mt-0.5">
+                  {group.tabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className="
+                        w-full flex items-center gap-2.5 px-3 py-2 text-xs sm:text-sm rounded-xl
+                        font-medium text-muted-foreground
+                        hover:text-foreground hover:bg-muted/60
+                        data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold
+                        data-[state=active]:shadow-sm
+                        transition-all duration-150 justify-start h-auto border-0 outline-none
+                      "
+                    >
+                      <tab.icon size={16} className="shrink-0 transition-transform duration-150 group-hover:scale-110" />
+                      <span className="truncate">{tab.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </TabsList>
         </div>
-      )}
 
-      <div className="flex gap-1 border-b dark:border-white/[0.06] overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm border-b-2 transition-colors shrink-0 ${
-              activeTab === tab.id
-                ? "border-primary text-primary font-medium"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <tab.icon size={16} />
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] p-6">
-        {activeTab === "general" && (
-          <div className="space-y-6">
+        {/* ── Right content area ── */}
+        <div className="flex-1 min-w-0 rounded-xl border bg-card dark:bg-card/50 dark:border-white/[0.06] p-6">
+          <TabsContent value="general" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Building2 size={18} className="text-primary" />
                 General Information
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">Organization name, contact details, and branding.</p>
+              <p className="text-sm text-muted-foreground mt-1">Organization name, contact details, and domain.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -210,108 +330,294 @@ export default function OrganizationSettingsPage() {
                 <p className="text-xs text-muted-foreground">Used to identify this organization from its subdomain (e.g. acme.yourdomain.com).</p>
               </div>
             </div>
+          </TabsContent>
 
-            <div className="border-t dark:border-white/[0.06] pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <Palette size={16} className="text-primary" />
-                  Brand Colors
-                </h4>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPreview(!showPreview)}
-                  className="gap-1.5 text-xs"
-                >
-                  <Eye size={14} />
-                  {showPreview ? "Hide Preview" : "Live Preview"}
-                </Button>
+          {/* Branding & Animated Loader */}
+          <TabsContent value="branding" className="mt-0 space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Sparkles size={18} className="text-primary" />
+                Branding & Splash Loader
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Customize brand colors, organization logo, and the 3D animated entrance loader.
+              </p>
+            </div>
+
+            {/* Brand Colors */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl border space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Primary Brand Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={form.brand_colors?.primary || "#2563eb"}
+                    onChange={(e) => updateField("brand_colors.primary", e.target.value)}
+                    className="h-9 w-9 rounded-lg border cursor-pointer"
+                  />
+                  <Input
+                    value={form.brand_colors?.primary || "#2563eb"}
+                    onChange={(e) => updateField("brand_colors.primary", e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {(["primary", "secondary", "accent"] as const).map((color) => (
-                  <div key={color} className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={form.brand_colors?.[color] || "#000000"}
-                      onChange={(e) => updateField(`brand_colors.${color}`, e.target.value)}
-                      className="w-10 h-10 rounded-md border cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <Label className="capitalize text-xs">{color}</Label>
-                      <Input
-                        value={form.brand_colors?.[color] || ""}
-                        onChange={(e) => updateField(`brand_colors.${color}`, e.target.value)}
-                        className="font-mono text-xs"
-                      />
-                    </div>
+
+              <div className="p-4 rounded-xl border space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Secondary Brand Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={form.brand_colors?.secondary || "#7c3aed"}
+                    onChange={(e) => updateField("brand_colors.secondary", e.target.value)}
+                    className="h-9 w-9 rounded-lg border cursor-pointer"
+                  />
+                  <Input
+                    value={form.brand_colors?.secondary || "#7c3aed"}
+                    onChange={(e) => updateField("brand_colors.secondary", e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl border space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Accent Brand Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={form.brand_colors?.accent || "#f59e0b"}
+                    onChange={(e) => updateField("brand_colors.accent", e.target.value)}
+                    className="h-9 w-9 rounded-lg border cursor-pointer"
+                  />
+                  <Input
+                    value={form.brand_colors?.accent || "#f59e0b"}
+                    onChange={(e) => updateField("brand_colors.accent", e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Tenant Animated Splash Loader Studio */}
+            <TenantLoaderCustomizer
+              config={
+                form.loader_config || {
+                  enabled: true,
+                  title: "",
+                  subtitle: "Build fast, ship faster",
+                  duration_ms: 2400,
+                  bg_theme: "dark",
+                }
+              }
+              onChange={(newCfg) => updateField("loader_config", newCfg)}
+              brandColor={form.brand_colors?.primary || "#2563eb"}
+              secondaryColor={form.brand_colors?.secondary || "#7c3aed"}
+              orgName={form.name}
+            />
+          </TabsContent>
+
+          {/* Subscription */}
+          <TabsContent value="subscription" className="mt-0">
+            <SubscriptionPanel />
+          </TabsContent>
+
+          {/* Storage */}
+          <TabsContent value="storage" className="mt-0">
+            <StoragePanel />
+          </TabsContent>
+
+          {/* AI Config */}
+          <TabsContent value="ai-config" className="mt-0">
+            <AIConfigPanel
+              initialConfig={{
+                customPrompt: form.customPrompt || "",
+                provider: form.llm_config?.provider || "gemini",
+                model_name: form.llm_config?.model_name || form.llm_config?.model || "gemini-2.5-flash",
+                gemini_api_key: form.llm_config?.gemini_api_key || "",
+                groq_api_key: form.llm_config?.groq_api_key || "",
+                openai_api_key: form.llm_config?.openai_api_key || "",
+                temperature: form.ai_settings?.temperature ?? form.llm_config?.temperature ?? 0.7,
+                max_tokens: form.ai_settings?.max_tokens ?? form.llm_config?.max_tokens ?? 2048,
+                top_k: form.ai_settings?.top_k ?? 40,
+                similarity_threshold: form.ai_settings?.similarity_threshold ?? 0.75,
+                response_style: form.ai_settings?.response_style || "balanced",
+                chunk_size: form.rag_config?.chunk_size ?? 500,
+                chunk_overlap: form.rag_config?.chunk_overlap ?? 100,
+                rag_top_k: form.rag_config?.top_k ?? 5,
+                bfs_max_depth: form.rag_config?.bfs_max_depth ?? 2,
+                bfs_max_nodes: form.rag_config?.bfs_max_nodes ?? 30,
+                query_cache_ttl_ms: form.rag_config?.query_cache_ttl_ms ?? 600000,
+              }}
+              onSave={async (newAiConfig: any) => {
+                const updatedPayload = {
+                  ...form,
+                  customPrompt: newAiConfig.customPrompt,
+                  ai_settings: {
+                    ...(form.ai_settings || {}),
+                    temperature: newAiConfig.temperature,
+                    top_k: newAiConfig.top_k,
+                    similarity_threshold: newAiConfig.similarity_threshold,
+                    max_tokens: newAiConfig.max_tokens,
+                    response_style: newAiConfig.response_style,
+                    system_prompt: newAiConfig.customPrompt,
+                  },
+                  llm_config: {
+                    ...(form.llm_config || {}),
+                    provider: newAiConfig.provider,
+                    model_name: newAiConfig.model_name,
+                    model: newAiConfig.model_name,
+                    gemini_api_key: newAiConfig.gemini_api_key,
+                    groq_api_key: newAiConfig.groq_api_key,
+                    openai_api_key: newAiConfig.openai_api_key,
+                    temperature: newAiConfig.temperature,
+                    max_tokens: newAiConfig.max_tokens,
+                  },
+                  rag_config: {
+                    ...(form.rag_config || {}),
+                    chunk_size: newAiConfig.chunk_size,
+                    chunk_overlap: newAiConfig.chunk_overlap,
+                    top_k: newAiConfig.rag_top_k,
+                    bfs_max_depth: newAiConfig.bfs_max_depth,
+                    bfs_max_nodes: newAiConfig.bfs_max_nodes,
+                    query_cache_ttl_ms: newAiConfig.query_cache_ttl_ms,
+                  },
+                };
+                setForm(updatedPayload);
+                const res = await AdminAPI.updateOrgSettings(updatedPayload);
+                if (res.data?.success) {
+                  toast.success("Success", "AI & LLM Configuration saved successfully");
+                  safeSetItem(STORAGE_KEYS.ORG_SETTINGS, sanitizeOrgSettingsForStorage(res.data.data));
+                  setOrgSettings(res.data.data);
+                }
+              }}
+            />
+          </TabsContent>
+
+          {/* RAG Settings */}
+          <TabsContent value="rag" className="mt-0">
+            <RagSettingsPanel form={form} updateField={updateField} />
+          </TabsContent>
+
+          {/* SMTP */}
+          <TabsContent value="smtp" className="mt-0">
+            <SmtpSettingsPanel form={form} updateField={updateField} />
+          </TabsContent>
+
+          {/* Chatbot */}
+          <TabsContent value="chatbot" className="mt-0">
+            <ChatbotPanel form={form} updateField={updateField} />
+          </TabsContent>
+
+          {/* API Keys */}
+          <TabsContent value="api-keys" className="mt-0">
+            <ApiKeysPanel />
+          </TabsContent>
+
+          {/* Billing */}
+          <TabsContent value="billing" className="mt-0">
+            <BillingPanel />
+          </TabsContent>
+
+          {/* Activity Log */}
+          <TabsContent value="activity-log" className="mt-0">
+            <ActivityLogPanel />
+          </TabsContent>
+
+          {/* Analytics */}
+          <TabsContent value="analytics" className="mt-0">
+            <AnalyticsPanel />
+          </TabsContent>
+
+
+          {/* Security */}
+          <TabsContent value="security" className="mt-0 space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Shield size={18} className="text-primary" />
+                Security
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage security and compliance settings for your organization.
+              </p>
+            </div>
+
+            <div className="rounded-xl border dark:border-white/[0.06] p-5 space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Database size={16} className="text-primary" />
+                    <p className="text-sm font-semibold">AI Session Logging</p>
                   </div>
-                ))}
+                  <p className="text-xs text-muted-foreground">
+                    Record AI conversations, prompts, responses, and usage
+                    for auditing, analytics, and troubleshooting.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.ai_session_logging}
+                  onCheckedChange={(checked) => updateField("ai_session_logging", checked)}
+                  aria-label="Toggle AI session logging"
+                />
               </div>
 
-              {showPreview && (
-                <PreviewPanel form={form} />
+              {form.ai_session_logging ? (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+                    <Info size={14} />
+                    When Enabled
+                  </div>
+                  <p className="text-xs text-muted-foreground">Log information such as:</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+                    {[
+                      "User ID", "Organization ID", "Session ID", "Prompt",
+                      "AI response", "Timestamp", "Model used", "Response time",
+                      "Token usage", "Feedback", "Errors",
+                    ].map((label) => (
+                      <div key={label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="w-1 h-1 rounded-full bg-primary/40" />
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  <pre className="rounded-lg bg-background dark:bg-black/20 p-3 text-[11px] font-mono text-muted-foreground overflow-x-auto border dark:border-white/[0.06]">
+                    {`{
+  "userId": "123",
+  "organizationId": "456",
+  "sessionId": "abc123",
+  "prompt": "How do I reset my password?",
+  "response": "You can reset your password by...",
+  "model": "gpt-5.5",
+  "tokens": 842,
+  "responseTime": 1250,
+  "createdAt": "2026-07-29T09:15:00Z"
+}`}
+                  </pre>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-400/20 bg-amber-500/5 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    <Info size={14} />
+                    When Disabled
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Prompts and responses will not be saved. Minimal operational data
+                    such as request ID, timestamp, success/failure, and response time
+                    may still be logged for monitoring.
+                  </p>
+                </div>
               )}
-            </div>
 
-            <div className="border-t dark:border-white/[0.06] pt-6">
-              <h4 className="text-sm font-semibold flex items-center gap-2 mb-4">
-                <Bot size={16} className="text-primary" />
-                Chatbot Configuration
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Chatbot Name</Label>
-                  <Input value={form.chatbot_name} onChange={(e) => updateField("chatbot_name", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Default Language</Label>
-                  <select
-                    value={form.default_language}
-                    onChange={(e) => updateField("default_language", e.target.value)}
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/[0.06]"
-                  >
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                    <option value="zh">Chinese</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                    <option value="pt">Portuguese</option>
-                    <option value="ar">Arabic</option>
-                    <option value="hi">Hindi</option>
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-1.5 mt-4">
-                <Label>Greeting Message</Label>
-                <textarea
-                  value={form.greeting_message}
-                  onChange={(e) => updateField("greeting_message", e.target.value)}
-                  rows={2}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y dark:border-white/[0.06]"
-                />
+              <div className="rounded-lg bg-muted/40 dark:bg-white/[0.03] p-3 border dark:border-white/[0.06]">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground">⚠️ Compliance notice:</span> When enabled, prompts and AI responses are securely stored and visible to administrators with the appropriate permissions. Disable this if your organization does not want conversation content retained.
+                </p>
               </div>
             </div>
+          </TabsContent>
 
-            <div className="border-t dark:border-white/[0.06] pt-6">
-              <h4 className="text-sm font-semibold mb-4">Custom System Prompt</h4>
-              <div className="space-y-1.5">
-                <textarea
-                  value={form.customPrompt}
-                  onChange={(e) => updateField("customPrompt", e.target.value)}
-                  rows={5}
-                  placeholder="Enter custom system prompt instructions for the AI..."
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y font-mono dark:border-white/[0.06]"
-                />
-                <p className="text-xs text-muted-foreground">Use {'{ORGANIZATION_NAME}'} as a placeholder for the org name.</p>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {activeTab === "hours" && (
-          <div className="space-y-6">
+          {/* Working Hours */}
+          <TabsContent value="hours" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Clock size={18} className="text-primary" />
@@ -372,52 +678,24 @@ export default function OrganizationSettingsPage() {
                 );
               })}
             </div>
-          </div>
-        )}
+          </TabsContent>
 
-        {activeTab === "email" && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Mail size={18} className="text-primary" />
-                Email Templates
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Customize email notifications sent to users and agents.
-              </p>
-            </div>
+          {/* Email Templates */}
+          <TabsContent value="email" className="mt-0 space-y-6">
+            <EmailTemplatesStudio
+              initialTemplates={form.email_templates}
+              brandColors={form.brand_colors}
+              logoUrl={form.logo?.url}
+              orgName={form.name}
+              onSave={(newTemplates) => {
+                updateField("email_templates", newTemplates);
+                return handleSave();
+              }}
+            />
+          </TabsContent>
 
-            {(["ticket_assigned", "ticket_resolved"] as const).map((template) => (
-              <div key={template} className="rounded-lg border dark:border-white/[0.06] p-4 space-y-3">
-                <h4 className="text-sm font-semibold capitalize">
-                  {template.replace("_", " ")}
-                </h4>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Subject</Label>
-                  <Input
-                    value={form.email_templates?.[template]?.subject || ""}
-                    onChange={(e) => updateField(`email_templates.${template}.subject`, e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Body</Label>
-                  <textarea
-                    value={form.email_templates?.[template]?.body || ""}
-                    onChange={(e) => updateField(`email_templates.${template}.body`, e.target.value)}
-                    rows={5}
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y font-mono dark:border-white/[0.06]"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Available variables: {'{{customer_name}}'}, {'{{agent_name}}'}, {'{{ticket_id}}'}, {'{{subject}}'}, {'{{priority}}'}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === "ticket-templates" && (
-          <div className="space-y-6">
+          {/* Ticket Templates */}
+          <TabsContent value="ticket-templates" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <FileText size={18} className="text-primary" />
@@ -428,11 +706,15 @@ export default function OrganizationSettingsPage() {
               </p>
             </div>
             <TicketTemplatesManager />
-          </div>
-        )}
+          </TabsContent>
 
-        {activeTab === "charts" && (
-          <div className="space-y-6">
+          {/* SLA & Auto-Close Settings */}
+          <TabsContent value="sla-autoclose" className="mt-0">
+            <SlaAutoClosePanel form={form} updateField={updateField} />
+          </TabsContent>
+
+          {/* Chart Settings */}
+          <TabsContent value="charts" className="mt-0 space-y-6">
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <BarChart3 size={18} className="text-primary" />
@@ -448,18 +730,11 @@ export default function OrganizationSettingsPage() {
                 <p className="text-sm font-medium">Show Charts</p>
                 <p className="text-xs text-muted-foreground">Toggle visibility of all analytics charts across the dashboard.</p>
               </div>
-              <button
-                onClick={() => updateField("show_charts", !form.show_charts)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  form.show_charts ? "bg-primary" : "bg-muted-foreground/30"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    form.show_charts ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+              <Switch
+                checked={form.show_charts ?? true}
+                onCheckedChange={(v) => updateField("show_charts", v)}
+                aria-label="Toggle chart visibility"
+              />
             </div>
 
             <div className="border-t dark:border-white/[0.06] pt-6">
@@ -498,148 +773,15 @@ export default function OrganizationSettingsPage() {
               <h4 className="text-sm font-semibold mb-3">Preview</h4>
               <ChartPreview form={form} />
             </div>
-          </div>
-        )}
-      </div>
+          </TabsContent>
+        </div>
+      </Tabs>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving} size="lg">
-          <Save size={16} className="mr-1" />
+      <div className="flex justify-end pb-2">
+        <Button onClick={handleSave} disabled={saving} size="sm">
+          <Save size={15} className="mr-1.5" />
           {saving ? "Saving..." : "Save Changes"}
         </Button>
-      </div>
-    </div>
-  );
-}
-
-function ChartPreview({ form }: { form: any }) {
-  const colors = form.chart_colors || {};
-  const sampleData = [
-    { name: "Jan", tickets: 40, chats: 24 },
-    { name: "Feb", tickets: 30, chats: 38 },
-    { name: "Mar", tickets: 20, chats: 28 },
-    { name: "Apr", tickets: 27, chats: 39 },
-    { name: "May", tickets: 18, chats: 30 },
-  ];
-  const pieData = [
-    { name: "Open", value: 35 },
-    { name: "Resolved", value: 55 },
-    { name: "Pending", value: 10 },
-  ];
-
-  return (
-    <div className="rounded-xl border dark:border-white/[0.06] overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 dark:bg-white/[0.03] border-b dark:border-white/[0.06]">
-        <span className="text-xs font-medium text-muted-foreground">Chart Preview</span>
-        {form.show_charts === false && (
-          <span className="text-xs font-medium text-destructive">Charts are hidden</span>
-        )}
-      </div>
-      {form.show_charts !== false && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-          <div className="rounded-lg border dark:border-white/[0.06] p-3">
-            <p className="text-xs font-medium mb-2" style={{ color: colors.text || "#64748b" }}>Bar Chart</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={sampleData}>
-                <CartesianGrid stroke={colors.grid || "#e2e8f0"} strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: colors.text || "#64748b" }} />
-                <YAxis tick={{ fontSize: 10, fill: colors.text || "#64748b" }} />
-                <Tooltip />
-                <Bar dataKey="tickets" fill={colors.primary || "#2563eb"} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="chats" fill={colors.secondary || "#7c3aed"} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="rounded-lg border dark:border-white/[0.06] p-3">
-            <p className="text-xs font-medium mb-2" style={{ color: colors.text || "#64748b" }}>Pie Chart</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={60} innerRadius={30}>
-                  {pieData.map((_, index) => {
-                    const palette = [colors.primary || "#2563eb", colors.tertiary || "#059669", colors.quaternary || "#f59e0b"];
-                    return <Cell key={index} fill={palette[index]} />;
-                  })}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PreviewPanel({ form }: { form: any }) {
-  const colors = form.brand_colors || {};
-  const primary = colors.primary || "#2563eb";
-  const secondary = colors.secondary || "#7c3aed";
-  const accent = colors.accent || "#f59e0b";
-  const chatbotName = form.chatbot_name || "Support AI";
-  const greeting = form.greeting_message || "How can I help you today?";
-
-  return (
-    <div className="mt-6 rounded-xl border dark:border-white/[0.06] overflow-hidden shadow-lg">
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 dark:bg-white/[0.03] border-b dark:border-white/[0.06]">
-        <span className="text-xs font-medium text-muted-foreground">Customer Chat Preview</span>
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: primary }} />
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: secondary }} />
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />
-        </div>
-      </div>
-
-      <div className="flex h-80" style={{ background: "hsl(var(--background))", color: "hsl(var(--foreground))" }}>
-        <div className="w-48 shrink-0 border-r dark:border-white/[0.06] p-3 flex flex-col" style={{ background: "hsl(var(--card))" }}>
-          <div className="flex items-center gap-2 pb-3 mb-3 border-b dark:border-white/[0.06]">
-            <span className="text-sm font-bold truncate" style={{ background: `linear-gradient(to right, ${primary}, ${secondary})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              {chatbotName}
-            </span>
-          </div>
-          {["Dashboard", "Chat", "Tickets"].map((item) => (
-            <div key={item} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-0.5"
-              style={item === "Chat" ? { backgroundColor: `${primary}1A`, color: primary } : { color: "hsl(var(--muted-foreground))" }}>
-              <div className="w-3.5 h-3.5 rounded" style={{ backgroundColor: item === "Chat" ? primary : "transparent" }} />
-              {item}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center gap-2 px-4 py-3 border-b dark:border-white/[0.06]" style={{ background: "hsl(var(--background))" }}>
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center shadow-sm" style={{ background: `linear-gradient(to bottom right, ${primary}, ${secondary})` }}>
-              <MessageCircle size={12} style={{ color: "#fff" }} />
-            </div>
-            <div>
-              <span className="text-xs font-semibold">New Chat</span>
-              <span className="text-[10px] block" style={{ color: "hsl(var(--muted-foreground))" }}>Start a conversation</span>
-            </div>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center justify-center p-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow-xl" style={{ background: `linear-gradient(to bottom right, ${primary}, ${secondary})`, boxShadow: `0 4px 14px ${primary}33` }}>
-              <Headphones size={22} style={{ color: "#fff" }} />
-            </div>
-            <span className="text-base font-bold mb-1" style={{ background: `linear-gradient(to right, ${primary}, ${secondary})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              {greeting}
-            </span>
-            <span className="text-[11px] text-center max-w-[240px]" style={{ color: "hsl(var(--muted-foreground))" }}>
-              Ask questions, report issues, or get help with your account.
-            </span>
-          </div>
-
-          <div className="px-4 py-3 border-t dark:border-white/[0.06] flex gap-2" style={{ background: "hsl(var(--background))" }}>
-            <input
-              readOnly
-              value="Type your message here..."
-              className="flex-1 h-9 rounded-lg border px-3 text-xs"
-              style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--input))", color: "hsl(var(--muted-foreground))" }}
-            />
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: primary }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

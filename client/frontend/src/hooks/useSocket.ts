@@ -12,7 +12,7 @@ export function useSocket() {
   useEffect(() => {
     if (!user?._id || !token) return;
 
-    const socketUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+    const socketUrl = (import.meta.env.VITE_BACKEND_URL || "http://localhost:3030").replace(/\/+$/, "");
     const socket = io(socketUrl, {
       auth: { token },
       transports: ["websocket", "polling"],

@@ -1,8 +1,10 @@
 import mongoose from "mongoose";
 import env from'./env.js'
 // import User from '../schema/user.schema.js';
- const dbconnection = async () => {
+const dbconnection = async () => {
     try {
+        mongoose.set('returnDocument', 'after');
+        mongoose.set('strictQuery', false);
         const connection = await mongoose.connect(
             env.MONGODB_URI
         )

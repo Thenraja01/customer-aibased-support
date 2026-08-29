@@ -4,7 +4,7 @@ export const query = async (req, res) => {
   try {
     const { q, type, category, dateFrom, dateTo, userId, status, page, limit } = req.query;
     const orgId = req.user?.organizationId;
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
+    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super_admin";
 
     const results = await searchService.search({
       query: q || "",

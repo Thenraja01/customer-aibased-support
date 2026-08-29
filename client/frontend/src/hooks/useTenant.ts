@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { AuthAPI } from "@/api/auth.api";
-import { hexToHsl } from "@/lib/utils";
 
 export interface TenantOrg {
   _id: string;
@@ -31,8 +30,8 @@ function extractTenantId(): string | null {
   return subdomain;
 }
 
-export async function fetchTenantSettings(): Promise<TenantOrg | null> {
-  const tenantId = extractTenantId();
+export async function fetchTenantSettings(tenantIdOrOrgId?: string): Promise<TenantOrg | null> {
+  const tenantId = tenantIdOrOrgId || extractTenantId();
   if (!tenantId) return null;
 
   try {
@@ -46,22 +45,68 @@ export async function fetchTenantSettings(): Promise<TenantOrg | null> {
   return null;
 }
 
+export function hexToHsl(hex: string): string | null {
+  if (!hex || typeof hex !== "string") return null;
+  let clean = hex.replace(/^#/, "").trim();
+  if (clean.length === 3) {
+    clean = clean.split("").map((c) => c + c).join("");
+  }
+  if (clean.length !== 6) return null;
+
+  const r = parseInt(clean.substring(0, 2), 16) / 255;
+  const g = parseInt(clean.substring(2, 4), 16) / 255;
+  const b = parseInt(clean.substring(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      case b:
+        h = (r - g) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
 export function applyBrandColors(brand_colors?: { primary?: string; secondary?: string; accent?: string }) {
   if (!brand_colors) return;
   const root = document.documentElement;
-  const { primary, secondary, accent } = brand_colors;
-  if (primary) {
-    root.style.setProperty("--primary", hexToHsl(primary));
-    root.style.setProperty("--ring", hexToHsl(primary));
-    root.style.setProperty("--brand-primary", primary);
+
+  if (brand_colors.primary) {
+    const hsl = hexToHsl(brand_colors.primary);
+    if (hsl) {
+      root.style.setProperty("--primary", hsl);
+      root.style.setProperty("--brand-primary", brand_colors.primary);
+    }
   }
-  if (secondary) {
-    root.style.setProperty("--secondary", hexToHsl(secondary));
-    root.style.setProperty("--brand-secondary", secondary);
+
+  if (brand_colors.secondary) {
+    const hsl = hexToHsl(brand_colors.secondary);
+    if (hsl) {
+      root.style.setProperty("--brand-secondary", brand_colors.secondary);
+    }
   }
-  if (accent) {
-    root.style.setProperty("--accent", hexToHsl(accent));
-    root.style.setProperty("--brand-accent", accent);
+
+  if (brand_colors.accent) {
+    const hsl = hexToHsl(brand_colors.accent);
+    if (hsl) {
+      root.style.setProperty("--brand-accent", brand_colors.accent);
+    }
   }
 }
 

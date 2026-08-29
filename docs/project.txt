@@ -1,0 +1,213 @@
+================================================================================
+                        SUPPORTAI - PROJECT DOCUMENTATION
+================================================================================
+
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+SupportAI is an enterprise-grade customer support platform powered by AI-based 
+Retrieval-Augmented Generation (RAG), hybrid document vector search, multi-tenant 
+organization & branch management, real-time agent/customer chat, automated FAQ 
+generation, and RBAC governance.
+
+Key Capabilities:
+- Multi-Tenant & Branch Scoped Architecture (SuperAdmin, Admin, BranchAdmin, Support, Customer)
+- AI Copilot & Automated Support Agent with Custom Tool Builder & Flow Schemas
+- Hybrid RAG Pipeline combining ChromaDB Vector Search, Keyword BM25, Knowledge Graph (Neo4j), & Confidence Reranking
+- Dynamic LLM Provider Support (Google Gemini, Groq, Ollama, Claude)
+- Full Document Management Lifecycle (Upload, Versioning, Approval Workflow, Chunking, Vectors)
+- Automated Billing, Usage Analytics, & Self-Service Organization API Keys
+- Real-Time WebSocket Messaging (Socket.io) for Live Agent Escalation & Chat Notifications
+
+
+2. TECHNOLOGY STACK
+--------------------------------------------------------------------------------
+Backend:
+- Runtime: Node.js (ES Modules, Express 5)
+- Main Database: MongoDB (Mongoose 9)
+- Vector Database: ChromaDB (768-dim embeddings via nomic-embed-text)
+- Graph Database: Neo4j (via neo4j-driver)
+- Cache & Rate Limit: Redis (ioredis)
+- Storage: Cloudinary (Multer storage)
+- Authentication: JWT, Bcrypt, OAuth Services
+- Notification: Firebase Admin (FCM Push Notifications), Nodemailer (SMTP OTP/Transactional Email)
+
+Frontend:
+- Core Framework: React 18+ (Vite + TypeScript)
+- UI Library & Icons: TailwindCSS, Lucide-React, Shadcn UI primitives, Recharts
+- State & Context: AuthContext, ThemeContext, NavigationContext, SocketContext
+
+AI & ML Stack:
+- LLM Providers: Google Gemini (@google/generative-ai), Groq SDK (groq-sdk), Ollama (Local)
+- Embedding Engine: Ollama / Chroma Default Embeddings (nomic-embed-text)
+- Guardrails & Safety: Dynamic FAQ safety checks, prompt injection detection, topic boundaries
+
+
+3. RBAC & PERMISSION MODEL
+--------------------------------------------------------------------------------
+Role Levels:
++-------+------------------+-------------------------------------------------------------+
+| Level | Role             | Description & Permissions                                   |
++-------+------------------+-------------------------------------------------------------+
+| 0     | super_admin      | Platform owner. Full multi-tenant org control & app configs |
+| 1     | admin            | Organization Administrator. Manages users, AI, billing, RAG |
+| 2     | branch_admin     | Branch Command Center. Manages single-branch team & tickets |
+| 3     | support          | Customer Support Agent. Handles assigned ticket queues      |
+| 4     | customer         | End User. AI Chat, self-service knowledge base, tickets     |
++-------+------------------+-------------------------------------------------------------+
+
+Document Access Governance:
+- Access to RAG knowledge chunks is dynamically scoped by `document.allowed_roles` and 
+  `user.organization_id` / `user.branch_id`.
+- Document lifecycle: uploaded -> processing -> ready_for_review -> pending_approval -> approved -> published -> archived.
+- Only PUBLISHED documents are ingested into vector indexes for RAG querying.
+
+
+4. TICKET & ESCALATION WORKFLOW
+--------------------------------------------------------------------------------
+Customer
+   │
+   ├── AI Chat
+   │      │
+   │      └── Escalation
+   │
+   └── Create Ticket
+           │
+           ▼
+      Ticket Service
+           │
+      ┌────┼───────────────┐
+      ▼    ▼               ▼
+ Routing  SLA          Notification
+      │    │               │
+      ▼    ▼               ▼
+   Agent  Timer        Email / Push
+      │
+      ▼
+ Socket.io
+      │
+      ▼
+ Agent Workspace
+      │
+      ▼
+ Customer 
+*support = agent
+
+
+5. REPOSITORY STRUCTURE
+--------------------------------------------------------------------------------
+customer-aibased-support/
+├── client/
+│   └── frontend/                      # React TypeScript Vite Frontend
+│       ├── src/
+│       │   ├── api/                   # Axios API services (admin, auth, ticket, rag, tools)
+│       │   ├── components/            # UI components (chat, admin, knowledge graph, settings)
+│       │   ├── config/                # PageRegistry & navigation route mappings
+│       │   ├── context/               # React Contexts (Auth, Theme, Navigation, Socket)
+│       │   ├── hooks/                 # Custom Hooks (useAuth, useSocket, useBranchScope)
+│       │   ├── layout/                # AppShell, Navbar, Sidebar, App Layout
+│       │   ├── pages/                 # Pages categorized by Admin, Customer, Support, SuperAdmin
+│       │   ├── routes/                # Route definitions (AdminRoutes, BranchRoutes, etc.)
+│       │   └── types/                 # TypeScript interfaces & types
+│       ├── package.json
+│       └── vite.config.ts
+│
+├── server/                            # Node.js Express Backend
+│   ├── config/                        # Database connections (MongoDB, Redis, Socket.io)
+│   ├── infrastructure/                # ChromaDB, Neo4j, Redis adapters
+│   ├── middleware/                    # Auth, RBAC gate, Rate Limiting, Error handling
+│   ├── models/                        # Mongoose schemas (User, Org, Ticket, Document, etc.)
+│   ├── modules/                       # Feature modules
+│   │   ├── admin/                     # Admin analytics, organization team management
+│   │   ├── agent/                     # AI Intent Planner, Action Registry, Flow Schemas
+│   │   ├── ai/                        # AI Orchestration, Worker tasks, Job schemas
+│   │   ├── auth/                      # Login, Registration, OAuth, OTP verification
+│   │   ├── branch/                    # Branch CRUD & management
+│   │   ├── business-ai/               # Custom AI tools & copilot workflows
+│   │   ├── chat/                      # AI Chat service, Confidence scoring, Knowledge Graph
+│   │   ├── document/                  # Document processing, OCR/Parse, Vector syncing
+│   │   ├── document-approval/         # Approval request service
+│   │   ├── incident/                  # Operational incident management
+│   │   ├── notification/              # Email & Push notification delivery
+│   │   ├── organization/              # Org settings, Billing, API keys, AI provider config
+│   │   ├── rag/                       # Hybrid retrieval (Vector + Keyword + Graph)
+│   │   ├── ticket/                    # Ticket lifecycle, Socket events, Workflow routing
+│   │   ├── topic/                     # KB Topic hierarchy
+│   │   ├── tool/                      # Dynamic tool builder engine
+│   │   └── user/                      # User profile, OTP, FCM push token update
+│   ├── services/                      # Cloudinary, Email, Business Tools
+│   ├── utils/                         # Constants, Logger, Email templates
+│   ├── validation/                    # Zod schemas & request validators
+│   ├── server.js                      # Application entry point
+│   ├── seed.js                        # System seeder script
+│   └── package.json
+│
+├── docs/                              # Project design docs & bug reports
+├── docker-compose.yml                 # Docker setup for Redis, ChromaDB, Mongo
+└── project.txt                        # Overall project reference summary
+
+
+6. MAIN API ENDPOINTS
+--------------------------------------------------------------------------------
+Auth & Identity:
+  POST /api/auth/login                  - User authentication
+  POST /api/auth/register               - User registration
+  POST /api/auth/otp/send               - Send email OTP
+  POST /api/auth/otp/verify             - Verify OTP & issue token
+
+AI & RAG Chat:
+  POST /api/chat/message                - Submit query to RAG pipeline / AI agent
+  GET  /api/chat/history                - Retrieve customer/agent conversation history
+  POST /api/rag/ingest                  - Ingest approved document into ChromaDB
+  POST /api/rag/query                   - Test hybrid search (vector + BM25 + graph)
+
+Tickets & Escalation:
+  GET  /api/tickets                     - List organization/branch tickets
+  POST /api/tickets                     - Create new support ticket
+  POST /api/tickets/:id/messages        - Post message to ticket thread
+  PUT  /api/tickets/:id/status          - Escalate / resolve ticket
+
+Organization & Settings:
+  GET  /api/organizations/settings      - Fetch org configuration & AI provider setup
+  PUT  /api/organizations/settings      - Update brand colors, AI providers, quotas
+  POST /api/organizations/api-keys      - Generate hashed org API keys
+
+
+7. LOCAL SETUP & RUNNING INSTRUCTIONS
+--------------------------------------------------------------------------------
+Prerequisites: Node.js (v18+), MongoDB, Redis, ChromaDB
+
+Step 1: Start Infrastructure (Docker)
+  docker-compose up -d
+
+Step 2: Backend Setup
+  cd server
+  npm install
+  npm run seed         # Populate roles, default admin, & default org
+  npm run dev          # Express server running on default http://localhost:5000
+
+Step 3: Frontend Setup
+  cd client/frontend
+  npm install
+  npm run dev          # Vite dev server running on http://localhost:5173
+
+Step 4: Build Verification
+  cd client/frontend
+  npm run build        # Production bundle validation
+
+
+8. KEY ENVIRONMENT VARIABLES
+--------------------------------------------------------------------------------
+Backend (.env):
+  PORT=5000
+  MONGO_URI=mongodb://localhost:27017/supportai
+  REDIS_URL=redis://localhost:6379
+  JWT_SECRET=your_jwt_secret_key
+  CHROMADB_URL=http://localhost:8000
+  LLM_PROVIDER=gemini # (gemini | groq | ollama)
+  GEMINI_API_KEY=your_gemini_key
+  GROQ_API_KEY=your_groq_key
+  CLOUDINARY_CLOUD_NAME=your_cloud_name
+  CLOUDINARY_API_KEY=your_api_key
+  CLOUDINARY_API_SECRET=your_api_secret
+
+================================================================================

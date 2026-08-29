@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import { FileText, Search, Download } from "lucide-react";
+import { FileText, Search, Eye } from "lucide-react";
 import { DocumentAPI } from "@/api";
+import DocumentViewer from "@/components/ui/DocumentViewer";
 
 export default function SupportDocumentsPage() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [viewingDoc, setViewingDoc] = useState<any>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -33,10 +36,15 @@ export default function SupportDocumentsPage() {
     }
   };
 
+  const handleOpenDocument = (doc: any) => {
+    setViewingDoc(doc);
+    setIsViewerOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Documents</h1>
+        <h1 className="text-2xl font-bold ">Documents</h1>
         <p className="text-sm text-muted-foreground">Browse knowledge base documents</p>
       </div>
 
@@ -71,7 +79,7 @@ export default function SupportDocumentsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((doc) => (
-            <div key={doc._id} className="rounded-xl border bg-card p-4 space-y-3 hover:shadow-md transition-shadow">
+            <div key={doc._id} className="rounded-lg border bg-card p-4 space-y-3 hover:shadow-md transition-shadow">
               <div className="flex items-start gap-3">
                 <div className="p-2 rounded-lg bg-primary/5">
                   <FileText size={18} className="text-primary" />
@@ -93,16 +101,29 @@ export default function SupportDocumentsPage() {
                 <p className="text-[10px] text-muted-foreground">Uploaded by {doc.user_id.name}</p>
               )}
               <div className="flex gap-2 pt-1">
-                {doc.file_url && (
-                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                    <Download size={12} /> Download
-                  </a>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleOpenDocument(doc)}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <Eye size={12} /> View File
+                </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {viewingDoc && (
+        <DocumentViewer
+          title={viewingDoc.title}
+          fileUrl={viewingDoc.file_url}
+          isOpen={isViewerOpen}
+          onClose={() => {
+            setViewingDoc(null);
+            setIsViewerOpen(false);
+          }}
+        />
       )}
     </div>
   );

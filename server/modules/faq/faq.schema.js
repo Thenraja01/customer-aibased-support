@@ -8,6 +8,12 @@ const faqSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    branch_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      default: null,
+      index: true,
+    },
     question: { type: String, required: true, maxlength: 500 },
     answer: { type: String, required: true },
     category: { type: String, maxlength: 100, default: "general" },

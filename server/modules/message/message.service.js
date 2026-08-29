@@ -1,8 +1,17 @@
 import Message from "./message.schema.js";
 import { escapeRegex } from "../../utils/escapeRegex.js";
 
+import { getIO } from "../../config/socket.js";
+
 export const sendMessage = async (data) => {
-  return await Message.create(data);
+  const msg = await Message.create(data);
+  try {
+    const io = getIO();
+    io.to(`chat:${msg.chat_id}`).emit("chat:message", msg);
+  } catch (err) {
+    console.warn("[MessageService] Socket broadcast notice:", err.message);
+  }
+  return msg;
 };
 
 export const getMessagesByChat = async (chatId) => {

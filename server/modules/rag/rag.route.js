@@ -1,20 +1,25 @@
 import express from "express";
 import * as ragController from "./rag.controller.js";
-import { protect, restrict } from "../../middleware/auth.middleware.js";
+import { protect } from "../../middleware/auth.middleware.js";
+import { checkRole } from "../../middleware/rbac.middleware.js";
+import { attachScope } from "../../middleware/branchScope.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { ingestSchema, querySchema } from "../../validation/index.js";
+
+const ADMIN = ["admin", "branch_admin"];
 
 const router = express.Router();
 
 router.use(protect);
 
-router.post("/ingest", restrict("super admin", "tenant admin", "admin", "support"), validate(ingestSchema), ragController.ingest);
+// Attach scope context for downstream branch-isolated RAG queries
+router.use(attachScope);
+
+router.post("/ingest", checkRole(...ADMIN), validate(ingestSchema), ragController.ingest);
 router.post("/query", validate(querySchema), ragController.query);
-router.get("/stats", restrict("super admin", "tenant admin", "admin"), ragController.getStats);
-router.get("/graph/stats", restrict("super admin", "tenant admin", "admin"), ragController.getGlobalStats);
-router.get("/graph/:documentId", restrict("super admin", "tenant admin", "admin", "support"), ragController.getDocumentGraph);
-router.get("/chunks/:documentId", restrict("super admin", "tenant admin", "admin", "support"), ragController.getDocumentChunks);
-router.get("/search", restrict("super admin", "tenant admin", "admin", "support"), ragController.searchByKeyword);
-router.delete("/:documentId", restrict("super admin", "tenant admin", "admin"), ragController.removeDocumentData);
+router.get("/stats", checkRole(...ADMIN), ragController.getStats);
+router.get("/chunks/:documentId", checkRole(...ADMIN), ragController.getDocumentChunks);
+router.get("/search", checkRole(...ADMIN), ragController.searchByKeyword);
+router.delete("/:documentId", checkRole("admin"), ragController.removeDocumentData);
 
 export default router;

@@ -45,7 +45,7 @@ export default function Features() {
         transition={{ duration: 0.5 }}
         className="max-w-3xl mx-auto text-center mb-16"
       >
-        <h1 className="text-4xl font-bold tracking-tight mb-4">Features</h1>
+        <h1 className="text-4xl font-bold  mb-4">Features</h1>
         <p className="text-lg text-muted-foreground">
           A complete toolkit for modern, AI-driven customer support.
         </p>
@@ -60,7 +60,7 @@ export default function Features() {
         {features.map((feature, i) => (
           <motion.div key={feature.title} variants={cardVariant} custom={i}>
             <Card
-              className="hover:shadow-md transition-all duration-300 dark:bg-card/50 dark:border-white/[0.06] dark:hover:border-primary/20 px-12 py-6 dark:hover:shadow-primary/5 hover:-translate-y-0.5 h-full"
+              className="hover:shadow-md transition-all duration-300 dark:bg-card/50 dark:border-white/[0.06] dark:hover:border-primary/20 dark:hover:shadow-primary/5 hover:-translate-y-0.5 h-full p-6"
             >
               <CardHeader>
                 <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/15 flex items-center justify-center mb-2">

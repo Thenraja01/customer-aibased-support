@@ -54,7 +54,7 @@ export default function Contact() {
         transition={{ duration: 0.5 }}
         className="max-w-3xl mx-auto text-center mb-16"
       >
-        <h1 className="text-4xl font-bold tracking-tight mb-4">Get in Touch</h1>
+        <h1 className="text-4xl font-bold  mb-4">Get in Touch</h1>
         <p className="text-lg text-muted-foreground">
           Have questions or want a personalized demo? We'd love to hear from you.
         </p>
@@ -75,10 +75,10 @@ export default function Contact() {
               <CardContent className="space-y-4">
                 {contactItems.map((item) => (
                   <motion.div key={item.label} variants={itemVariant} className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 dark:bg-primary/15 flex items-center justify-center">
+                    <div className="w-9 h-9 shrink-0 rounded-lg bg-primary/10 dark:bg-primary/15 flex items-center justify-center">
                       <item.icon className="h-4 w-4 text-primary" />
                     </div>
-                    <span>{item.label}</span>
+                    <span className="min-w-0 break-words">{item.label}</span>
                   </motion.div>
                 ))}
               </CardContent>
@@ -137,6 +137,7 @@ export default function Contact() {
                       <Textarea required rows={5} placeholder="How can we help you?" className="dark:border-white/[0.06] dark:focus:border-primary/40" />
                     </div>
                     <Button type="submit" className="w-full dark:bg-primary dark:hover:bg-primary/90 dark:shadow-lg dark:shadow-primary/20">
+                      <Send className="mr-2 h-4 w-4" />
                       Send Message
                     </Button>
                   </form>

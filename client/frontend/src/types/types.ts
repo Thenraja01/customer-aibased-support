@@ -4,7 +4,12 @@ export interface IUser {
   email: string;
   phone?: string;
   organization_id: any;
+  branch_id?: any;
+  branchId?: string;
+  branchName?: string;
   role_id: any;
+  role?: string;
+  roleName?: string;
   status: string;
   createdAt?: string;
 }

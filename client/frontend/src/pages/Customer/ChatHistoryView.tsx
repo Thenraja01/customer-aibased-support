@@ -1,22 +1,19 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
-import type { RootState, AppDispatch } from "@/store/store";
+import { useGlobalChat } from "@/context/ChatContext";
+import { useAuthContext } from "@/context/AuthContext";
 import { Loader2, AlertCircle } from "lucide-react";
-import { useChat } from "@/hooks/useChat";
 import { useChatScroll } from "@/hooks/useChatScroll";
-import { setActiveChat, clearError } from "@/store/chatSlice";
 import { useSocket } from "@/context/SocketContext";
-import { ChatAPI } from "@/api";
+import { ChatAPI } from "@/api/chat.api.js";
 import ChatHeader from "@/components/chat/ChatHeader";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
-import TypingIndicator from "@/components/chat/TypingIndigator";
+import TypingIndicator from "@/components/chat/TypingIndicator";
 
 export default function ChatHistoryView() {
   const { id } = useParams();
-  const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.user);
+  const { user } = useAuthContext();
   const { socket } = useSocket();
 
   const {
@@ -29,7 +26,8 @@ export default function ChatHistoryView() {
     loadMessages,
     sendWithAI,
     resetMessages,
-  } = useChat();
+    selectChat,
+  } = useGlobalChat();
 
   const { containerRef, handleScroll } = useChatScroll(messages);
   const [loading, setLoading] = useState(true);
@@ -37,22 +35,28 @@ export default function ChatHistoryView() {
 
   useEffect(() => {
     if (!id) return;
+    let isMounted = true;
     (async () => {
       setLoading(true);
       try {
         const res = await ChatAPI.getById(id);
-        if (res.data.success) {
-          dispatch(setActiveChat(res.data.data));
-        } else {
-          setNotFound(true);
+        if (isMounted) {
+          if (res.data?.success) {
+            selectChat(res.data.data);
+          } else if (res.data && res.data._id) {
+            selectChat(res.data);
+          } else {
+            setNotFound(true);
+          }
         }
       } catch {
-        setNotFound(true);
+        if (isMounted) setNotFound(true);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     })();
-  }, [id, dispatch]);
+    return () => { isMounted = false; };
+  }, [id, selectChat]);
 
   useEffect(() => {
     if (activeChat?._id) {
@@ -76,11 +80,8 @@ export default function ChatHistoryView() {
   }, [resetMessages]);
 
   useEffect(() => {
-    if (error) {
-      const t = setTimeout(() => dispatch(clearError()), 5000);
-      return () => clearTimeout(t);
-    }
-  }, [error, dispatch]);
+    // We don't have clearError in useGlobalChat currently, just ignore or handle it in context
+  }, [error]);
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
@@ -154,9 +155,9 @@ export default function ChatHistoryView() {
           </div>
         ) : (
           <div className="py-2">
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <ChatMessage
-                key={msg._id}
+                key={msg._id || `${msg.created_at || ""}-${idx}`}
                 message={msg}
                 isOwn={!msg.is_ai && msg.sender_id === user?._id}
               />
@@ -166,7 +167,7 @@ export default function ChatHistoryView() {
         )}
       </div>
 
-      <div className="border-t bg-white bg-background/80 backdrop-blur-xl shrink-0">
+      <div className="border-t bg-background/80 backdrop-blur-xl shrink-0">
         <ChatInput
           onSend={handleSend}
           disabled={sending || aiThinking}

@@ -1,35 +1,25 @@
-import { useCallback, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminAPI } from "@/api/admin.api";
-import {
-  setDashboardStats,
-  setLoading,
-} from "@/store/adminSlice";
-import type { RootState, AppDispatch } from "@/store/store";
 
 export const useAdminDashboard = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const { dashboardStats, loading } = useSelector(
-    (state: RootState) => state.admin
-  );
+  const queryClient = useQueryClient();
 
-  const fetchStats = useCallback(async () => {
-    dispatch(setLoading(true));
-    try {
+  const { data, isLoading } = useQuery({
+    queryKey: ["adminDashboardStats"],
+    queryFn: async () => {
       const res = await AdminAPI.getDashboardStats();
-      if (res.data.success) {
-        dispatch(setDashboardStats(res.data.data));
-      }
-    } catch (error) {
-      console.error("Failed to fetch dashboard stats", error);
-    } finally {
-      dispatch(setLoading(false));
-    }
-  }, [dispatch]);
+      return res.data;
+    },
+  });
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+  const fetchStats = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["adminDashboardStats"] });
+  }, [queryClient]);
 
-  return { dashboardStats, loading, refetch: fetchStats };
+  return { 
+    dashboardStats: data?.success ? data.data : null, 
+    loading: isLoading, 
+    refetch: fetchStats 
+  };
 };

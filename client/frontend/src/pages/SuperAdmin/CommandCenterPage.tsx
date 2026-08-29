@@ -3,25 +3,23 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ShieldAlert, Activity, Building2, Users, Bot, Wifi, AlertTriangle,
   Power, Megaphone, PlusCircle, UserCheck, RefreshCw, Database,
-  ScrollText, Sparkles, CheckCircle2, XCircle, ArrowUpRight, Zap,
-  BarChart3, Layers, Compass, TrendingUp
+  ScrollText, Sparkles, ArrowUpRight, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminAPI } from "@/api/admin.api";
-import {
-  ScatterPlotWidget, HistogramWidget, AreaChartWidget, BoxPlotWidget,
-  HeatmapWidget, BubbleChartWidget, WaterfallChartWidget
-} from "@/components/admin/AdvancedDashboardCharts";
+import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import TenantAppLoader from "@/components/branding/TenantAppLoader";
 
 export default function CommandCenterPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [actionFeedback, setActionFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const toast = useToast();
 
   // Modals
   const [showNotificationModal, setShowNotificationModal] = useState(false);
@@ -35,6 +33,9 @@ export default function CommandCenterPage() {
 
   // Impersonate
   const [selectedOrgId, setSelectedOrgId] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+  const [confirmMessage, setConfirmMessage] = useState("");
 
   const fetchStatus = async () => {
     try {
@@ -44,7 +45,7 @@ export default function CommandCenterPage() {
         setData(res.data.data);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to load platform status" });
+      toast.error("Error", err?.response?.data?.message || "Failed to load platform status");
     } finally {
       setLoading(false);
     }
@@ -57,19 +58,22 @@ export default function CommandCenterPage() {
   const handleToggleMaintenance = async () => {
     if (!data) return;
     const nextState = !data.platformStatus?.maintenanceMode;
-    if (!confirm(`Are you sure you want to ${nextState ? "ENABLE" : "DISABLE"} Maintenance Mode?`)) return;
-    try {
-      setActionLoading("maintenance");
-      const res = await AdminAPI.toggleMaintenanceMode(nextState);
-      if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.data.message });
-        fetchStatus();
+    setConfirmMessage(`Are you sure you want to ${nextState ? "ENABLE" : "DISABLE"} Maintenance Mode?`);
+    setConfirmAction(() => async () => {
+      try {
+        setActionLoading("maintenance");
+        const res = await AdminAPI.toggleMaintenanceMode(nextState);
+        if (res.data?.success) {
+          toast.success("Success", res.data.data.message);
+          fetchStatus();
+        }
+      } catch (err: any) {
+        toast.error("Error", err?.response?.data?.message || "Failed to toggle maintenance mode");
+      } finally {
+        setActionLoading(null);
       }
-    } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to toggle maintenance mode" });
-    } finally {
-      setActionLoading(null);
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const handleSendNotification = async (e: React.FormEvent) => {
@@ -79,13 +83,13 @@ export default function CommandCenterPage() {
       setActionLoading("notif");
       const res = await AdminAPI.sendGlobalNotification({ title: notifTitle, message: notifMessage, type: notifType });
       if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.data.message });
+        toast.success("Success", res.data.data.message);
         setShowNotificationModal(false);
         setNotifTitle("");
         setNotifMessage("");
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to send notification" });
+      toast.error("Error", err?.response?.data?.message || "Failed to send notification");
     } finally {
       setActionLoading(null);
     }
@@ -99,7 +103,7 @@ export default function CommandCenterPage() {
         setShowImpersonateModal(true);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: "Failed to fetch organizations for impersonation" });
+      toast.error("Error", "Failed to fetch organizations for impersonation");
     }
   };
 
@@ -109,11 +113,11 @@ export default function CommandCenterPage() {
       setActionLoading("impersonate");
       const res = await AdminAPI.impersonateOrg(selectedOrgId);
       if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.data.message });
+        toast.success("Success", res.data.data.message);
         setShowImpersonateModal(false);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to impersonate" });
+      toast.error("Error", err?.response?.data?.message || "Failed to impersonate");
     } finally {
       setActionLoading(null);
     }
@@ -124,10 +128,10 @@ export default function CommandCenterPage() {
       setActionLoading("cache");
       const res = await AdminAPI.clearSystemCache();
       if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.message });
+        toast.success("Success", res.data.message);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to clear cache" });
+      toast.error("Error", err?.response?.data?.message || "Failed to clear cache");
     } finally {
       setActionLoading(null);
     }
@@ -138,10 +142,10 @@ export default function CommandCenterPage() {
       setActionLoading("jobs");
       const res = await AdminAPI.restartBackgroundJobs();
       if (res.data?.success) {
-        setActionFeedback({ type: "success", msg: res.data.message });
+        toast.success("Success", res.data.message);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to restart background jobs" });
+      toast.error("Error", err?.response?.data?.message || "Failed to restart background jobs");
     } finally {
       setActionLoading(null);
     }
@@ -153,13 +157,10 @@ export default function CommandCenterPage() {
       const res = await AdminAPI.backupDatabase();
       if (res.data?.success) {
         const bkp = res.data.data;
-        setActionFeedback({
-          type: "success",
-          msg: `Database Snapshot Created: ${bkp.snapshotId} (${bkp.sizeEstimate}). Summary: ${bkp.summary.organizations} Orgs, ${bkp.summary.users} Users, ${bkp.summary.documents} Docs.`,
-        });
+        toast.success("Success", `Database Snapshot Created: ${bkp.snapshotId} (${bkp.sizeEstimate}). Summary: ${bkp.summary.organizations} Orgs, ${bkp.summary.users} Users, ${bkp.summary.documents} Docs.`);
       }
     } catch (err: any) {
-      setActionFeedback({ type: "error", msg: err?.response?.data?.message || "Failed to create database backup" });
+      toast.error("Error", err?.response?.data?.message || "Failed to create database backup");
     } finally {
       setActionLoading(null);
     }
@@ -167,12 +168,12 @@ export default function CommandCenterPage() {
 
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <RefreshCw className="w-8 h-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground">Initializing Command Center Telemetry...</p>
-        </div>
-      </div>
+      <TenantAppLoader
+        title="Command Center"
+        orgName="SupportAI"
+        subtitle={["Initializing", "platform", "telemetry..."]}
+        bgTheme="auto"
+      />
     );
   }
 
@@ -182,7 +183,6 @@ export default function CommandCenterPage() {
     <div className="space-y-6">
       {/* Top Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 text-white shadow-2xl border border-indigo-500/20">
-        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -196,7 +196,7 @@ export default function CommandCenterPage() {
                 </Badge>
               )}
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent flex items-center gap-2.5">
+            <h1 className="text-3xl md:text-4xl font-extrabold  bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent flex items-center gap-2.5">
               <ShieldAlert className="text-amber-400" size={32} />
               Command Center
             </h1>
@@ -217,25 +217,11 @@ export default function CommandCenterPage() {
         </div>
       </div>
 
-      {/* Action feedback message */}
-      {actionFeedback && (
-        <div className={`p-4 rounded-xl border flex items-center justify-between transition-all duration-300 ${
-          actionFeedback.type === "success"
-            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-            : "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
-        }`}>
-          <div className="flex items-center gap-2.5 text-sm font-medium">
-            {actionFeedback.type === "success" ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-            <span>{actionFeedback.msg}</span>
-          </div>
-          <button onClick={() => setActionFeedback(null)} className="text-xs underline opacity-80 hover:opacity-100">Dismiss</button>
-        </div>
-      )}
 
       {/* 6 Core Telemetry Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {/* Card 1: Platform Status */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -274,7 +260,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 2: Active Organizations */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -301,7 +287,7 @@ export default function CommandCenterPage() {
             </div>
             <div className="flex justify-between py-1">
               <span className="text-muted-foreground">Plan Distribution:</span>
-              <div className="flex gap-1.5 text-xs font-mono">
+              <div className="flex flex-wrap justify-end gap-1.5 text-xs font-mono">
                 <Badge variant="outline">Enterprise: {activeOrganizationsCard?.planBreakdown?.enterprise || 0}</Badge>
                 <Badge variant="outline">Business: {activeOrganizationsCard?.planBreakdown?.business || 0}</Badge>
               </div>
@@ -310,7 +296,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 3: Online Users */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
@@ -343,7 +329,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 4: AI Services */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
@@ -378,7 +364,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 5: API Health */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
@@ -413,7 +399,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Card 6: Critical Alerts */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
+        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
@@ -451,7 +437,7 @@ export default function CommandCenterPage() {
 
 
       {/* Quick Actions Panel */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-5">
+      <div className="rounded-lg border bg-card p-5 sm:p-6 shadow-sm space-y-5">
         <div className="flex items-center justify-between border-b dark:border-white/[0.06] pb-4">
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2">
@@ -584,7 +570,7 @@ export default function CommandCenterPage() {
       </div>
 
       {/* Recent Activity Log Stream */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
+      <div className="rounded-lg border bg-card p-5 sm:p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b dark:border-white/[0.06] pb-3">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <ScrollText size={18} className="text-primary" />
@@ -643,7 +629,7 @@ export default function CommandCenterPage() {
                 >
                   <option value="info">Info</option>
                   <option value="warning">Warning</option>
-                  <option value="urgent">Urgent</option>
+                  <option value="error">Urgent (Error)</option>
                 </select>
               </div>
 
@@ -704,6 +690,14 @@ export default function CommandCenterPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Toggle Maintenance Mode"
+        message={confirmMessage}
+        variant="warning"
+        onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
+        onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
     </div>
   );
 }

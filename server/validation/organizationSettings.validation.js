@@ -26,6 +26,7 @@ export const updateOrganizationSettingsSchema = z.object({
     })
     .optional(),
   show_charts: z.boolean().optional(),
+  ai_session_logging: z.boolean().optional(),
   default_language: z.string().trim().max(10).optional(),
   greeting_message: z.string().max(500).optional(),
   logo: z
@@ -72,6 +73,12 @@ export const updateOrganizationSettingsSchema = z.object({
     .optional(),
   email_templates: z
     .object({
+      ticket_created: z
+        .object({
+          subject: z.string().optional(),
+          body: z.string().optional(),
+        })
+        .optional(),
       ticket_assigned: z
         .object({
           subject: z.string().optional(),
@@ -84,6 +91,64 @@ export const updateOrganizationSettingsSchema = z.object({
           body: z.string().optional(),
         })
         .optional(),
+      ai_escalation: z
+        .object({
+          subject: z.string().optional(),
+          body: z.string().optional(),
+        })
+        .optional(),
+      sla_warning: z
+        .object({
+          subject: z.string().optional(),
+          body: z.string().optional(),
+        })
+        .optional(),
+      announcement_update: z
+        .object({
+          subject: z.string().optional(),
+          body: z.string().optional(),
+        })
+        .optional(),
     })
     .optional(),
-  });
+  rag_config: z
+    .object({
+      chunk_size: z.number().int().min(50).max(8000).optional(),
+      chunk_overlap: z.number().int().min(0).max(2000).optional(),
+      top_k: z.number().int().min(1).max(100).optional(),
+      min_score: z.number().min(0).max(1).optional(),
+      rerank_enabled: z.boolean().optional(),
+      rerank_model: z.string().optional(),
+      embedding_provider: z.string().optional(),
+      embedding_model: z.string().optional(),
+      bfs_max_depth: z.number().int().min(1).max(10).optional(),
+      bfs_max_nodes: z.number().int().min(1).max(100).optional(),
+      query_cache_ttl_ms: z.number().int().min(0).max(86400000).optional(),
+    })
+    .optional(),
+  llm_config: z
+    .object({
+      provider: z.string().optional(),
+      model_name: z.string().optional(),
+      gemini_api_key: z.string().optional(),
+      groq_api_key: z.string().optional(),
+      openai_api_key: z.string().optional(),
+      grok_api_key: z.string().optional(),
+      claude_api_key: z.string().optional(),
+    })
+    .optional(),
+  custom_fields: z
+    .array(
+      z.object({
+        name: z.string(),
+        label: z.string(),
+        type: z.enum(["text", "number", "select", "checkbox", "date"]),
+        options: z.array(z.string()).optional(),
+        required: z.boolean().optional(),
+        order: z.number().optional(),
+      })
+    )
+    .optional(),
+  plan: z.enum(["free", "starter", "business", "enterprise"]).optional(),
+  status: z.enum(["active", "suspended"]).optional(),
+});

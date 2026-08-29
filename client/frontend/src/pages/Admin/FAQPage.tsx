@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Plus, Edit2, Trash2, HelpCircle, AlertCircle, X, Check, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { FAQAPI } from "@/api";
+import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface FaqItem {
   _id: string;
@@ -22,19 +24,20 @@ export default function FAQPage() {
   const { user } = useAuth();
   const orgId = user?.organization_id?._id || user?.organization_id;
 
+  const toast = useToast();
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<FaqItem | null>(null);
   const [formData, setFormData] = useState({ question: "", answer: "", is_active: true, category: "" });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
 
   const fetchFaqs = useCallback(async () => {
     setLoading(true);
-    setError("");
     try {
       const res = statusFilter ? await FAQAPI.getByStatus(statusFilter) : await FAQAPI.getAll();
       if (res.data.success) {
@@ -43,7 +46,7 @@ export default function FAQPage() {
         setFaqs(items);
       }
     } catch {
-      setError("Failed to load FAQs");
+      toast.error("Error", "Failed to load FAQs");
     } finally {
       setLoading(false);
     }
@@ -94,13 +97,15 @@ export default function FAQPage() {
   };
 
   const handleDelete = async (faq: FaqItem) => {
-    if (!confirm(`Delete FAQ: "${faq.question}"?`)) return;
-    try {
-      await FAQAPI.delete(faq._id);
-      fetchFaqs();
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to delete FAQ");
-    }
+    setConfirmAction(() => async () => {
+      try {
+        await FAQAPI.delete(faq._id);
+        fetchFaqs();
+      } catch (err: any) {
+        toast.error("Error", err.response?.data?.message || "Failed to delete FAQ");
+      }
+    });
+    setConfirmOpen(true);
   };
 
   const toggleActive = async (faq: FaqItem) => {
@@ -108,7 +113,7 @@ export default function FAQPage() {
       await FAQAPI.update(faq._id, { is_active: !faq.is_active });
       fetchFaqs();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to update FAQ");
+      toast.error("Error", err.response?.data?.message || "Failed to update FAQ");
     }
   };
 
@@ -117,7 +122,7 @@ export default function FAQPage() {
       await FAQAPI.approve(faq._id);
       fetchFaqs();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to approve FAQ");
+      toast.error("Error", err.response?.data?.message || "Failed to approve FAQ");
     }
   };
 
@@ -127,7 +132,7 @@ export default function FAQPage() {
       await FAQAPI.reject(faq._id, reason || "");
       fetchFaqs();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to reject FAQ");
+      toast.error("Error", err.response?.data?.message || "Failed to reject FAQ");
     }
   };
 
@@ -147,7 +152,7 @@ export default function FAQPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">FAQ Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold ">FAQ Management</h1>
           <p className="text-muted-foreground text-sm">Create and manage FAQs with approval workflow.</p>
         </div>
         <Button onClick={() => { setEditing(null); setShowForm(true); }}>
@@ -155,13 +160,6 @@ export default function FAQPage() {
           New FAQ
         </Button>
       </div>
-
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2" role="alert">
-          <AlertCircle size={14} />{error}
-          <button onClick={() => setError("")} className="ml-auto"><X size={14} /></button>
-        </div>
-      )}
 
       <div className="flex gap-1 overflow-x-auto">
         {statusFilters.map((s) => (
@@ -330,6 +328,14 @@ export default function FAQPage() {
           ))}
         </div>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete FAQ"
+        message="Are you sure you want to delete this FAQ? This action cannot be undone."
+        variant="danger"
+        onConfirm={() => { confirmAction?.(); setConfirmOpen(false); }}
+        onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
+      />
     </div>
   );
 }

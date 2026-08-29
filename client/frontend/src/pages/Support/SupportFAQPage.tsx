@@ -100,7 +100,7 @@ export default function SupportFAQPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">FAQ</h1>
+          <h1 className="text-2xl font-bold ">FAQ</h1>
           <p className="text-sm text-muted-foreground">Browse approved FAQs or submit new ones for admin review.</p>
         </div>
         <Button onClick={() => { resetForm(); setShowForm(true); }}>
@@ -111,7 +111,7 @@ export default function SupportFAQPage() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={resetForm}>
-          <div className="bg-card rounded-xl shadow-2xl border max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card rounded-lg shadow-2xl border max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Submit New FAQ</h2>
               <button onClick={resetForm} className="p-1 rounded hover:bg-muted"><X size={18} /></button>
@@ -232,7 +232,7 @@ export default function SupportFAQPage() {
                   {filteredApproved.map((faq) => {
                     const isOpen = expandedId === faq._id;
                     return (
-                      <div key={faq._id} className="rounded-xl border bg-card overflow-hidden">
+                      <div key={faq._id} className="rounded-lg border bg-card overflow-hidden">
                         <button
                           onClick={() => setExpandedId(isOpen ? null : faq._id)}
                           className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-muted/30 transition-colors"
@@ -270,7 +270,7 @@ export default function SupportFAQPage() {
                   const BadgeIcon = badge.icon;
                   const isOpen = expandedId === faq._id;
                   return (
-                    <div key={faq._id} className="rounded-xl border bg-card overflow-hidden">
+                    <div key={faq._id} className="rounded-lg border bg-card overflow-hidden">
                       <button
                         onClick={() => setExpandedId(isOpen ? null : faq._id)}
                         className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-muted/30 transition-colors"

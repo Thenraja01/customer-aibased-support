@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, Plus } from "lucide-react";
 import type { IRole } from "@/types";
 
@@ -22,7 +21,11 @@ export default function RoleManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const excludedRoles = ["super_admin", "super admin"];
 
+  const filteredRoles = roles.filter(
+    (role) => !excludedRoles.includes(role.role_name)
+  );
   const handleCreate = async () => {
     if (!newRole.trim()) return;
     setSubmitting(true);
@@ -62,17 +65,22 @@ export default function RoleManager({
           placeholder="New role name"
           className="max-w-xs"
         />
-        <Button onClick={handleCreate} disabled={submitting || !newRole.trim()}>
+        <Button
+          onClick={handleCreate}
+          disabled={submitting || !newRole.trim()}
+        >
           <Plus size={14} className="mr-1" />
           Add Role
         </Button>
       </div>
 
       <div className="space-y-2">
-        {roles.length === 0 ? (
-          <p className="text-muted-foreground text-sm py-4">No roles found.</p>
+        {filteredRoles.length === 0 ? (
+          <p className="text-muted-foreground text-sm py-4">
+            No roles found.
+          </p>
         ) : (
-          roles.map((role) => (
+          filteredRoles.map((role) => (
             <div
               key={role._id}
               className="flex items-center justify-between p-3 rounded-lg border bg-card"
@@ -102,7 +110,10 @@ export default function RoleManager({
                 </div>
               ) : (
                 <>
-                  <Badge variant="secondary">{role.role_name}</Badge>
+                  <div className=""></div>
+                  {role.role_name}
+
+
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
@@ -114,6 +125,7 @@ export default function RoleManager({
                     >
                       <Pencil size={14} />
                     </Button>
+
                     <Button
                       variant="destructive"
                       size="icon-sm"

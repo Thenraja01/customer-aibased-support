@@ -1,8 +1,11 @@
 import * as faqService from "./faq.service.js";
+import { normalizeRoleName, isNormalizedAdminRole } from "../../utils/constants.js";
 
 export const create = async (req, res) => {
   try {
-    const faq = await faqService.createFaq(req.body, req.user);
+    const orgId = req.scope?.organizationId || req.user?.organizationId;
+    const branchId = req.scope?.branchId || req.user?.branchId;
+    const faq = await faqService.createFaq(req.body, req.user, orgId, branchId);
     res.status(201).json({ success: true, data: faq });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -11,8 +14,9 @@ export const create = async (req, res) => {
 
 export const getActive = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const faqs = await faqService.getActiveFaqs(orgId);
+    const orgId = req.scope?.isSuperAdmin ? null : (req.scope?.organizationId || req.user?.organizationId);
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : (req.scope?.branchId || req.user?.branchId);
+    const faqs = await faqService.getActiveFaqs(orgId, branchId);
     res.status(200).json({ success: true, data: faqs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -21,9 +25,9 @@ export const getActive = async (req, res) => {
 
 export const getAll = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
-    const orgId = isSuperAdmin ? null : req.user?.organizationId;
-    const faqs = await faqService.getAllFaqs(orgId);
+    const orgId = req.scope?.isSuperAdmin ? null : (req.scope?.organizationId || req.user?.organizationId);
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : (req.scope?.branchId || req.user?.branchId);
+    const faqs = await faqService.getAllFaqs(orgId, branchId);
     res.status(200).json({ success: true, data: faqs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -32,9 +36,9 @@ export const getAll = async (req, res) => {
 
 export const getByStatus = async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.roleName?.toLowerCase() === "super admin";
-    const orgId = isSuperAdmin ? null : req.user?.organizationId;
-    const faqs = await faqService.getFaqsByStatus(req.params.status, orgId);
+    const orgId = req.scope?.isSuperAdmin ? null : (req.scope?.organizationId || req.user?.organizationId);
+    const branchId = req.scope?.isSuperAdmin || req.scope?.isOrgAdmin ? null : (req.scope?.branchId || req.user?.branchId);
+    const faqs = await faqService.getFaqsByStatus(req.params.status, orgId, branchId);
     res.status(200).json({ success: true, data: faqs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -63,7 +67,7 @@ export const update = async (req, res) => {
 
 export const approve = async (req, res) => {
   try {
-    const faq = await faqService.approveFaq(req.params.id, req.user.userId);
+    const faq = await faqService.approveFaq(req.params.id, req.user.userId || req.user._id);
     res.status(200).json({ success: true, data: faq });
   } catch (error) {
     const status = error.message === "FAQ not found" ? 404 : 400;
@@ -93,8 +97,9 @@ export const remove = async (req, res) => {
 
 export const getMyFaqs = async (req, res) => {
   try {
-    const orgId = req.user?.organizationId;
-    const faqs = await faqService.getFaqsByUser(req.user.userId, orgId);
+    const orgId = req.scope?.organizationId || req.user?.organizationId;
+    const branchId = req.scope?.branchId || req.user?.branchId;
+    const faqs = await faqService.getFaqsByUser(req.user.userId || req.user._id, orgId, branchId);
     res.status(200).json({ success: true, data: faqs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -8,44 +8,59 @@ export const createChat = async (data) => {
   return await Chat.create(data);
 };
 
-export const getAllChats = async () => {
-  return await Chat.find()
+export const getAllChats = async (orgId = null, branchId = null) => {
+  const query = {};
+  if (orgId) query.organization_id = orgId;
+  if (branchId) query.branch_id = branchId;
+  return await Chat.find(query)
     .populate("user_id", "name email")
     .sort({ created_at: -1 });
 };
 
-export const getChatById = async (id) => {
-  const chat = await Chat.findById(id)
+export const getChatById = async (id, orgId = null) => {
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  const chat = await Chat.findOne(query)
     .populate("user_id", "name email")
     .populate("organization_id", "name");
   if (!chat) throw new Error("Chat not found");
   return chat;
 };
 
-export const getChatsByUser = async (userId) => {
-  return await Chat.find({ user_id: userId }).sort({ created_at: -1 });
+export const getChatsByUser = async (userId, orgId = null) => {
+  const query = { user_id: userId };
+  if (orgId) query.organization_id = orgId;
+  return await Chat.find(query).sort({ created_at: -1 });
 };
 
-export const updateChatTopic = async (id, topic) => {
-  const chat = await Chat.findByIdAndUpdate(id, { topic }, { new: true });
+export const updateChatTopic = async (id, topic, orgId = null) => {
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  const chat = await Chat.findOneAndUpdate(query, { topic }, { new: true });
   if (!chat) throw new Error("Chat not found");
   return chat;
 };
 
-export const closeChat = async (id) => {
-  const chat = await Chat.findByIdAndUpdate(id, { status: "closed" }, { new: true });
+export const closeChat = async (id, orgId = null) => {
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  const chat = await Chat.findOneAndUpdate(query, { status: "closed" }, { new: true });
   if (!chat) throw new Error("Chat not found");
   return chat;
 };
 
-export const reopenChat = async (id) => {
-  const chat = await Chat.findByIdAndUpdate(id, { status: "open" }, { new: true });
+export const reopenChat = async (id, orgId = null) => {
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  const chat = await Chat.findOneAndUpdate(query, { status: "open" }, { new: true });
   if (!chat) throw new Error("Chat not found");
   return chat;
 };
 
-export const deleteChat = async (id) => {
-  const chat = await Chat.findByIdAndDelete(id);
+export const deleteChat = async (id, orgId = null) => {
+  const query = { _id: id };
+  if (orgId) query.organization_id = orgId;
+  const chat = await Chat.findOneAndDelete(query);
   if (!chat) throw new Error("Chat not found");
   await Promise.all([
     Message.deleteMany({ chat_id: id }),
@@ -55,21 +70,39 @@ export const deleteChat = async (id) => {
   return { message: "Chat and related data deleted successfully" };
 };
 
-export const countUserChats = async (userId) => {
-  return await Chat.countDocuments({ user_id: userId });
+export const countUserChats = async (userId, orgId = null) => {
+  const query = { user_id: userId };
+  if (orgId) query.organization_id = orgId;
+  return await Chat.countDocuments(query);
 };
 
-export const getActiveChats = async () => {
-  return await Chat.find({ status: "open" })
+export const getActiveChats = async (orgId = null, branchId = null) => {
+  const query = { status: { $in: ["open", "escalated", "in_progress", "waiting_for_agent"] } };
+  if (orgId) query.organization_id = orgId;
+  if (branchId) query.branch_id = branchId;
+  return await Chat.find(query)
     .populate("user_id", "name email")
     .sort({ created_at: -1 });
 };
 
-export const searchChats = async (keyword) => {
+export const searchChats = async (keyword, orgId = null, branchId = null) => {
   const safe = escapeRegex(keyword);
-  return await Chat.find({
+  const query = {
     topic: { $regex: safe, $options: "i" },
-  }).populate("user_id", "name email");
+  };
+  if (orgId) query.organization_id = orgId;
+  if (branchId) query.branch_id = branchId;
+  return await Chat.find(query).populate("user_id", "name email");
+};
+
+export const closeAllUserChats = async (userId, orgId = null) => {
+  const query = { user_id: userId, status: "open" };
+  if (orgId) query.organization_id = orgId;
+  const result = await Chat.updateMany(
+    query,
+    { status: "closed" }
+  );
+  return { closedCount: result.modifiedCount };
 };
 
 export const closeInactiveChats = async () => {
@@ -87,3 +120,19 @@ export const closeInactiveChats = async () => {
 export const updateLastMessageTime = async (chatId) => {
   await Chat.findByIdAndUpdate(chatId, { last_message_at: new Date() });
 };
+
+export const deleteAllChats = async (userId, orgId = null) => {
+  const query = { user_id: userId };
+  if (orgId) query.organization_id = orgId;
+  const chats = await Chat.find(query).select("_id");
+  const chatIds = chats.map(c => c._id);
+  
+  await Chat.deleteMany(query);
+  await Promise.all([
+    Message.deleteMany({ chat_id: { $in: chatIds } }),
+    AISession.deleteMany({ chat_id: { $in: chatIds } }),
+    ChatMemory.deleteMany({ chat_id: { $in: chatIds } }),
+  ]);
+  return { deletedCount: chatIds.length, chatIds };
+};
+

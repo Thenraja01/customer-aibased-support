@@ -1,13 +1,15 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import env from "./env.js";
+import { allowedOrigins } from "./cors.js";
+import { registerTicketSocketHandlers } from "../modules/ticket/ticket.socket.js";
 
 let io;
 
 export function initSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: ["http://localhost:5173", process.env.CLIENT_URL].filter(Boolean),
+      origin: allowedOrigins,
       credentials: true,
     },
   });
@@ -45,6 +47,9 @@ export function initSocket(httpServer) {
     socket.on("typing:stop", ({ chatId }) => {
       socket.to(`chat:${chatId}`).emit("typing:stop", { chatId, userId });
     });
+
+    // Ticket real-time messaging handlers (rooms, presence, read receipts).
+    registerTicketSocketHandlers(io, socket);
 
     socket.on("disconnect", () => {
     });

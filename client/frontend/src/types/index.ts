@@ -10,7 +10,18 @@ export interface IOrganization {
   address?: string;
   phone?: string;
   email?: string;
-  status?: "active" | "inactive";
+  status?: "active" | "inactive" | "suspended" | "DELETION_PENDING";
+  plan?: "free" | "starter" | "business" | "enterprise";
+  allowed_registration_roles?: string[];
+  plan_customization?: {
+    custom_price?: number;
+    custom_name?: string;
+    custom_storage_mb?: number;
+    custom_ai_requests?: number;
+    features?: string[];
+  };
+  storage_limit?: number;
+  ai_requests_limit?: number;
   customPrompt?: string;
   chatbot_name?: string;
   default_language?: string;
@@ -66,7 +77,13 @@ export interface IUser {
   _id?: string;
 
   organization_id: IOrganization;
-  role_id: IRole;
+  branch_id?: any;
+  branchId?: string;
+  branchName?: string;
+  user_type?: string;
+  role_id?: IRole | string;
+  role?: string;
+  roleName?: string;
 
   name: string;
   email: string;

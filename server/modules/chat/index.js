@@ -1,1 +1,1 @@
-export { default as chatRouter } from "./chat.route.js";
+export { default as chatRouter, publicRouter } from "./chat.route.js";

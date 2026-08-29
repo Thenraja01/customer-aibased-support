@@ -1,92 +1,158 @@
-import { useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchChats,
-  fetchUserChats,
-  createChat,
-  closeChat,
-  fetchMessages,
-  sendMessage,
-  sendAndReceiveAI,
-  setActiveChat,
-  clearMessages,
-} from "@/store/chatSlice";
-import type { RootState, AppDispatch } from "@/store/store";
+import { useCallback, useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ChatAPI } from "@/api/chat.api.js";
+import { MessageAPI } from "@/api/message.api.js";
+import { useAuthContext } from "@/context/AuthContext";
 
 export function useChat() {
-  const dispatch = useDispatch<AppDispatch>();
-  const { chats, activeChat, messages, loading, messagesLoading, sending, aiThinking, error } =
-    useSelector((state: RootState) => state.chat);
-  const { user } = useSelector((state: RootState) => state.user);
+  const queryClient = useQueryClient();
+  const { user } = useAuthContext();
+  const [activeChat, setActiveChatState] = useState<any>(null);
+  const [params, setParams] = useState<Record<string, string> | undefined>(undefined);
+  const [loadType, setLoadType] = useState<"user" | "all" | null>(null);
+
+  const { data: chatsData, isLoading: chatsLoading, error: chatsError } = useQuery({
+    queryKey: ["chats", loadType, user?._id, params],
+    queryFn: async () => {
+      if (loadType === "user" && user?._id) {
+        const res = await ChatAPI.getByUser(user._id);
+        return res.data?.data || res.data;
+      } else if (loadType === "all") {
+        const res = await ChatAPI.getAll(params);
+        return res.data?.data || res.data;
+      }
+      return [];
+    },
+    enabled: loadType !== null,
+  });
+
+  const { data: messagesData, isLoading: messagesLoading } = useQuery({
+    queryKey: ["messages", activeChat?._id],
+    queryFn: async () => {
+      if (!activeChat?._id) return [];
+      const res = await MessageAPI.getByChat(activeChat._id);
+      const raw = res.data?.data || res.data;
+      if (Array.isArray(raw)) return raw;
+      if (Array.isArray(raw?.messages)) return raw.messages;
+      return [];
+    },
+    enabled: !!activeChat?._id,
+  });
+
+  const createChatMutation = useMutation({
+    mutationFn: (data: any) => ChatAPI.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    },
+  });
+
+  const closeChatMutation = useMutation({
+    mutationFn: (chatId: string) => ChatAPI.close(chatId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    },
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: (data: any) => MessageAPI.send(data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["messages", variables.chat_id] });
+    },
+  });
+
+  const sendAIMutation = useMutation({
+    mutationFn: (data: { chatId: string; message: string }) => ChatAPI.sendAI(data.chatId, data.message),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["messages", variables.chatId] });
+    },
+  });
+
+  const messages = messagesData || [];
+  
+  const sortedMessages = useMemo(() => {
+    return [...messages].sort(
+      (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }, [messages]);
+
+  const pendingMessages = useMemo(() => {
+    return messages.filter((m: any) => m.status === "pending" || m.status === "sending");
+  }, [messages]);
 
   const loadUserChats = useCallback(() => {
-    if (user?._id) {
-      dispatch(fetchUserChats(user._id));
-    }
-  }, [dispatch, user]);
+    setLoadType("user");
+  }, []);
 
   const loadAllChats = useCallback(
-    (params?: Record<string, string>) => {
-      dispatch(fetchChats(params));
+    (newParams?: Record<string, string>) => {
+      setParams(newParams);
+      setLoadType("all");
     },
-    [dispatch]
+    []
   );
 
   const startNewChat = useCallback(
-    (data: { user_id: string; organization_id: string; topic: string }) => {
-      return dispatch(createChat(data)).unwrap();
+    async (data: { user_id: string; organization_id: string; topic: string }) => {
+      const res = await createChatMutation.mutateAsync(data);
+      return res.data?.data || res.data;
     },
-    [dispatch]
+    [createChatMutation]
   );
 
   const endChat = useCallback(
-    (chatId: string) => {
-      return dispatch(closeChat(chatId));
+    async (chatId: string) => {
+      return closeChatMutation.mutateAsync(chatId);
     },
-    [dispatch]
+    [closeChatMutation]
   );
 
   const loadMessages = useCallback(
     (chatId: string) => {
-      return dispatch(fetchMessages(chatId));
+      if (activeChat?._id !== chatId) {
+        // Find chat from chats list if possible, or just set id
+        const chatObj = chatsData?.find((c: any) => c._id === chatId) || { _id: chatId };
+        setActiveChatState(chatObj);
+      }
     },
-    [dispatch]
+    [activeChat, chatsData]
   );
 
   const send = useCallback(
-    (data: { chat_id: string; sender_id: string; content: string; message_type: string; is_ai: boolean }) => {
-      return dispatch(sendMessage(data));
+    async (data: { chat_id: string; sender_id: string; content: string; message_type: string; is_ai: boolean }) => {
+      return sendMessageMutation.mutateAsync(data);
     },
-    [dispatch]
+    [sendMessageMutation]
   );
 
   const sendWithAI = useCallback(
-    (chatId: string, userId: string, content: string) => {
-      return dispatch(sendAndReceiveAI({ chatId, userId, content })).unwrap();
+    async (chatId: string, _userId: string, content: string) => {
+      return sendAIMutation.mutateAsync({ chatId, message: content });
     },
-    [dispatch]
+    [sendAIMutation]
   );
 
   const selectChat = useCallback(
     (chat: any) => {
-      dispatch(setActiveChat(chat));
+      setActiveChatState(chat);
     },
-    [dispatch]
+    []
   );
 
   const resetMessages = useCallback(() => {
-    dispatch(clearMessages());
-  }, [dispatch]);
+    setActiveChatState(null);
+  }, []);
 
   return {
-    chats,
+    chats: chatsData || [],
     activeChat,
     messages,
-    loading,
+    sortedMessages,
+    pendingMessages,
+    loading: chatsLoading,
     messagesLoading,
-    sending,
-    aiThinking,
-    error,
+    sending: sendMessageMutation.isPending,
+    aiThinking: sendAIMutation.isPending,
+    error: chatsError ? (chatsError as Error).message : null,
     loadUserChats,
     loadAllChats,
     startNewChat,

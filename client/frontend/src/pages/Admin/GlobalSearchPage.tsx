@@ -40,7 +40,7 @@ export default function GlobalSearchPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">Global Search</h1>
+        <h1 className="text-2xl font-bold ">Global Search</h1>
         <p className="text-sm text-muted-foreground">
           Search across users, chats, tickets, and documents.
         </p>

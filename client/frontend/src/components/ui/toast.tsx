@@ -1,4 +1,4 @@
-import { useState, useCallback, createContext, useContext, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, createContext, useContext, type ReactNode } from "react";
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from "lucide-react";
 
 type ToastType = "success" | "error" | "info" | "warning";
@@ -17,6 +17,24 @@ interface ToastContextType {
   info: (title: string, message?: string) => void;
   warning: (title: string, message?: string) => void;
 }
+
+type ToastListener = (type: ToastType, title: string, message?: string) => void;
+const toastListeners = new Set<ToastListener>();
+
+export const toast = {
+  success: (title: string, message?: string) => {
+    toastListeners.forEach((l) => l("success", title, message));
+  },
+  error: (title: string, message?: string) => {
+    toastListeners.forEach((l) => l("error", title, message));
+  },
+  info: (title: string, message?: string) => {
+    toastListeners.forEach((l) => l("info", title, message));
+  },
+  warning: (title: string, message?: string) => {
+    toastListeners.forEach((l) => l("warning", title, message));
+  },
+};
 
 const ToastContext = createContext<ToastContextType | null>(null);
 
@@ -47,13 +65,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => removeToast(id), 5000);
   }, [removeToast]);
 
-  const ctx: ToastContextType = {
+  useEffect(() => {
+    const listener: ToastListener = (type, title, message) => {
+      addToast(type, title, message);
+    };
+    toastListeners.add(listener);
+    return () => {
+      toastListeners.delete(listener);
+    };
+  }, [addToast]);
+
+  const ctx = useMemo((): ToastContextType => ({
     toast: addToast,
     success: (title, message) => addToast("success", title, message),
     error: (title, message) => addToast("error", title, message),
     info: (title, message) => addToast("info", title, message),
     warning: (title, message) => addToast("warning", title, message),
-  };
+  }), [addToast]);
 
   return (
     <ToastContext.Provider value={ctx}>
