@@ -452,34 +452,6 @@ router.get("/v1/organizations", async (_req, res) => {
   }
 });
 
-router.get("/v1/organizations/by-domain", async (req, res) => {
-  try {
-    const { domain } = req.query;
-    if (!domain) {
-      return res.status(400).json({ success: false, message: "Domain query parameter is required" });
-    }
-    const org = await Organization.findOne({ domain: domain.toLowerCase().trim() }).lean();
-    if (!org) {
-      return res.status(404).json({ success: false, message: "Organization not found for this domain" });
-    }
-    res.status(200).json({ success: true, data: org });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-router.get("/v1/app-settings", async (_req, res) => {
-  try {
-    let settings = await GlobalSetting.findById("global").lean();
-    if (!settings) {
-      settings = await GlobalSetting.create({ _id: "global" });
-    }
-    res.status(200).json({ success: true, data: settings });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
 router.get("/v1/roles", async (_req, res) => {
   try {
     const roles = [

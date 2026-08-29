@@ -128,11 +128,6 @@ export default function AdminDashboard() {
       const escalatedCount = tickets.filter((t: any) => t.priority === "urgent" || t.priority === "high" || t.status === "escalated" || t.is_escalated).length +
         chats.filter((c: any) => c.status === "escalated" || c.status === "waiting_for_agent").length;
 
-      const openCount = tickets.filter((t: any) => t.status === "open").length;
-      const inProgCount = tickets.filter((t: any) => t.status === "in_progress").length;
-      const resolvedCount = tickets.filter((t: any) => t.status === "resolved").length;
-      const closedCount = tickets.filter((t: any) => t.status === "closed").length;
-
       setStats({
         totalUsers: orgUsers.length,
         activeUsers: orgUsers.filter((u: any) => u.status === "active").length,

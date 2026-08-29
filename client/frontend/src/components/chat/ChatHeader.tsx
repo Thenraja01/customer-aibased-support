@@ -95,13 +95,6 @@ const ChatHeader = memo(function ChatHeader({ activeChat, isSupportView, onBack,
     setConfirmOpen(true);
   }, [activeChat, endChat, loadUserChats]);
 
-  const isTyping = useMemo(() => {
-    if (!activeChat?._id || !user?._id) return false;
-    return Object.keys(typingUsers).some((key) =>
-      key.startsWith(`${activeChat._id}:`) && !key.endsWith(user._id)
-    );
-  }, [typingUsers, activeChat?._id, user?._id]);
-
   return (
     <>
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border/80 px-4 sm:px-6 py-3 bg-card/90 backdrop-blur-xl shrink-0 select-none shadow-sm">

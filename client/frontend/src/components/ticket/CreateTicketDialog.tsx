@@ -40,11 +40,6 @@ interface CreateTicketDialogProps {
   onClose: () => void;
 }
 
-interface FormErrors {
-  subject?: string;
-  description?: string;
-}
-
 const CreateTicketDialog = memo(function CreateTicketDialog({ open, onClose }: CreateTicketDialogProps) {
   const { user } = useAuthContext();
   const { addTicket, creating } = useTickets();

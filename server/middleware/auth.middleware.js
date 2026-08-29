@@ -331,48 +331,6 @@ export const selfOrAdminByChatOwner = (paramName = "chatId") => {
   };
 };
 
-/**
- * Self or Admin by chat ownership
- * Allows chat owners and admins to access chat resources
- * @param {string} paramName - Name of the chatId parameter (default: 'chatId')
- */
-export const selfOrAdminByChatOwner = (paramName = 'chatId') => {
-  return async (req, res, next) => {
-    const chatId = req.params[paramName];
-    const userId = req.user?.userId || req.user?._id;
-    const userRole = req.user?.roleName || req.user?.role_id?.role_name;
-    const isAdmin = ['super admin', 'tenant admin', 'admin'].some(
-      (r) => r.toLowerCase().replace(/[\s_]+/g, " ") === userRole?.toLowerCase().replace(/[\s_]+/g, " ")
-    );
-
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized: User not authenticated"
-      });
-    }
-
-    if (isAdmin) {
-      return next();
-    }
-
-    try {
-      const Chat = mongoose.model('Chat');
-      const chat = await Chat.findById(chatId).select('user_id').lean();
-      if (chat && chat.user_id?.toString() === userId.toString()) {
-        return next();
-      }
-    } catch {
-      // fall through to forbidden
-    }
-
-    return res.status(403).json({
-      success: false,
-      message: "Forbidden: You can only access your own conversations",
-    });
-  };
-};
-
 export default {
   protect,
   protectSimple,

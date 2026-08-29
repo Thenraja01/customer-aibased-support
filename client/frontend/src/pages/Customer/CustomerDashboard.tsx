@@ -55,8 +55,6 @@ export default function CustomerDashboard() {
 
   const loading = ticketsLoading || chatsLoading;
 
-  const loading = ticketsLoading || chatsLoading;
-
   const openCount = tickets.filter((t: any) => t.status === "open").length;
   const inProgressCount = tickets.filter((t: any) => t.status === "in_progress").length;
   const resolvedCount = tickets.filter((t: any) => t.status === "resolved").length;

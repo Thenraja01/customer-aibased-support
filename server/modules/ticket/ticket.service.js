@@ -174,9 +174,7 @@ export const getTicketByNumber = async (ticketNumber, organizationId = null) => 
   if (organizationId) filter.organization_id = organizationId;
   const ticket = await Ticket.findOne(filter)
     .populate("user_id", "name email")
-    .populate("assigned_to", "name email")
-    .populate("resolved_by", "name email")
-    .populate("closed_by", "name email");
+    .populate("assigned_to", "name email");
   if (!ticket) throw new Error("Ticket not found");
   return ticket;
 };

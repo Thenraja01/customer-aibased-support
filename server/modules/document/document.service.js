@@ -965,22 +965,3 @@ export const getDocumentRoleAccess = async (documentId) => {
     .lean();
   return entries.map((e) => e.role_id);
 };
-
-export const setDocumentRoleAccess = async (documentId, roleIds, organizationId) => {
-  await DocumentRoleAccess.deleteMany({ document_id: documentId });
-  if (roleIds && roleIds.length > 0) {
-    const entries = roleIds.map((roleId) => ({
-      document_id: documentId,
-      role_id: roleId,
-      organization_id: organizationId,
-    }));
-    await DocumentRoleAccess.insertMany(entries);
-  }
-};
-
-export const getDocumentRoleAccess = async (documentId) => {
-  const entries = await DocumentRoleAccess.find({ document_id: documentId })
-    .populate("role_id", "role_name")
-    .lean();
-  return entries.map((e) => e.role_id);
-};

@@ -43,6 +43,4 @@ const roleSchema = new mongoose.Schema(
 roleSchema.index({ organization_id: 1, status: 1 });
 roleSchema.index({ role_name: 1, organization_id: 1 }, { unique: true, sparse: true });
 
-roleSchema.index({ role_name: 1, organization_id: 1 }, { unique: true });
-
 export default mongoose.model("Role", roleSchema);

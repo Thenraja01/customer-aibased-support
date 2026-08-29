@@ -67,38 +67,6 @@ export default function AIAnalyticsPage() {
     { subject: "Token Economy", A: totalTokens > 0 ? 88 : 75, fullMark: 100 },
   ];
 
-  // Real backend dynamic datasets derived from database stats
-  const totalTokens = sessionStats?.totalTokens || ragStats?.totalTokens || 0;
-  const totalSessions = sessionStats?.totalSessions || ragStats?.totalQueries || 0;
-  const avgLatency = ragStats?.avgResponseTime || sessionStats?.avgResponseTime || 340;
-  const successfulQueries = ragStats?.successfulQueries || 0;
-  const totalQueries = ragStats?.totalQueries || 1;
-  const accuracyPct = Math.round((successfulQueries / Math.max(1, totalQueries)) * 100);
-
-  const tokenVolumeAreaData = [
-    { time: "Start", volume: Math.round(totalTokens * 0.1) },
-    { time: "Day 2", volume: Math.round(totalTokens * 0.25) },
-    { time: "Day 4", volume: Math.round(totalTokens * 0.5) },
-    { time: "Day 6", volume: Math.round(totalTokens * 0.8) },
-    { time: "Current", volume: totalTokens },
-  ];
-
-  const latencyHistogramData = [
-    { interval: "< 200ms", count: Math.max(0, Math.round(totalSessions * 0.4)) },
-    { interval: "200-500ms", count: Math.max(0, Math.round(totalSessions * 0.35)) },
-    { interval: "500ms-1s", count: Math.max(0, Math.round(totalSessions * 0.15)) },
-    { interval: "> 1s", count: Math.max(0, Math.round(totalSessions * 0.1)) },
-  ];
-
-  const aiRadarData = [
-    { subject: "Accuracy", A: accuracyPct > 0 ? accuracyPct : 92, fullMark: 100 },
-    { subject: "Retrieval Speed", A: Math.max(50, 100 - Math.round(avgLatency / 10)), fullMark: 100 },
-    { subject: "Context Window", A: 95, fullMark: 100 },
-    { subject: "Relevance", A: Math.max(70, Math.round((ragStats?.avgScore || 0.85) * 100)), fullMark: 100 },
-    { subject: "Safety Filter", A: 99, fullMark: 100 },
-    { subject: "Token Economy", A: totalTokens > 0 ? 88 : 75, fullMark: 100 },
-  ];
-
   return (
     <div className="space-y-6">
       {/* Header Banner */}

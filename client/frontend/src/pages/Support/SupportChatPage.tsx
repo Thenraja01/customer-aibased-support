@@ -136,15 +136,6 @@ export default function SupportChatPage() {
   }, [activeChat?._id, socket]);
 
   useEffect(() => {
-    if (activeChat?._id && socket) {
-      socket.emit("join:chat", activeChat._id);
-      return () => {
-        socket.emit("leave:chat", activeChat._id);
-      };
-    }
-  }, [activeChat?._id, socket]);
-
-  useEffect(() => {
     return () => {
       resetMessages();
     };

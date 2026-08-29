@@ -24,13 +24,7 @@ export default function AppRoutes() {
 
       <Route element={<AppShell />}>
         {superAdminRoutes}
-      </Route>
-
-      <Route element={<AdminLayout />}>
         {adminRoutes}
-      </Route>
-
-      <Route element={<SupportLayout />}>
         {supportRoutes}
         {branchRoutes}
         {customerRoutes}

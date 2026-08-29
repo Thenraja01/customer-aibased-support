@@ -307,16 +307,8 @@ export default function Login() {
                       disabled={isLoading}
                       className="pl-10 h-11 dark:border-white/[0.06] dark:focus:border-primary/40"
                       required
-                      aria-invalid={!!(errors.email && touched.email)}
-                      aria-describedby={errors.email ? "email-error" : undefined}
                     />
                   </div>
-                  {errors.email && touched.email && (
-                    <p id="email-error" className="text-xs text-destructive flex items-center gap-1 mt-1" role="alert">
-                      <AlertCircle size={12} />
-                      {errors.email}
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -337,8 +329,6 @@ export default function Login() {
                       disabled={isLoading}
                       className="pl-10 pr-12 h-11 dark:border-white/[0.06] dark:focus:border-primary/40"
                       required
-                      aria-invalid={!!(errors.password && touched.password)}
-                      aria-describedby={errors.password ? "password-error" : undefined}
                     />
                     <button
                       type="button"
@@ -350,12 +340,6 @@ export default function Login() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {errors.password && touched.password && (
-                    <p id="password-error" className="text-xs text-destructive flex items-center gap-1 mt-1" role="alert">
-                      <AlertCircle size={12} />
-                      {errors.password}
-                    </p>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-2">

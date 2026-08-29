@@ -40,7 +40,6 @@ interface AuthContextType {
   setSession: (data: any) => boolean;
   updateUser: (data: any) => void;
   logout: () => void;
-  can: (...permissions: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -348,10 +347,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
-  const loginWithOrg = useCallback(async (email: string, password: string, organizationId: string) => {
-    return login(email, password, organizationId);
-  }, [login]);
-
   const logout = useCallback(() => {
     try {
       const rt = refreshToken;
@@ -431,14 +426,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUser,
     logout,
   };
-
-  const can = useCallback((...permissions: string[]): boolean => {
-    if (!user) return false;
-    const roleName = typeof user.role_id === "object" ? user.role_id?.role_name : user.role_id;
-    if (roleName === "super_admin") return true;
-    const userPerms = user.role_id?.permissions || user.permissions || [];
-    return permissions.length === 0 || permissions.some((p) => userPerms.includes(p));
-  }, [user]);
 
   return (
     <AuthContext.Provider value={value}>
