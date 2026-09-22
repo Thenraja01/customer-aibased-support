@@ -5,8 +5,11 @@ import {
   saveSession,
 } from "@/utils/localStorage";
 
+const rawBackendUrl = (import.meta.env.VITE_BACKEND_URL || "").trim();
+const baseURL = rawBackendUrl && rawBackendUrl !== '""' && rawBackendUrl !== "''" ? rawBackendUrl : "";
+
 const AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL,
+  baseURL: baseURL || undefined,
   withCredentials: true,
   timeout: 20000,
 });

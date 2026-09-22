@@ -21,6 +21,13 @@ const organizationSchema = new mongoose.Schema(
       lowercase: true,
       set: (v) => (v === null || v === undefined || !String(v).trim() ? undefined : String(v).trim().toLowerCase()),
     },
+    subdomain: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true,
+    },
     address: { type: String },
     phone: { type: String, maxlength: 20 },
     email: { type: String, unique: true, lowercase: true, maxlength: 255 },

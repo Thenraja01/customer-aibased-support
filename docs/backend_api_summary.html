@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backend API Reference & System Summary — SupportAI</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #13111c 100%);
+      --card-bg: rgba(30, 41, 59, 0.6);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover-border: rgba(99, 102, 241, 0.4);
+      --glass-bg: rgba(15, 23, 42, 0.75);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-primary: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.3);
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-purple: #a855f7;
+      
+      /* Method Badges */
+      --get-bg: rgba(16, 185, 129, 0.15);
+      --get-color: #34d399;
+      --get-border: rgba(52, 211, 153, 0.3);
+      
+      --post-bg: rgba(99, 102, 241, 0.15);
+      --post-color: #818cf8;
+      --post-border: rgba(129, 140, 248, 0.3);
+      
+      --put-bg: rgba(245, 158, 11, 0.15);
+      --put-color: #fbbf24;
+      --put-border: rgba(251, 191, 36, 0.3);
+      
+      --patch-bg: rgba(168, 85, 247, 0.15);
+      --patch-color: #c084fc;
+      --patch-border: rgba(192, 132, 252, 0.3);
+      
+      --delete-bg: rgba(239, 68, 68, 0.15);
+      --delete-color: #f87171;
+      --delete-border: rgba(248, 113, 113, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      line-height: 1.6;
+      padding-bottom: 60px;
+    }
+
+    /* Top Navigation / Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 18px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-cyan));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      color: #fff;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .brand-text h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(to right, #fff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 10px;
+    }
+
+    .tech-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tech-pill span.dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+    }
+
+    /* Container */
+    .container {
+      max-width: 1300px;
+      margin: 30px auto;
+      padding: 0 24px;
+    }
+
+    /* Metrics Bar */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-bottom: 35px;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 22px;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card:hover {
+      border-color: var(--card-hover-border);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent-primary);
+    }
+
+    .metric-card.emerald::before { background: var(--accent-emerald); }
+    .metric-card.cyan::before { background: var(--accent-cyan); }
+    .metric-card.purple::before { background: var(--accent-purple); }
+
+    .metric-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      margin: 8px 0 4px 0;
+      color: #fff;
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    /* Architecture Overview Section */
+    .section-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 28px;
+      backdrop-filter: blur(10px);
+      margin-bottom: 35px;
+    }
+
+    .section-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .arch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .arch-item {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .arch-item-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .arch-item-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Search and Filter Bar */
+    .filter-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px 16px 12px 42px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    .search-box input:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+
+    .tab-btn.active {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: #fff;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    /* Module Section */
+    .module-group {
+      margin-bottom: 30px;
+    }
+
+    .module-header {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .module-header .count-tag {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    /* Endpoint Grid / Cards */
+    .endpoint-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 16px;
+    }
+
+    .endpoint-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .endpoint-card:hover {
+      border-color: var(--card-hover-border);
+      transform: translateY(-2px);
+    }
+
+    .endpoint-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .method-badge {
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .method-badge.get { background: var(--get-bg); color: var(--get-color); border: 1px solid var(--get-border); }
+    .method-badge.post { background: var(--post-bg); color: var(--post-color); border: 1px solid var(--post-border); }
+    .method-badge.put { background: var(--put-bg); color: var(--put-color); border: 1px solid var(--put-border); }
+    .method-badge.patch { background: var(--patch-bg); color: var(--patch-color); border: 1px solid var(--patch-border); }
+    .method-badge.delete { background: var(--delete-bg); color: var(--delete-color); border: 1px solid var(--delete-border); }
+
+    .endpoint-path {
+      font-family: 'Fira Code', monospace;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: #f1f5f9;
+      word-break: break-all;
+    }
+
+    .endpoint-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .endpoint-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 10px;
+      margin-top: 6px;
+    }
+
+    .auth-tag {
+      font-size: 11px;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .copy-btn:hover {
+      background: var(--accent-primary);
+      color: #fff;
+      border-color: var(--accent-primary);
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 30px;
+      color: var(--text-muted);
+      font-size: 13px;
+      border-top: 1px solid var(--card-border);
+      margin-top: 50px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      header { padding: 14px 20px; flex-direction: column; gap: 12px; align-items: flex-start; }
+      .endpoint-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">AI</div>
+      <div class="brand-text">
+        <h1>SupportAI Backend API</h1>
+        <p>Interactive Architecture & API Specification Summary</p>
+      </div>
+    </div>
+    <div class="header-badges">
+      <div class="tech-pill"><span class="dot"></span> Node.js / Express</div>
+      <div class="tech-pill">MongoDB & Redis</div>
+      <div class="tech-pill">Socket.io</div>
+    </div>
+  </header>
+
+  <div class="container">
+    
+    <!-- Key Metrics Grid -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-title">Total Endpoints</div>
+        <div class="metric-value">65+</div>
+        <div class="metric-sub">Across 12 Major Domain Routers</div>
+      </div>
+      <div class="metric-card cyan">
+        <div class="metric-title">AI & RAG Services</div>
+        <div class="metric-value">Ollama & Vector</div>
+        <div class="metric-sub">Knowledge Graph, Memory & Prompts</div>
+      </div>
+      <div class="metric-card emerald">
+        <div class="metric-title">Real-Time Messaging</div>
+        <div class="metric-value">WebSockets</div>
+        <div class="metric-sub">Socket.io & SSE Widget Streaming</div>
+      </div>
+      <div class="metric-card purple">
+        <div class="metric-title">Background Services</div>
+        <div class="metric-value">2 Services</div>
+        <div class="metric-sub">Ingestion Watchdog & Memory Archiver</div>
+      </div>
+    </div>
+
+    <!-- System Architecture Summary -->
+    <div class="section-card">
+      <div class="section-title">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+        Core System Architecture & Infrastructure
+      </div>
+      <div class="arch-grid">
+        <div class="arch-item">
+          <div class="arch-item-title">⚡ Express.js Server Entry</div>
+          <div class="arch-item-desc">Main application initialized in <code>server/server.js</code>. Integrates CORS, Helmet security headers, global error handling middleware, and upload static directories.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-title">🗄️ Multi-Storage Layer</div>
+          <div class="arch-item-desc">MongoDB for core entity persistence (Users, Tickets, Documents), Redis for fast caching, and Firebase Admin for cross-device push notifications.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-title">🔍 RAG & Knowledge Engine</div>
+          <div class="arch-item-desc">Background warmup of local Ollama embeddings, Knowledge Graph relations, knowledge gap analysis, long-term memory expiry archiver.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-title">🛡️ Multi-Tenant Scoping</div>
+          <div class="arch-item-desc">Role-based access control (RBAC) and automated Organization/Branch context scoping middleware (<code>enforceBranchScope()</code>).</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="filter-wrapper">
+      <div class="search-box">
+        <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+        <input type="text" id="searchInput" placeholder="Search endpoints (e.g. /auth, /tickets, RAG)...">
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="filterCategory('all')">All Endpoints</button>
+        <button class="tab-btn" onclick="filterCategory('auth')">Auth & Users</button>
+        <button class="tab-btn" onclick="filterCategory('ai')">AI & RAG Engine</button>
+        <button class="tab-btn" onclick="filterCategory('ticket')">Tickets & Support</button>
+        <button class="tab-btn" onclick="filterCategory('doc')">Documents</button>
+        <button class="tab-btn" onclick="filterCategory('widget')">Widget & API</button>
+        <button class="tab-btn" onclick="filterCategory('org')">Enterprise Admin</button>
+      </div>
+    </div>
+
+    <!-- API Modules Container -->
+    <div id="modulesContainer">
+
+      <!-- Module 1: Auth & Users -->
+      <div class="module-group" data-category="auth">
+        <div class="module-header">
+          🔐 Authentication & User Administration
+          <span class="count-tag">14 Endpoints</span>
+        </div>
+        <div class="endpoint-grid">
+          
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/auth/login</span>
+              </div>
+              <div class="endpoint-desc">Authenticate user with email & password, issuing JWT access & refresh tokens.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🌐 Public</span>
+              <button class="copy-btn" onclick="copyPath('/auth/login')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/auth/register</span>
+              </div>
+              <div class="endpoint-desc">Register a new customer account or initiate onboarding registration flow.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🌐 Public</span>
+              <button class="copy-btn" onclick="copyPath('/auth/register')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/users/profile</span>
+              </div>
+              <div class="endpoint-desc">Fetch profile details, permissions, organization, and branch metadata of active user.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Auth Required</span>
+              <button class="copy-btn" onclick="copyPath('/users/profile')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/users/profile/2fa/enable</span>
+              </div>
+              <div class="endpoint-desc">Generate 2FA secret key and QR code for two-factor authenticator app setup.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Auth Required</span>
+              <button class="copy-btn" onclick="copyPath('/users/profile/2fa/enable')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/users/otp/request</span>
+              </div>
+              <div class="endpoint-desc">Request one-time password (OTP) sent to user's registered phone or email.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🌐 Public</span>
+              <button class="copy-btn" onclick="copyPath('/users/otp/request')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/users/search</span>
+              </div>
+              <div class="endpoint-desc">Search platform users with role, branch, and keyword query filters.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">👑 Admin Only</span>
+              <button class="copy-btn" onclick="copyPath('/users/search')">Copy</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Module 2: AI & RAG Engine -->
+      <div class="module-group" data-category="ai">
+        <div class="module-header">
+          🧠 AI, RAG & Knowledge Engine
+          <span class="count-tag">12 Endpoints</span>
+        </div>
+        <div class="endpoint-grid">
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/rag/query</span>
+              </div>
+              <div class="endpoint-desc">Perform hybrid semantic vector retrieval + graph traversal to generate context-augmented AI responses.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Auth Required</span>
+              <button class="copy-btn" onclick="copyPath('/rag/query')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/knowledge-graph</span>
+              </div>
+              <div class="endpoint-desc">Retrieve knowledge graph nodes, entities, and relationship edges across company docs.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Staff / Admin</span>
+              <button class="copy-btn" onclick="copyPath('/knowledge-graph')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/knowledge-gaps</span>
+              </div>
+              <div class="endpoint-desc">Fetch unanswered AI user queries and missing knowledge base topics for content gap analysis.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Staff / Admin</span>
+              <button class="copy-btn" onclick="copyPath('/knowledge-gaps')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/admin/v1/prompt</span>
+              </div>
+              <div class="endpoint-desc">List prompt versions, active system instructions, and LLM temperature configurations.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">👑 Admin Only</span>
+              <button class="copy-btn" onclick="copyPath('/admin/v1/prompt')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/memory</span>
+              </div>
+              <div class="endpoint-desc">Inspect customer long-term conversational memory items and context summaries.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Staff / Admin</span>
+              <button class="copy-btn" onclick="copyPath('/memory')">Copy</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Module 3: Tickets & Support -->
+      <div class="module-group" data-category="ticket">
+        <div class="module-header">
+          🎫 Customer Support & Ticketing System
+          <span class="count-tag">15 Endpoints</span>
+        </div>
+        <div class="endpoint-grid">
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/tickets</span>
+              </div>
+              <div class="endpoint-desc">Submit a new support ticket with subject, priority, branch ID, and custom fields.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Auth Required</span>
+              <button class="copy-btn" onclick="copyPath('/tickets')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/tickets/escalate-from-chat</span>
+              </div>
+              <div class="endpoint-desc">Seamlessly escalate an active AI bot chat into a human agent support ticket.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Auth Required</span>
+              <button class="copy-btn" onclick="copyPath('/tickets/escalate-from-chat')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/tickets/:ticketId/smart-assign</span>
+              </div>
+              <div class="endpoint-desc">AI smart-assignment algorithm matching ticket category to available staff workload.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Staff / Admin</span>
+              <button class="copy-btn" onclick="copyPath('/tickets/smart-assign')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/tickets/:id/ai-intelligence</span>
+              </div>
+              <div class="endpoint-desc">Retrieve AI-generated ticket summaries, sentiment score, and suggested agent reply drafts.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Staff Only</span>
+              <button class="copy-btn" onclick="copyPath('/tickets/:id/ai-intelligence')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/tickets/queue</span>
+              </div>
+              <div class="endpoint-desc">Fetch real-time support ticket queue filtered by branch and assignment.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Staff Only</span>
+              <button class="copy-btn" onclick="copyPath('/tickets/queue')">Copy</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Module 4: Documents -->
+      <div class="module-group" data-category="doc">
+        <div class="module-header">
+          📄 Document Management & Ingestion Pipeline
+          <span class="count-tag">10 Endpoints</span>
+        </div>
+        <div class="endpoint-grid">
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/documents/upload</span>
+              </div>
+              <div class="endpoint-desc">Upload PDF, DOCX, TXT files for background text extraction, chunking, and embedding.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Staff / Admin</span>
+              <button class="copy-btn" onclick="copyPath('/documents/upload')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/documents</span>
+              </div>
+              <div class="endpoint-desc">List indexed documents with parsing status (<code>pending</code>, <code>embedding</code>, <code>ready</code>, <code>failed</code>).</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Auth Required</span>
+              <button class="copy-btn" onclick="copyPath('/documents')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/document-verifications</span>
+              </div>
+              <div class="endpoint-desc">Submit document for automated verification and approval compliance workflow.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Auth Required</span>
+              <button class="copy-btn" onclick="copyPath('/document-verifications')">Copy</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Module 5: Widget & API -->
+      <div class="module-group" data-category="widget">
+        <div class="module-header">
+          🔌 Embeddable Chat Widget & API Keys
+          <span class="count-tag">8 Endpoints</span>
+        </div>
+        <div class="endpoint-grid">
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/api/v1/config</span>
+              </div>
+              <div class="endpoint-desc">Get embeddable widget theme configuration, welcome message, and organization branding.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🌐 Public</span>
+              <button class="copy-btn" onclick="copyPath('/api/v1/config')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/api/v1/chat/stream</span>
+              </div>
+              <div class="endpoint-desc">Server-Sent Events (SSE) endpoint for real-time streaming AI chat responses in widget.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔑 API Key</span>
+              <button class="copy-btn" onclick="copyPath('/api/v1/chat/stream')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/api/v1/api-keys</span>
+              </div>
+              <div class="endpoint-desc">Generate secure API keys for external developers and web widget integrations.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">👑 Admin Only</span>
+              <button class="copy-btn" onclick="copyPath('/api/v1/api-keys')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge post">POST</span>
+                <span class="endpoint-path">/feedback</span>
+              </div>
+              <div class="endpoint-desc">Submit CSAT score or rating (thumbs up/down) for AI response quality.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🌐 Public / Widget</span>
+              <button class="copy-btn" onclick="copyPath('/feedback')">Copy</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Module 6: Enterprise Admin -->
+      <div class="module-group" data-category="org">
+        <div class="module-header">
+          🏢 Enterprise Multi-Tenancy & Audit Governance
+          <span class="count-tag">10 Endpoints</span>
+        </div>
+        <div class="endpoint-grid">
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/organizations</span>
+              </div>
+              <div class="endpoint-desc">Manage tenant organizations, custom branding, domain rules, and plan tiers.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">👑 Super Admin</span>
+              <button class="copy-btn" onclick="copyPath('/organizations')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/branches</span>
+              </div>
+              <div class="endpoint-desc">List organizational sub-branches and department scopes for fine-grained permissions.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">🔒 Admin</span>
+              <button class="copy-btn" onclick="copyPath('/branches')">Copy</button>
+            </div>
+          </div>
+
+          <div class="endpoint-card">
+            <div>
+              <div class="endpoint-top">
+                <span class="method-badge get">GET</span>
+                <span class="endpoint-path">/audit-logs</span>
+              </div>
+              <div class="endpoint-desc">Query security audit logs, tracking administrative edits, permission shifts, and deletions.</div>
+            </div>
+            <div class="endpoint-footer">
+              <span class="auth-tag">👑 Admin Only</span>
+              <button class="copy-btn" onclick="copyPath('/audit-logs')">Copy</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <footer>
+    SupportAI Customer Support Backend Platform &copy; 2026. Generated automatically from system router definitions.
+  </footer>
+
+  <script>
+    // Live Search Filter
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', function(e) {
+      const term = e.target.value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.endpoint-card');
+      
+      cards.forEach(card => {
+        const path = card.querySelector('.endpoint-path').textContent.toLowerCase();
+        const desc = card.querySelector('.endpoint-desc').textContent.toLowerCase();
+        
+        if (path.includes(term) || desc.includes(term)) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+
+    // Category Tabs Filter
+    function filterCategory(cat) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const groups = document.querySelectorAll('.module-group');
+      groups.forEach(group => {
+        if (cat === 'all' || group.getAttribute('data-category') === cat) {
+          group.style.display = 'block';
+        } else {
+          group.style.display = 'none';
+        }
+      });
+    }
+
+    // Copy to clipboard helper
+    function copyPath(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        const oldText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.background = '#10b981';
+        btn.style.color = '#fff';
+        setTimeout(() => {
+          btn.textContent = oldText;
+          btn.style.background = '';
+          btn.style.color = '';
+        }, 1500);
+      });
+    }
+  </script>
+</body>
+</html>

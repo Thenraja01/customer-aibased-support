@@ -93,6 +93,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     isMountedRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("auth_token");
+    const urlUserEncoded = params.get("auth_user");
+    if (urlToken && urlUserEncoded) {
+      try {
+        const decodedUser = JSON.parse(decodeURIComponent(atob(urlUserEncoded)));
+        const normalized = normalizeUser(decodedUser);
+        saveSession({
+          token: urlToken,
+          refreshToken: "",
+          user: normalized,
+        });
+        setToken(urlToken);
+        setUser(normalized);
+        params.delete("auth_token");
+        params.delete("auth_user");
+        const cleanSearch = params.toString() ? `?${params.toString()}` : "";
+        window.history.replaceState({}, document.title, `${window.location.pathname}${cleanSearch}`);
+      } catch (e) {
+        console.error("Failed to parse URL session parameters:", e);
+      }
+    }
     return () => {
       isMountedRef.current = false;
     };

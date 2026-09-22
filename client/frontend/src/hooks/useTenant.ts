@@ -23,10 +23,18 @@ function extractTenantId(): string | null {
 
   const hostname = window.location.hostname;
   if (hostname === "localhost" || hostname === "127.0.0.1") return null;
+
   const parts = hostname.split(".");
+  if (hostname.endsWith(".localhost")) {
+    if (parts.length === 2) return parts[0];
+    if (parts.length >= 3) return parts[1];
+  }
+
   if (parts.length < 3) return null;
-  const subdomain = parts[0];
-  if (subdomain === "www") return parts.length > 3 ? parts[1] : null;
+  const subdomain = parts[0].toLowerCase();
+  if (["www", "platform", "su", "api", "admin"].includes(subdomain)) {
+    return parts.length > 3 ? parts[1] : null;
+  }
   return subdomain;
 }
 

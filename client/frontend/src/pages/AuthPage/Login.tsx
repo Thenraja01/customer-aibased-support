@@ -15,6 +15,7 @@ import { useAuthContext } from "@/context/AuthContext";
 import { AuthAPI } from "@/api/auth.api";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import OAuthButtons from "@/components/OAuthButtons";
+import { redirectUserToRoleSubdomain } from "@/utils/subdomainRouter";
 
 type LoginStatus =
   | { type: "idle" }
@@ -94,7 +95,11 @@ export default function Login() {
           setStatus({ type: "invalid_credentials" });
           return;
         }
-        navigateToDashboard(data?.role || data?.roleName);
+        const userObj = data || res.data.user;
+        const redirected = redirectUserToRoleSubdomain(userObj, token);
+        if (!redirected) {
+          navigateToDashboard(userObj?.role || userObj?.roleName);
+        }
         return;
       }
 

@@ -4,7 +4,10 @@ let socketInstance: Socket | null = null;
 
 export function getSocket(token?: string): Socket {
   if (!socketInstance) {
-    const socketUrl = (import.meta.env.VITE_BACKEND_URL || "http://localhost:3030").replace(/\/+$/, "");
+    const rawSocketUrl = (import.meta.env.VITE_BACKEND_URL || "").trim();
+    const socketUrl = rawSocketUrl && rawSocketUrl !== '""' && rawSocketUrl !== "''"
+      ? rawSocketUrl.replace(/\/+$/, "")
+      : (typeof window !== "undefined" ? window.location.origin : "");
     socketInstance = io(socketUrl, {
       auth: { token },
       transports: ["websocket", "polling"],

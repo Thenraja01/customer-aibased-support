@@ -23,11 +23,21 @@ export default defineConfig({
     },
   },
   server: {
-    
-    port: 3000,
-    open: true,
-    hmr: {
-      port: 3000,
-    },
+    host: true,
+    port: 5173,
+    // @ts-ignore
+    allowedHosts: [
+      'jeeva.localfix.app',
+      'platform.localfix.app',
+      '.localfix.app',
+      '.trycloudflare.com',
+      '.cloudflare.com',
+      'keg-uranium-overstate.ngrok-free.dev',
+      '.ngrok-free.dev',
+      '.ngrok-free.app',
+      '.ngrok.app',
+      '.ngrok.dev',
+      'localhost',
+    ],
   },
 });

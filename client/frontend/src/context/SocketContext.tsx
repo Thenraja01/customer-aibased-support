@@ -35,11 +35,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     const currentUserId = user?._id || user?.userId;
     if (!currentUserId || !token) return;
 
-    const socketUrl = (
-      import.meta.env.VITE_SOCKET_URL ||
-      import.meta.env.VITE_BACKEND_URL ||
-      "http://localhost:3030"
-    ).replace(/\/+$/, "");
+    const rawSocketUrl = (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_BACKEND_URL || "").trim();
+    const socketUrl = rawSocketUrl && rawSocketUrl !== '""' && rawSocketUrl !== "''"
+      ? rawSocketUrl.replace(/\/+$/, "")
+      : window.location.origin;
     const socket = io(socketUrl, {
       auth: { token },
       transports: ["polling", "websocket"],

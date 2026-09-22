@@ -383,21 +383,26 @@ export const buildAuthTokens = async (user, ctx = {}) => {
   });
 
   const orgName = org?.name || user.organization_id?.name;
+  const orgSubdomain = org?.subdomain || user.organization_id?.subdomain || org?.organization_id || user.organization_id?.organization_id || "";
+  const branchSubdomain = branch?.subdomain || user.branch_id?.subdomain || branch?.code || user.branch_id?.code || "";
+
   const sanitizedUser = {
     id: user._id,
     _id: user._id,
     userId: user._id,
     organization_id:
       typeof user.organization_id === "object"
-        ? { _id: organizationId, name: orgName }
+        ? { _id: organizationId, name: orgName, subdomain: orgSubdomain, organization_id: org?.organization_id }
         : organizationId,
+    organizationSubdomain: orgSubdomain,
     branch_id: branch
-      ? { _id: branch._id, name: branch.name, code: branch.code || "" }
+      ? { _id: branch._id, name: branch.name, code: branch.code || "", subdomain: branchSubdomain }
       : typeof user.branch_id === "string"
       ? user.branch_id
       : null,
     branchId,
     branchName: branch?.name || null,
+    branchSubdomain,
     role:
       typeof user.role === "object"
         ? { _id: roleId, role_name: roleName }

@@ -34,18 +34,74 @@ export const identifyTenant = async (req, res, next) => {
     }
   }
 
-  // 3. From subdomain (for unauthenticated public pages)
+  // 3. From subdomain (for unauthenticated public pages or widget)
   if (!organizationId) {
-    const host = req.get("host") || "";
-    const subdomain = host.split(".")[0];
-    if (subdomain && subdomain !== "localhost" && subdomain.length > 2) {
+    const rawHost = req.get("host") || "";
+    const host = rawHost.split(":")[0]; // strip port e.g. 5173 or 3030
+    const hostParts = host.split(".");
+    
+    let possibleTenantSubdomain = null;
+    let possibleBranchSubdomain = null;
+
+    if (host.endsWith(".localhost")) {
+      if (hostParts.length === 2) {
+        possibleTenantSubdomain = hostParts[0];
+      } else if (hostParts.length >= 3) {
+        possibleBranchSubdomain = hostParts[0];
+        possibleTenantSubdomain = hostParts[1];
+      }
+    } else if (hostParts.length >= 3 && hostParts[0] !== "localhost" && hostParts[0] !== "www") {
+      possibleTenantSubdomain = hostParts[0];
+      if (hostParts.length >= 4) {
+        possibleBranchSubdomain = hostParts[0];
+        possibleTenantSubdomain = hostParts[1];
+      }
+    }
+
+    if (possibleTenantSubdomain) {
       try {
-        const org = await Organization.findOne({ domain: subdomain }).select("_id status").lean();
+        let org = await Organization.findOne({
+          $or: [
+            { subdomain: possibleTenantSubdomain.toLowerCase() },
+            { domain: possibleTenantSubdomain.toLowerCase() },
+            { organization_id: possibleTenantSubdomain.toUpperCase() }
+          ]
+        }).select("_id status").lean();
+
+        if (!org && possibleBranchSubdomain) {
+          // Retry if first part was tenant
+          org = await Organization.findOne({
+            $or: [
+              { subdomain: possibleBranchSubdomain.toLowerCase() },
+              { domain: possibleBranchSubdomain.toLowerCase() },
+              { organization_id: possibleBranchSubdomain.toUpperCase() }
+            ]
+          }).select("_id status").lean();
+          if (org) {
+            possibleTenantSubdomain = possibleBranchSubdomain;
+            possibleBranchSubdomain = null;
+          }
+        }
+
         if (org && org.status === "active") {
           organizationId = org._id.toString();
+
+          if (possibleBranchSubdomain) {
+            const { default: Branch } = await import("../modules/branch/branch.schema.js");
+            const branch = await Branch.findOne({
+              organization_id: organizationId,
+              $or: [
+                { subdomain: possibleBranchSubdomain.toLowerCase() },
+                { code: possibleBranchSubdomain.toUpperCase() }
+              ]
+            }).select("_id status").lean();
+            if (branch && branch.status === "active") {
+              branchId = branch._id.toString();
+            }
+          }
         }
-      } catch {
-        /* continue */
+      } catch (error) {
+        console.error("Subdomain resolution error:", error);
       }
     }
   }

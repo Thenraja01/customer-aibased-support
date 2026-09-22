@@ -13,6 +13,12 @@ const branchSchema = new mongoose.Schema(
     address: { type: String, maxlength: 255 },
     phone: { type: String, maxlength: 20 },
     email: { type: String, maxlength: 255, lowercase: true },
+    subdomain: {
+      type: String,
+      sparse: true,
+      trim: true,
+      lowercase: true,
+    },
     status: {
       type: String,
       enum: ["active", "inactive"],
