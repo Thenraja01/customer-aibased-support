@@ -314,7 +314,18 @@ export const processAIMessage = async (params = {}) => {
     if (!effectiveOrgId && currentUser?.organization_id) {
       effectiveOrgId = currentUser.organization_id._id || currentUser.organization_id;
     }
-  } else if (effectiveOrgId) {
+  }
+
+  if (!effectiveOrgId) {
+    const fallbackOrg = await Organization.findOne({ status: "active" })
+      .select("name address email brand_colors customPrompt ai_settings guardrails")
+      .lean()
+      .catch(() => null);
+    if (fallbackOrg) {
+      effectiveOrgId = fallbackOrg._id;
+      currentOrg = fallbackOrg;
+    }
+  } else if (!currentOrg) {
     currentOrg = await Organization.findById(effectiveOrgId)
       .select("name address email brand_colors customPrompt ai_settings guardrails")
       .lean()

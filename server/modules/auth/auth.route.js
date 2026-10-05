@@ -445,8 +445,26 @@ router.get("/v1/organizations", async (_req, res) => {
   try {
     const orgs = await Organization.find({ status: { $ne: "DELETION_PENDING" } })
       .sort({ name: 1 })
-      .select("name organization_id allowed_registration_roles plan status");
+      .select("name organization_id allowed_registration_roles plan status brand_colors logo loader_config chart_colors chatbot_name greeting_message phone email address");
     res.status(200).json({ success: true, data: orgs });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get("/v1/organizations/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    let org = null;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      org = await Organization.findById(id).lean();
+    } else {
+      org = await Organization.findOne({ organization_id: id }).lean();
+    }
+    if (!org) {
+      return res.status(404).json({ success: false, message: "Organization not found" });
+    }
+    res.status(200).json({ success: true, data: org });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -62,8 +62,8 @@ export default function Login() {
 
   const navigateToDashboard = useCallback((role?: string) => {
     const r = (role || "").toLowerCase().replace(/[\s_]+/g, "_");
-    if (r === "super_admin") navigate("/superadmin/dashboard", { replace: true });
-    else if (r === "admin" || r === "branch_admin") navigate("/admin/dashboard", { replace: true });
+    if (r === "super_admin" || r === "platform_admin") navigate("/superadmin/dashboard", { replace: true });
+    else if (r === "admin") navigate("/admin/dashboard", { replace: true });
     else if (r === "branch_admin") navigate("/branch/dashboard", { replace: true });
     else if (r === "support") navigate("/support/dashboard", { replace: true });
     else navigate("/dashboard", { replace: true });

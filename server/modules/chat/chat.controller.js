@@ -25,12 +25,21 @@ export const createNewChat = async (req, res) => {
 
 export const processAI = async (req, res) => {
   try {
-    const { chatId, message, model, provider } = req.body;
-    const userId = req.user?.userId || null;
-    const organizationId = req.user?.organizationId || req.organizationId || null;
+    let { chatId, message, model, provider } = req.body;
+    const userId = req.user?.userId || req.user?._id || req.body.user_id || null;
+    const organizationId = req.user?.organizationId || req.user?.organization_id || req.body.organization_id || req.organizationId || null;
 
-    if (!chatId || !message) {
-      return res.status(400).json({ success: false, message: "chatId and message are required" });
+    if (!message || (typeof message === "string" && !message.trim())) {
+      return res.status(400).json({ success: false, message: "message is required" });
+    }
+
+    if (!chatId) {
+      const newChat = await Chat.create({
+        user_id: userId,
+        organization_id: organizationId,
+        status: "active",
+      }).catch(() => null);
+      chatId = newChat ? String(newChat._id) : String(new (await import("mongoose")).default.Types.ObjectId());
     }
 
     const aiMessage = await processAIMessage({
@@ -44,7 +53,13 @@ export const processAI = async (req, res) => {
       provider,
     });
 
-    res.status(200).json({ success: true, data: aiMessage });
+    res.status(200).json({
+      success: true,
+      data: {
+        ...(typeof aiMessage === "object" ? aiMessage : { response: aiMessage }),
+        chatId,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -52,9 +67,21 @@ export const processAI = async (req, res) => {
 
 export const processAIStream = async (req, res) => {
   try {
-    const { chatId, message } = req.body;
-    if (!chatId || !message) {
-      return res.status(400).json({ success: false, message: "chatId and message are required" });
+    let { chatId, message } = req.body;
+    const userId = req.user?.userId || req.user?._id || req.body.user_id || null;
+    const organizationId = req.user?.organizationId || req.user?.organization_id || req.body.organization_id || req.organizationId || null;
+
+    if (!message) {
+      return res.status(400).json({ success: false, message: "message is required" });
+    }
+
+    if (!chatId) {
+      const newChat = await Chat.create({
+        user_id: userId,
+        organization_id: organizationId,
+        status: "active",
+      }).catch(() => null);
+      chatId = newChat ? String(newChat._id) : String(new (await import("mongoose")).default.Types.ObjectId());
     }
 
     const { processAIStream: runAIStream } = await import("../../services/ai/aiStreaming.service.js");

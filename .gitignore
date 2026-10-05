@@ -1,4 +1,5 @@
 node_modules/
+**/node_modules/
 .env
 .env.*
 device-management.json
@@ -10,4 +11,5 @@ build/
 server/uploads/
 uploads/
 inspect-db.js
-
+backup_supportai/
+.expo/

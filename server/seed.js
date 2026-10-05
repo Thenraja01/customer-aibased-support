@@ -8,7 +8,7 @@ import Organization from './modules/organization/organization.schema.js';
 import Branch from './modules/branch/branch.schema.js';
 import User from './modules/user/user.schema.js';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/supportai';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/project1_db';
 
 const ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'superadmin@supportai.com';
 const ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'Super@123';
