@@ -13,7 +13,7 @@ export default {
   RATE_LIMIT_WINDOW_MS: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 min
   RATE_LIMIT_MAX_REQUESTS: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // Increased for development
 
-  MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017/supportai",
+  MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017/project1_db",
 
   // JWT
   JWT_SECRET: process.env.JWT_SECRET,

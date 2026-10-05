@@ -252,14 +252,19 @@ const buildConversationContext = (recentMessages) => {
   return result;
 };
 
-const createSystemMessage = async (chatId, senderId, content) =>
-  Message.create({
+const createSystemMessage = async (chatId, senderId, content) => {
+  const validSenderId = mongoose.Types.ObjectId.isValid(senderId) ? senderId : null;
+  return Message.create({
     chat_id: chatId,
-    sender_id: senderId,
+    sender_id: validSenderId,
     content,
     message_type: "text",
     is_ai: true,
-  }).catch(() => null);
+  }).catch((err) => {
+    console.error("[createSystemMessage] error:", err.message);
+    return null;
+  });
+};
 
 const stripInternalGuidance = (text) => {
   if (!text) return text;
@@ -314,7 +319,18 @@ export const processAIMessage = async (params = {}) => {
     if (!effectiveOrgId && currentUser?.organization_id) {
       effectiveOrgId = currentUser.organization_id._id || currentUser.organization_id;
     }
-  } else if (effectiveOrgId) {
+  }
+
+  if (!effectiveOrgId) {
+    const fallbackOrg = await Organization.findOne({ status: "active" })
+      .select("name address email brand_colors customPrompt ai_settings guardrails")
+      .lean()
+      .catch(() => null);
+    if (fallbackOrg) {
+      effectiveOrgId = fallbackOrg._id;
+      currentOrg = fallbackOrg;
+    }
+  } else if (!currentOrg) {
     currentOrg = await Organization.findById(effectiveOrgId)
       .select("name address email brand_colors customPrompt ai_settings guardrails")
       .lean()
@@ -984,8 +1000,13 @@ export const processAIMessage = async (params = {}) => {
     })
     .catch(() => null);
 
+  const aiMessageObj = aiMessage?.toObject ? aiMessage.toObject() : (aiMessage || {});
   return {
-    ...(aiMessage?.toObject ? aiMessage.toObject() : aiMessage),
+    ...aiMessageObj,
+    content: aiMessageObj.content || finalResponse,
+    chatId: chatId,
+    chat_id: chatId,
+    is_ai: true,
     confidence: confidenceResult.confidence,
     responseMode: responseMode.mode,
     citations,

@@ -59,7 +59,7 @@ process.on("unhandledRejection", (reason) => {
 
 const app = express();
 
-app.use(helmet({ 
+app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: false,
   xFrameOptions: false
@@ -99,22 +99,29 @@ app.use((req, res, next) => {
 });
 
 app.use("/auth", authRouter);
+app.use("/api/auth", authRouter);
 app.use("/users", userRouter);
+app.use("/api/users", userRouter);
 app.use("/chats", chatRouter);
+app.use("/api/chats", chatRouter);
 app.use("/public/chats", publicRouter);
 app.use("/messages", messageRouter);
+app.use("/api/messages", messageRouter);
 app.use("/tickets", ticketRouter);
+app.use("/api/tickets", ticketRouter);
 app.use("/ticket-templates", ticketTemplateRouter);
 app.use("/notifications", notificationRouter);
 app.use("/documents", documentRouter);
 app.use("/document-verifications", documentVerificationRouter);
 app.use("/organizations", organizationRouter);
+app.use("/api/organizations", organizationRouter);
 app.use("/branches", branchRouter);
 app.use("/document-types", documentTypeRouter);
 app.use("/ai-sessions", aiSessionRouter);
 app.use("/api/ai", aiSessionRouter);
 app.use("/audit-logs", auditLogRouter);
 app.use("/faqs", faqRouter);
+app.use("/api/faqs", faqRouter);
 app.use("/rag", ragRouter);
 app.use("/memory", memoryRouter);
 app.use("/knowledge-gaps", knowledgeGapRouter);
@@ -132,6 +139,16 @@ app.use("/api-keys", apiKeyRouter);
 app.use("/api/v1", widgetRouter);
 app.use("/api/v1/feedback", feedbackRouter);
 app.use("/widget", widgetRouter);
+
+app.get(["/settings/ui", "/api/settings/ui"], (req, res) => {
+  res.json({
+    success: true,
+    fontFamily: "Inter, sans-serif",
+    fontSize: "md",
+    lineHeight: "normal",
+    letterSpacing: 0,
+  });
+});
 
 app.get("/api/health/v1", (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;
@@ -159,7 +176,7 @@ const startServer = async () => {
 
     // Run database migrations for legacy document statuses and roles
     await runDocumentStatusMigration();
-    
+
     // Initialize Redis cache layer
     await initRedis();
 
