@@ -199,10 +199,12 @@ export default function ResetPassword() {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background/95 to-background/90 px-4 sm:px-6 py-8 sm:py-12"
+      className="min-h-screen relative overflow-hidden bg-cover bg-center bg-no-repeat flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12"
+      style={{ backgroundImage: `url('/src/bg-aimodel.jpg')` }}
       onKeyDown={handleKeyDown}
     >
-      <div className="w-full max-w-md">
+      <div className="absolute inset-0 bg-background/80 dark:bg-background/85 backdrop-blur-md" />
+      <div className="relative z-10 w-full max-w-md">
         {/* Back button */}
         <div className="mb-4">
           <Link
@@ -215,14 +217,16 @@ export default function ResetPassword() {
         </div>
 
         {/* Main Card */}
-        <div className="rounded-lg border bg-card dark:bg-card/50 dark:border-white/[0.06] shadow-lg overflow-hidden">
+        <div className="rounded-2xl border border-border/80 bg-card/90 dark:border-white/[0.08] backdrop-blur-xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="p-6 pb-0">
             <div className="flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                <Key size={24} className="text-primary" aria-hidden="true" />
-              </div>
-              <h1 className="text-2xl font-bold ">Reset Password</h1>
+              <img
+                src="/src/networking.png"
+                alt="SupportAI Logo"
+                className="h-12 w-auto object-contain mb-3 drop-shadow-md rounded-lg"
+              />
+              <h1 className="text-2xl font-bold">Reset Password</h1>
               <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">
                 {isSuccess 
                   ? "Your password has been reset successfully" 

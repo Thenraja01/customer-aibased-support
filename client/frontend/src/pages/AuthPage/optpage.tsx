@@ -207,17 +207,28 @@ export default function OtpPage() {
   // ── Success screen ────────────────────────────────────────────
   if (verified) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted px-4">
+      <div
+        className="min-h-screen relative overflow-hidden bg-cover bg-center bg-no-repeat flex items-center justify-center px-4"
+        style={{ backgroundImage: `url('/src/bg-aimodel.jpg')` }}
+      >
+        <div className="absolute inset-0 bg-background/80 dark:bg-background/85 backdrop-blur-md" />
         <motion.div
-          className="w-full max-w-md text-center"
+          className="relative z-10 w-full max-w-md text-center"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4 }}
         >
-          <Card className="border-0 shadow-2xl bg-card/95 backdrop-blur-md px-8 py-14 dark:bg-card/80 dark:border-white/[0.06]">
+          <Card className="border border-border/80 shadow-2xl bg-card/90 backdrop-blur-xl px-8 py-14 dark:border-white/[0.08]">
             <CardContent className="space-y-5">
+              <div className="mx-auto mb-2 flex items-center justify-center">
+                <img
+                  src="/src/networking.png"
+                  alt="SupportAI Logo"
+                  className="h-14 w-auto object-contain drop-shadow-md rounded-lg"
+                />
+              </div>
               <motion.div
-                className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-400/30"
+                className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-400/30"
                 initial={{ scale: 0, rotate: -30 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: "spring", stiffness: 260, damping: 18 }}
@@ -251,24 +262,27 @@ export default function OtpPage() {
 
   // ── Main OTP form ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-secondary/5">
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-10">
+    <div
+      className="min-h-screen relative overflow-hidden bg-cover bg-center bg-no-repeat flex items-center justify-center"
+      style={{ backgroundImage: `url('/src/bg-aimodel.jpg')` }}
+    >
+      <div className="absolute inset-0 bg-background/80 dark:bg-background/85 backdrop-blur-md" />
+      <div className="relative z-10 w-full min-h-screen flex items-center justify-center px-4 sm:px-6 py-10">
         <motion.div
           className="w-full max-w-md"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Card className="border-0 shadow-2xl bg-card/95 backdrop-blur-md dark:bg-card/80 dark:border-white/[0.06]">
+          <Card className="border border-border/80 shadow-2xl bg-card/90 backdrop-blur-xl dark:border-white/[0.08]">
             <CardHeader className="text-center space-y-4 pb-4 px-8 pt-10">
-              <motion.div
-                className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25"
-                initial={{ scale: 0, rotate: -30 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: "spring", stiffness: 220, damping: 18 }}
-              >
-                <ShieldCheck className="w-10 h-10 text-primary-foreground" />
-              </motion.div>
+              <div className="mx-auto mb-1 flex items-center justify-center">
+                <img
+                  src="/src/networking.png"
+                  alt="SupportAI Logo"
+                  className="h-14 w-auto object-contain drop-shadow-md rounded-lg"
+                />
+              </div>
 
               <motion.div
                 initial={{ opacity: 0, y: 10 }}

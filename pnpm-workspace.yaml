@@ -1,0 +1,8 @@
+packages:
+  - 'client/frontend'
+  - 'server'
+
+onlyBuiltDependencies:
+  - "@firebase/util"
+  - esbuild
+  - protobufjs

@@ -26,11 +26,6 @@ import {
 } from "lucide-react";
 
 import HeroSection from "./components/HeroSection";
-import HybridRagVisualizer from "./components/HybridRagVisualizer";
-import AgentCopilotSimulator from "./components/AgentCopilotSimulator";
-import TicketIntelligenceDashboard from "./components/TicketIntelligenceDashboard";
-import RoleExperienceSelector from "./components/RoleExperienceSelector";
-import LiveArchitectureShowcase from "./components/LiveArchitectureShowcase";
 
 function SupportAIWidget() {
   useEffect(() => {
@@ -124,17 +119,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2. Interactive Feature Matrix: Hybrid RAG & Knowledge Graph Visualizer */}
-      <HybridRagVisualizer />
 
-      {/* 3. Autonomous AI Copilot with Interactive HITL Approval Simulator */}
-      <AgentCopilotSimulator />
-
-      {/* 4. 11-Dimensional Ticket Intelligence Dashboard Mockup */}
-      <TicketIntelligenceDashboard />
-
-      {/* 5. Role-Based Experience Selector */}
-      <RoleExperienceSelector />
 
       {/* 6. Interactive ROI & Business Impact Calculator */}
       <section className="relative py-20 lg:py-28 bg-muted/10 border-t border-border/40">
@@ -293,8 +278,7 @@ export default function Home() {
         </div>
       </section>
     
-      {/* 7. Live Architecture Showcase: Tech stack, benchmarks, security */}
-      <LiveArchitectureShowcase />
+
 
       {/* 8. Enterprise Testimonials */}
       <section className="py-20 bg-background border-t border-border/40">

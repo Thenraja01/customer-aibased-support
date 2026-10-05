@@ -96,13 +96,13 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-white/[0.06] dark:shadow-lg dark:shadow-black/10">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to={isLoggedIn ? getDashboardPath() : "/"} className="flex items-center gap-2">
-          {brandLogo ? (
-            <img src={brandLogo} alt={brandName} className="h-7 w-auto" />
-          ) : (
-            <Bot className="h-6 w-6 text-primary" />
-          )}
-          <span className="text-xl font-bold">{brandName}</span>
+        <Link to={isLoggedIn ? getDashboardPath() : "/"} className="flex items-center gap-2.5">
+          <img
+            src={brandLogo || "/src/networking.png"}
+            alt={brandName}
+            className="h-8 w-8 object-contain rounded-lg shadow-sm"
+          />
+          <span className="text-xl font-bold tracking-tight">{brandName}</span>
         </Link>
 
         {isLoggedIn && (

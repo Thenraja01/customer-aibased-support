@@ -142,29 +142,29 @@ export default function Login() {
   }, [status]);
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-muted dark:from-background dark:via-background dark:to-primary/5">
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
+    <div
+      className="min-h-screen relative overflow-hidden bg-cover bg-center bg-no-repeat flex items-center justify-center"
+      style={{ backgroundImage: `url('/src/bg-aimodel.jpg')` }}
+    >
+      {/* Semi-transparent dark/light theme backdrop */}
+      <div className="absolute inset-0 bg-background/80 dark:bg-background/85 backdrop-blur-md" />
+
+      <div className="relative z-10 w-full min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
         <motion.div
           className="w-full max-w-md"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Card className="border-0 shadow-2xl bg-card/95 backdrop-blur-md px-6 sm:px-10 py-8 sm:py-10 dark:bg-card/80 dark:border-white/[0.06]">
+          <Card className="border border-border/80 shadow-2xl bg-card/90 backdrop-blur-xl px-6 sm:px-10 py-8 sm:py-10 dark:border-white/[0.08]">
             <CardHeader className="text-center space-y-3 pb-6">
-              {tenant?.logo?.url ? (
-                <div className="mx-auto mb-2">
-                  <img src={tenant.logo.url} alt={tenant.name || "Logo"} className="max-h-14 w-auto object-contain" />
-                </div>
-              ) : appSettings?.logo?.url ? (
-                <div className="mx-auto mb-2">
-                  <img src={appSettings.logo.url} alt={appSettings.app_name || "Logo"} className="max-h-14 w-auto object-contain" />
-                </div>
-              ) : (
-                <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25">
-                  <Award className="w-8 h-8 text-primary-foreground" />
-                </div>
-              )}
+              <div className="mx-auto mb-2 flex items-center justify-center">
+                <img
+                  src={tenant?.logo?.url || appSettings?.logo?.url || "/src/networking.png"}
+                  alt={tenant?.name || appSettings?.app_name || "SupportAI"}
+                  className="h-14 w-auto object-contain drop-shadow-md rounded-lg"
+                />
+              </div>
               <div>
                 <CardTitle className="text-2xl sm:text-3xl font-bold">
                   {tenant ? tenant.name || "Welcome" : appSettings?.login_page?.title || "Welcome Back"}
