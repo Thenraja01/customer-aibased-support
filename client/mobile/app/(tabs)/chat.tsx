@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../src/context/AuthContext";
-import { useSocket } from "../../src/context/SocketContext";
 import { useTheme } from "../../src/context/ThemeContext";
 import { apiClient } from "../../src/api/client";
 import {
@@ -23,7 +22,7 @@ import {
   Zap,
   ShieldCheck,
   Info,
-  Radio,
+  CheckCircle2,
 } from "lucide-react-native";
 
 interface Message {
@@ -35,17 +34,9 @@ interface Message {
   confidence?: number;
 }
 
-const QUICK_PROMPTS = [
-  "💳 Billing & Plan details",
-  "⚡ How to configure SSO",
-  "🛡️ Check open ticket status",
-  "📖 Hybrid RAG knowledge base",
-  "⚙️ API rate limits & keys",
-];
 
 export default function AIChatScreen() {
   const { user } = useAuth();
-  const { socket, isConnected } = useSocket();
   const { colors, appName, chatbotName, greetingMessage } = useTheme();
 
   const [chatId, setChatId] = useState<string | null>(null);
@@ -63,32 +54,7 @@ export default function AIChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  // Listen for real-time live messages from Socket.io
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on("chat_message", (data: any) => {
-      if (data.sender !== "user") {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: data._id || String(Date.now()),
-            sender: data.sender || "ai",
-            text: data.message || data.text,
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            citations: data.citations,
-            confidence: data.confidence || 98,
-          },
-        ]);
-        setIsTyping(false);
-      }
-    });
-
-    return () => {
-      socket.off("chat_message");
-    };
-  }, [socket]);
-
+  // Send message using direct HTTP REST API
   const handleSend = async (customPrompt?: string) => {
     const textToSend = customPrompt || inputText;
     if (!textToSend.trim() || isTyping) return;
@@ -134,13 +100,12 @@ export default function AIChatScreen() {
               "I have analyzed your request against the enterprise knowledge base.",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             citations: aiMsg.citations || [],
-            confidence: aiMsg.confidence || 98.4,
+            confidence: aiMsg.confidence ? Math.round(aiMsg.confidence * 100) : 98,
           },
         ]);
       }
     } catch (err: any) {
-      console.warn("AI chat request error:", err?.response?.data || err.message);
-      // User-friendly message instead of raw backend error strings
+      console.warn("AI chat HTTP error:", err?.response?.data || err.message);
       setMessages((prev) => [
         ...prev,
         {
@@ -176,19 +141,19 @@ export default function AIChatScreen() {
                 <Text style={[styles.title, { color: colors.text }]}>{chatbotName || appName} Copilot</Text>
                 <View style={[styles.ragPill, { backgroundColor: `${colors.accentEmerald}20`, borderColor: `${colors.accentEmerald}40` }]}>
                   <Sparkles size={10} color={colors.accentEmerald} />
-                  <Text style={[styles.ragPillText, { color: colors.accentEmerald }]}>RAG Ready</Text>
+                  <Text style={[styles.ragPillText, { color: colors.accentEmerald }]}>Hybrid RAG</Text>
                 </View>
               </View>
               <Text style={[styles.subtitle, { color: colors.textDim }]}>
-                {isConnected ? "Connected to Live WebSocket Stream" : "Connected via Verified REST Engine"}
+                Direct Enterprise HTTP REST Engine
               </Text>
             </View>
           </View>
 
           <View style={[styles.statusBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Radio size={12} color={isConnected ? colors.accentEmerald : colors.textDim} />
-            <Text style={[styles.statusBadgeText, { color: isConnected ? colors.accentEmerald : colors.textDim }]}>
-              {isConnected ? "Live" : "Ready"}
+            <CheckCircle2 size={12} color={colors.accentEmerald} />
+            <Text style={[styles.statusBadgeText, { color: colors.accentEmerald }]}>
+              Ready
             </Text>
           </View>
         </View>
@@ -282,26 +247,7 @@ export default function AIChatScreen() {
           }
         />
 
-        {/* Quick Suggestion Chips (Horizontally Scrollable) */}
-        <View style={styles.quickPromptsRow}>
-          <FlatList
-            horizontal
-            data={QUICK_PROMPTS}
-            keyExtractor={(item) => item}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickPromptsContent}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.quickPromptChip, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => handleSend(item.replace(/^[^\s]+\s/, ""))}
-                activeOpacity={0.8}
-              >
-                <Zap size={11} color={colors.primary} style={{ marginRight: 4 }} />
-                <Text style={[styles.quickPromptText, { color: colors.textMuted }]}>{item}</Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
+      
 
         {/* Input Bar */}
         <View style={[styles.inputContainer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>

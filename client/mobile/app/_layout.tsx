@@ -2,7 +2,6 @@ import React from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
-import { SocketProvider } from "../src/context/SocketContext";
 import { ThemeProvider, useTheme } from "../src/context/ThemeContext";
 import { ActivityIndicator, View } from "react-native";
 
@@ -46,11 +45,9 @@ function RootNavigation() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <SocketProvider>
-        <ThemeProvider>
-          <RootNavigation />
-        </ThemeProvider>
-      </SocketProvider>
+      <ThemeProvider>
+        <RootNavigation />
+      </ThemeProvider>
     </AuthProvider>
   );
 }
