@@ -10,4 +10,5 @@ build/
 server/uploads/
 uploads/
 inspect-db.js
-
+backup_supportai/
+.expo/
