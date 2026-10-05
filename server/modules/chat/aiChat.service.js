@@ -252,14 +252,19 @@ const buildConversationContext = (recentMessages) => {
   return result;
 };
 
-const createSystemMessage = async (chatId, senderId, content) =>
-  Message.create({
+const createSystemMessage = async (chatId, senderId, content) => {
+  const validSenderId = mongoose.Types.ObjectId.isValid(senderId) ? senderId : null;
+  return Message.create({
     chat_id: chatId,
-    sender_id: senderId,
+    sender_id: validSenderId,
     content,
     message_type: "text",
     is_ai: true,
-  }).catch(() => null);
+  }).catch((err) => {
+    console.error("[createSystemMessage] error:", err.message);
+    return null;
+  });
+};
 
 const stripInternalGuidance = (text) => {
   if (!text) return text;
@@ -995,8 +1000,13 @@ export const processAIMessage = async (params = {}) => {
     })
     .catch(() => null);
 
+  const aiMessageObj = aiMessage?.toObject ? aiMessage.toObject() : (aiMessage || {});
   return {
-    ...(aiMessage?.toObject ? aiMessage.toObject() : aiMessage),
+    ...aiMessageObj,
+    content: aiMessageObj.content || finalResponse,
+    chatId: chatId,
+    chat_id: chatId,
+    is_ai: true,
     confidence: confidenceResult.confidence,
     responseMode: responseMode.mode,
     citations,
