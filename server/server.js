@@ -59,7 +59,7 @@ process.on("unhandledRejection", (reason) => {
 
 const app = express();
 
-app.use(helmet({ 
+app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: false,
   xFrameOptions: false
@@ -176,7 +176,7 @@ const startServer = async () => {
 
     // Run database migrations for legacy document statuses and roles
     await runDocumentStatusMigration();
-    
+
     // Initialize Redis cache layer
     await initRedis();
 

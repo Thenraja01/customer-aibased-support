@@ -3,23 +3,22 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-// Dynamically determine host: works on Physical Devices (Expo Go via LAN), Android Emulator, iOS Simulator, and Web
 const getDevHost = () => {
   const debuggerHost =
     Constants.expoConfig?.hostUri ||
+    (Constants as any).expoGoConfig?.debuggerHost ||
     (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
     (Constants as any).manifest?.debuggerHost;
 
   if (debuggerHost) {
     const ip = debuggerHost.split(":")[0];
-    return `http://${ip}:3030`;
+    if (ip && ip !== "localhost" && ip !== "127.0.0.1") {
+      return `http://${ip}:3030`;
+    }
   }
 
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:3030";
-  }
-
-  return "http://localhost:3030";
+  // Active dev machine LAN IP
+  return "http://192.168.10.214:3030";
 };
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || getDevHost();
